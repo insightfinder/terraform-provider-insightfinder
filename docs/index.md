@@ -33,9 +33,9 @@ The provider supports authentication via:
 
 1. **Provider configuration** (shown above)
 2. **Environment variables**:
-   - `INSIGHTFINDER_USERNAME`
-   - `INSIGHTFINDER_LICENSE_KEY`
-   - `INSIGHTFINDER_BASE_URL`
+   - `IF_USERNAME`
+   - `IF_LICENSE_KEY`
+   - `IF_BASE_URL`
 
 ## Schema
 

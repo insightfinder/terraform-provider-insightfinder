@@ -74,9 +74,9 @@ The provider supports the following authentication methods:
 1. **Static credentials** (shown above)
 2. **Environment variables**:
    ```bash
-   export INSIGHTFINDER_USERNAME="your-username"
-   export INSIGHTFINDER_LICENSE_KEY="your-license-key"
-   export INSIGHTFINDER_BASE_URL="https://app.insightfinder.com"
+   export IF_USERNAME="your-username"
+   export IF_LICENSE_KEY="your-license-key"
+   export IF_BASE_URL="https://app.insightfinder.com"
    ```
 
 ### Example: Creating a Project

@@ -24,9 +24,9 @@ provider "insightfinder" {
 ## Using Environment Variables
 
 ```bash
-export INSIGHTFINDER_USERNAME="your-username"
-export INSIGHTFINDER_LICENSE_KEY="your-license-key"
-export INSIGHTFINDER_BASE_URL="https://app.insightfinder.com"
+export IF_USERNAME="your-username"
+export IF_LICENSE_KEY="your-license-key"
+export IF_BASE_URL="https://app.insightfinder.com"
 ```
 
 ```hcl
