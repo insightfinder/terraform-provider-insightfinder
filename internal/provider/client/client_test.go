@@ -145,11 +145,9 @@ func TestDoRequest(t *testing.T) {
 				}
 
 				w.WriteHeader(tt.serverStatus)
-				w.Write([]byte(tt.serverResponse))
+				_, _ = w.Write([]byte(tt.serverResponse))
 			}))
-			defer server.Close()
-
-			// Create client
+			defer server.Close() // Create client
 			client, err := NewClient(server.URL, "test_user", "test_key")
 			if err != nil {
 				t.Fatalf("Failed to create client: %v", err)
@@ -231,11 +229,9 @@ func TestDoFormRequest(t *testing.T) {
 				}
 
 				w.WriteHeader(tt.serverStatus)
-				w.Write([]byte(tt.serverResponse))
+				_, _ = w.Write([]byte(tt.serverResponse))
 			}))
-			defer server.Close()
-
-			// Create client
+			defer server.Close() // Create client
 			client, err := NewClient(server.URL, "test_user", "test_key")
 			if err != nil {
 				t.Fatalf("Failed to create client: %v", err)

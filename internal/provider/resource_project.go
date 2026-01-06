@@ -756,18 +756,6 @@ func (r *projectResource) Configure(_ context.Context, req resource.ConfigureReq
 	r.client = client
 }
 
-// initializeComputedFields sets null/empty values for all computed fields that are still unknown
-// This ensures Terraform doesn't error with "unknown value" after apply operations
-func initializeComputedFields(plan *projectResourceModel) {
-	// For fields that are Optional+Computed, if they're null (not set by user), keep them null
-	// This satisfies Terraform's requirement that all values must be known after apply
-
-	// The key is that fields marked as Computed: true MUST have a definite value (even if null)
-	// after create/update operations. They cannot remain "unknown".
-	// Since most of these fields are Optional+Computed and not set by the user,
-	// they'll already be null which is fine - we just need to ensure they're not "unknown"
-}
-
 // populateSettings converts the Terraform plan/state into a settings map for API calls
 func populateSettings(plan *projectResourceModel) map[string]interface{} {
 	// Helper function to parse JSON fields
@@ -1069,7 +1057,7 @@ func populateSettings(plan *projectResourceModel) map[string]interface{} {
 		if parsed := parseJSONField(plan.BaseValueSetting.ValueString()); parsed != nil {
 			// Marshal to JSON and unmarshal to the struct field
 			if jsonBytes, err := json.Marshal(parsed); err == nil {
-				json.Unmarshal(jsonBytes, &projectSettings.BaseValueSetting)
+				_ = json.Unmarshal(jsonBytes, &projectSettings.BaseValueSetting)
 			}
 		}
 	}
@@ -1079,21 +1067,21 @@ func populateSettings(plan *projectResourceModel) map[string]interface{} {
 	if !plan.EmailSetting.IsNull() {
 		if parsed := parseJSONField(plan.EmailSetting.ValueString()); parsed != nil {
 			if jsonBytes, err := json.Marshal(parsed); err == nil {
-				json.Unmarshal(jsonBytes, &projectSettings.EmailSetting)
+				_ = json.Unmarshal(jsonBytes, &projectSettings.EmailSetting)
 			}
 		}
 	}
 	if !plan.InstanceGroupingUpdate.IsNull() {
 		if parsed := parseJSONField(plan.InstanceGroupingUpdate.ValueString()); parsed != nil {
 			if jsonBytes, err := json.Marshal(parsed); err == nil {
-				json.Unmarshal(jsonBytes, &projectSettings.InstanceGroupingUpdate)
+				_ = json.Unmarshal(jsonBytes, &projectSettings.InstanceGroupingUpdate)
 			}
 		}
 	}
 	if !plan.LlmEvaluationSetting.IsNull() {
 		if parsed := parseJSONField(plan.LlmEvaluationSetting.ValueString()); parsed != nil {
 			if jsonBytes, err := json.Marshal(parsed); err == nil {
-				json.Unmarshal(jsonBytes, &projectSettings.LlmEvaluationSetting)
+				_ = json.Unmarshal(jsonBytes, &projectSettings.LlmEvaluationSetting)
 			}
 		}
 	}
