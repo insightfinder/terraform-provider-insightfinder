@@ -182,7 +182,7 @@ func (r *logLabelsResource) Read(ctx context.Context, req resource.ReadRequest, 
 	}
 
 	// If no labels exist, remove from state
-	if currentLabels == nil || len(currentLabels) == 0 {
+	if len(currentLabels) == 0 {
 		resp.State.RemoveResource(ctx)
 		return
 	}
