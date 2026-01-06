@@ -1,0 +1,87 @@
+# Binaries for programs and plugins
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+terraform-provider-insightfinder
+
+# Test binary, built with `go test -c`
+*.test
+
+# Output of the go coverage tool
+*.out
+coverage.txt
+
+# Dependency directories
+vendor/
+
+# Go workspace file
+go.work
+
+# Terraform files
+*.tfstate
+*.tfstate.*
+*.tfvars
+*.tfvars.json
+.terraform/
+.terraform.lock.hcl
+crash.log
+crash.*.log
+
+# Terraform CLI configuration
+.terraformrc
+terraformrc
+
+# Exclude terraform module/test directories to be removed
+terraform-module/
+test-conviva/
+conviva.tf
+
+# IDE
+.idea/
+*.swp
+*.swo
+*~
+.vscode/
+.project
+.settings/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Local dev overrides
+override.tf
+override.tf.json
+*_override.tf
+*_override.tf.json
+
+# Sensitive data files
+*.pem
+*.key
+*.crt
+secrets/
+
+# Build artifacts
+dist/
+bin/
+*.zip
+*.tar.gz
+
+# Logs
+*.log
+logs/
+
+# Temporary files
+tmp/
+temp/
+
+# Test artifacts
+terraform-apply-logs/
+outputs/
+
+# Environment files
+.env
+.env.local
+
