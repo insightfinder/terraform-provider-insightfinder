@@ -1,6 +1,5 @@
 ---
 page_title: "InsightFinder Provider"
-subcategory: ""
 description: |-
   The InsightFinder provider allows you to manage InsightFinder resources using Terraform.
 ---
