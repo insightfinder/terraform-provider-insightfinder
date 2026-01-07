@@ -1972,7 +1972,7 @@ func (r *projectResource) Read(ctx context.Context, req resource.ReadRequest, re
 		// Keep existing state if we can't read from API
 	} else if logLabels != nil {
 		// Convert API response to state model, preserving the order from existing state
-		state.LogLabelSettings = convertLogLabelsToStateWithOrder(logLabels, state.LogLabelSettings)
+		state.LogLabelSettings = convertLogLabelsToState(logLabels, state.LogLabelSettings)
 	}
 
 	diags = resp.State.Set(ctx, &state)
@@ -2328,13 +2328,8 @@ func normalizeJSON(jsonStr string) string {
 }
 
 // convertLogLabelsToState converts API log labels response to Terraform state model
-func convertLogLabelsToState(apiLabels map[string]string) []logLabelSettingModel {
-	return convertLogLabelsToStateWithOrder(apiLabels, nil)
-}
-
-// convertLogLabelsToStateWithOrder converts API log labels response to Terraform state model
 // while preserving the order from existing state when possible
-func convertLogLabelsToStateWithOrder(apiLabels map[string]string, existingState []logLabelSettingModel) []logLabelSettingModel {
+func convertLogLabelsToState(apiLabels map[string]string, existingState []logLabelSettingModel) []logLabelSettingModel {
 	var result []logLabelSettingModel
 
 	// Map from API field names to label types
