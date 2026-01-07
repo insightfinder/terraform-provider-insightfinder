@@ -1971,8 +1971,8 @@ func (r *projectResource) Read(ctx context.Context, req resource.ReadRequest, re
 		tflog.Warn(ctx, "Could not read log labels", map[string]any{"error": err.Error()})
 		// Keep existing state if we can't read from API
 	} else if logLabels != nil {
-		// Convert API response to state model
-		state.LogLabelSettings = convertLogLabelsToState(logLabels)
+		// Convert API response to state model, preserving the order from existing state
+		state.LogLabelSettings = convertLogLabelsToState(logLabels, state.LogLabelSettings)
 	}
 
 	diags = resp.State.Set(ctx, &state)
@@ -2328,7 +2328,8 @@ func normalizeJSON(jsonStr string) string {
 }
 
 // convertLogLabelsToState converts API log labels response to Terraform state model
-func convertLogLabelsToState(apiLabels map[string]string) []logLabelSettingModel {
+// while preserving the order from existing state when possible
+func convertLogLabelsToState(apiLabels map[string]string, existingState []logLabelSettingModel) []logLabelSettingModel {
 	var result []logLabelSettingModel
 
 	// Map from API field names to label types
@@ -2336,6 +2337,9 @@ func convertLogLabelsToState(apiLabels map[string]string) []logLabelSettingModel
 		"whitelist":                "whitelist",
 		"trainingWhitelist":        "trainingWhitelist",
 		"trainingBlacklistLabels":  "blacklist",
+		"featurelist":              "featurelist",
+		"incidentlist":             "incidentlist",
+		"triagelist":               "triagelist",
 		"patternNameLabels":        "patternName",
 		"patternSignatureLabels":   "patternSignature",
 		"patternMatchRegexLabels":  "patternMatchRegex",
@@ -2345,54 +2349,112 @@ func convertLogLabelsToState(apiLabels map[string]string) []logLabelSettingModel
 		"logSeverityLabels":        "logSeverity",
 		"logStatusCodeLabels":      "logStatusCode",
 		"alertEventTypeLabels":     "alertEventType",
+		"anomalyFeatureLabels":     "anomalyFeature",
+		"dataFilterLabels":         "dataFilter",
+		"instanceNameLabels":       "instanceName",
+		"dataQualityCheckLabels":   "dataQualityCheck",
+		"extractionBlacklist":      "extractionBlacklist",
 	}
 
-	// Define a consistent order for label types to avoid drift
-	// This matches the most common usage order
-	labelTypeOrder := []string{
-		"whitelist",
-		"trainingWhitelist",
-		"blacklist",
-		"patternName",
-		"patternSignature",
-		"patternMatchRegex",
-		"patternIgnoreRegex",
-		"customAction",
-		"logEventID",
-		"logSeverity",
-		"logStatusCode",
-		"alertEventType",
+	// Reverse map for looking up API fields from label types
+	labelTypeToAPIField := make(map[string]string)
+	for apiField, labelType := range apiFieldToLabelType {
+		labelTypeToAPIField[labelType] = apiField
 	}
 
-	// Process in the defined order to ensure consistency
-	for _, labelType := range labelTypeOrder {
-		// Find the API field for this label type
-		var apiField string
-		for field, lt := range apiFieldToLabelType {
-			if lt == labelType {
-				apiField = field
-				break
+	// Create a map of API data for quick lookup
+	apiDataMap := make(map[string]string)
+	for apiField, jsonString := range apiLabels {
+		if labelType, ok := apiFieldToLabelType[apiField]; ok {
+			if jsonString != "" && jsonString != "[]" {
+				apiDataMap[labelType] = normalizeJSON(jsonString)
+			}
+		}
+	}
+
+	// If we have existing state, preserve its order and only include items that exist in API
+	if len(existingState) > 0 {
+		processedTypes := make(map[string]bool)
+
+		// First pass: preserve order from existing state
+		for _, existing := range existingState {
+			labelType := existing.LabelType.ValueString()
+			if normalizedJSON, ok := apiDataMap[labelType]; ok {
+				result = append(result, logLabelSettingModel{
+					LabelType:      types.StringValue(labelType),
+					LogLabelString: types.StringValue(normalizedJSON),
+				})
+				processedTypes[labelType] = true
 			}
 		}
 
-		if apiField == "" {
-			continue
+		// Second pass: add any new types from API that weren't in existing state
+		// Use a consistent order for new types
+		defaultOrder := []string{
+			"trainingWhitelist",
+			"featurelist",
+			"incidentlist",
+			"triagelist",
+			"patternName",
+			"whitelist",
+			"blacklist",
+			"patternSignature",
+			"patternMatchRegex",
+			"patternIgnoreRegex",
+			"customAction",
+			"logEventID",
+			"logSeverity",
+			"logStatusCode",
+			"alertEventType",
+			"anomalyFeature",
+			"dataFilter",
+			"instanceName",
+			"dataQualityCheck",
+			"extractionBlacklist",
 		}
 
-		// Check if this field exists in the API response
-		jsonString, ok := apiLabels[apiField]
-		if !ok {
-			continue
+		for _, labelType := range defaultOrder {
+			if !processedTypes[labelType] {
+				if normalizedJSON, ok := apiDataMap[labelType]; ok {
+					result = append(result, logLabelSettingModel{
+						LabelType:      types.StringValue(labelType),
+						LogLabelString: types.StringValue(normalizedJSON),
+					})
+				}
+			}
+		}
+	} else {
+		// No existing state, use default order
+		labelTypeOrder := []string{
+			"trainingWhitelist",
+			"featurelist",
+			"incidentlist",
+			"triagelist",
+			"patternName",
+			"whitelist",
+			"blacklist",
+			"patternSignature",
+			"patternMatchRegex",
+			"patternIgnoreRegex",
+			"customAction",
+			"logEventID",
+			"logSeverity",
+			"logStatusCode",
+			"alertEventType",
+			"anomalyFeature",
+			"dataFilter",
+			"instanceName",
+			"dataQualityCheck",
+			"extractionBlacklist",
 		}
 
-		// Check if the JSON string is not empty or "[]"
-		if jsonString != "" && jsonString != "[]" {
-			// Normalize JSON formatting for consistency
-			normalizedJSON := normalizeJSON(jsonString)
-			result = append(result, logLabelSettingModel{
-				LabelType:      types.StringValue(labelType),
-				LogLabelString: types.StringValue(normalizedJSON),
-			})
+		for _, labelType := range labelTypeOrder {
+			if normalizedJSON, ok := apiDataMap[labelType]; ok {
+				result = append(result, logLabelSettingModel{
+					LabelType:      types.StringValue(labelType),
+					LogLabelString: types.StringValue(normalizedJSON),
+				})
+			}
 		}
 	}
 
