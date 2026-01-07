@@ -9,6 +9,7 @@ import (
 	"encoding/json"
 	"fmt"
 
+	"github.com/hashicorp/terraform-plugin-framework/attr"
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
@@ -151,15 +152,15 @@ type projectResourceModel struct {
 	ZoneNameKey                  types.String `tfsdk:"zone_name_key"`
 
 	// Complex object fields (will use types.String for JSON encoding)
-	BaseValueSetting       types.String           `tfsdk:"base_value_setting"`
-	CdfSetting             types.String           `tfsdk:"cdf_setting"`
-	EmailSetting           types.String           `tfsdk:"email_setting"`
-	InstanceGroupingUpdate types.String           `tfsdk:"instance_grouping_update"`
-	LlmEvaluationSetting   types.String           `tfsdk:"llm_evaluation_setting"`
-	LogToLogSettingList    types.String           `tfsdk:"log_to_log_setting_list"`
-	WebhookHeaderList      types.String           `tfsdk:"webhook_header_list"`
-	SharedUsernames        types.String           `tfsdk:"shared_usernames"`
-	LogLabelSettings       []logLabelSettingModel `tfsdk:"log_label_settings"`
+	BaseValueSetting       types.String `tfsdk:"base_value_setting"`
+	CdfSetting             types.String `tfsdk:"cdf_setting"`
+	EmailSetting           types.String `tfsdk:"email_setting"`
+	InstanceGroupingUpdate types.String `tfsdk:"instance_grouping_update"`
+	LlmEvaluationSetting   types.String `tfsdk:"llm_evaluation_setting"`
+	LogToLogSettingList    types.String `tfsdk:"log_to_log_setting_list"`
+	WebhookHeaderList      types.String `tfsdk:"webhook_header_list"`
+	SharedUsernames        types.String `tfsdk:"shared_usernames"`
+	LogLabelSettings       types.List   `tfsdk:"log_label_settings"`
 }
 
 type projectCreationConfigModel struct {
@@ -1688,45 +1689,72 @@ func (r *projectResource) Create(ctx context.Context, req resource.CreateRequest
 	}
 
 	// Process log_label_settings if provided - each setting must be applied individually
-	if len(config.LogLabelSettings) > 0 {
-		tflog.Info(ctx, "Processing log label settings", map[string]any{"count": len(config.LogLabelSettings)})
-
-		// Convert terraform model to client model
-		settings := make([]*client.LogLabelSetting, 0, len(config.LogLabelSettings))
-		for _, setting := range config.LogLabelSettings {
-			settings = append(settings, &client.LogLabelSetting{
-				LabelType:      setting.LabelType.ValueString(),
-				LogLabelString: setting.LogLabelString.ValueString(),
-			})
-		}
-
-		// Apply all settings (function will iterate and call API for each)
-		err := r.client.CreateOrUpdateLogLabels(
-			plan.ProjectName.ValueString(),
-			r.client.Username,
-			settings,
-		)
-		if err != nil {
-			resp.Diagnostics.AddError(
-				"Error applying log label settings",
-				fmt.Sprintf("Could not apply log label settings: %s", err.Error()),
-			)
+	if !config.LogLabelSettings.IsNull() && !config.LogLabelSettings.IsUnknown() {
+		var configSettings []logLabelSettingModel
+		diags = config.LogLabelSettings.ElementsAs(ctx, &configSettings, false)
+		resp.Diagnostics.Append(diags...)
+		if resp.Diagnostics.HasError() {
 			return
 		}
 
-		// Use config values in state (normalized for consistency)
-		// Note: GetLogLabels uses a different endpoint that may not immediately reflect changes
-		normalizedSettings := make([]logLabelSettingModel, 0, len(config.LogLabelSettings))
-		for _, setting := range config.LogLabelSettings {
-			normalizedSettings = append(normalizedSettings, logLabelSettingModel{
-				LabelType:      setting.LabelType,
-				LogLabelString: types.StringValue(normalizeJSON(setting.LogLabelString.ValueString())),
-			})
+		if len(configSettings) > 0 {
+			tflog.Info(ctx, "Processing log label settings", map[string]any{"count": len(configSettings)})
+
+			// Convert terraform model to client model
+			settings := make([]*client.LogLabelSetting, 0, len(configSettings))
+			for _, setting := range configSettings {
+				settings = append(settings, &client.LogLabelSetting{
+					LabelType:      setting.LabelType.ValueString(),
+					LogLabelString: setting.LogLabelString.ValueString(),
+				})
+			}
+
+			// Apply all settings (function will iterate and call API for each)
+			err := r.client.CreateOrUpdateLogLabels(
+				plan.ProjectName.ValueString(),
+				r.client.Username,
+				settings,
+			)
+			if err != nil {
+				resp.Diagnostics.AddError(
+					"Error applying log label settings",
+					fmt.Sprintf("Could not apply log label settings: %s", err.Error()),
+				)
+				return
+			}
+
+			// Use config values in state (normalized for consistency)
+			// Note: GetLogLabels uses a different endpoint that may not immediately reflect changes
+			normalizedSettings := make([]logLabelSettingModel, 0, len(configSettings))
+			for _, setting := range configSettings {
+				normalizedSettings = append(normalizedSettings, logLabelSettingModel{
+					LabelType:      setting.LabelType,
+					LogLabelString: types.StringValue(normalizeJSON(setting.LogLabelString.ValueString())),
+				})
+			}
+
+			// Convert back to types.List
+			listValue, diags := types.ListValueFrom(ctx, config.LogLabelSettings.ElementType(ctx), normalizedSettings)
+			resp.Diagnostics.Append(diags...)
+			if resp.Diagnostics.HasError() {
+				return
+			}
+			plan.LogLabelSettings = listValue
 		}
-		plan.LogLabelSettings = normalizedSettings
-	} else if len(config.LogLabelSettings) == 0 {
-		// Explicitly set empty list if none configured
-		plan.LogLabelSettings = []logLabelSettingModel{}
+	}
+
+	// If LogLabelSettings is null or empty, set it to an empty list
+	if config.LogLabelSettings.IsNull() {
+		emptyList, diags := types.ListValueFrom(ctx, types.ObjectType{
+			AttrTypes: map[string]attr.Type{
+				"label_type":       types.StringType,
+				"log_label_string": types.StringType,
+			},
+		}, []logLabelSettingModel{})
+		resp.Diagnostics.Append(diags...)
+		if !resp.Diagnostics.HasError() {
+			plan.LogLabelSettings = emptyList
+		}
 	}
 
 	// SystemName and ProjectCreationConfig are config-only (not returned by API)
@@ -1971,8 +1999,30 @@ func (r *projectResource) Read(ctx context.Context, req resource.ReadRequest, re
 		tflog.Warn(ctx, "Could not read log labels", map[string]any{"error": err.Error()})
 		// Keep existing state if we can't read from API
 	} else if logLabels != nil {
+		// Extract existing state for comparison
+		var existingSettings []logLabelSettingModel
+		if !state.LogLabelSettings.IsNull() && !state.LogLabelSettings.IsUnknown() {
+			diags = state.LogLabelSettings.ElementsAs(ctx, &existingSettings, false)
+			resp.Diagnostics.Append(diags...)
+			if resp.Diagnostics.HasError() {
+				return
+			}
+		}
+
 		// Convert API response to state model, preserving the order from existing state
-		state.LogLabelSettings = convertLogLabelsToState(logLabels, state.LogLabelSettings)
+		convertedSettings := convertLogLabelsToState(logLabels, existingSettings)
+
+		// Convert back to types.List
+		listValue, diags := types.ListValueFrom(ctx, types.ObjectType{
+			AttrTypes: map[string]attr.Type{
+				"label_type":       types.StringType,
+				"log_label_string": types.StringType,
+			},
+		}, convertedSettings)
+		resp.Diagnostics.Append(diags...)
+		if !resp.Diagnostics.HasError() {
+			state.LogLabelSettings = listValue
+		}
 	}
 
 	diags = resp.State.Set(ctx, &state)
@@ -2228,38 +2278,55 @@ func (r *projectResource) Update(ctx context.Context, req resource.UpdateRequest
 	}
 
 	// Process log_label_settings if provided - each setting must be applied individually
-	if len(config.LogLabelSettings) > 0 {
-		tflog.Info(ctx, "Processing log label settings", map[string]any{"count": len(config.LogLabelSettings)})
-
-		// Convert terraform model to client model
-		settings := make([]*client.LogLabelSetting, 0, len(config.LogLabelSettings))
-		for _, setting := range config.LogLabelSettings {
-			settings = append(settings, &client.LogLabelSetting{
-				LabelType:      setting.LabelType.ValueString(),
-				LogLabelString: setting.LogLabelString.ValueString(),
-			})
-		}
-
-		// Apply all settings (function will iterate and call API for each)
-		err := r.client.CreateOrUpdateLogLabels(
-			plan.ProjectName.ValueString(),
-			r.client.Username,
-			settings,
-		)
-		if err != nil {
-			resp.Diagnostics.AddError(
-				"Error applying log label settings",
-				fmt.Sprintf("Could not apply log label settings: %s", err.Error()),
-			)
+	if !config.LogLabelSettings.IsNull() && !config.LogLabelSettings.IsUnknown() {
+		var configSettings []logLabelSettingModel
+		diags = config.LogLabelSettings.ElementsAs(ctx, &configSettings, false)
+		resp.Diagnostics.Append(diags...)
+		if resp.Diagnostics.HasError() {
 			return
 		}
 
-		// Log labels applied successfully
-		// Note: plan.LogLabelSettings already contains the correct values from the plan
-		// We don't need to modify it since Terraform has already normalized them
-	} else if len(config.LogLabelSettings) == 0 {
+		if len(configSettings) > 0 {
+			tflog.Info(ctx, "Processing log label settings", map[string]any{"count": len(configSettings)})
+
+			// Convert terraform model to client model
+			settings := make([]*client.LogLabelSetting, 0, len(configSettings))
+			for _, setting := range configSettings {
+				settings = append(settings, &client.LogLabelSetting{
+					LabelType:      setting.LabelType.ValueString(),
+					LogLabelString: setting.LogLabelString.ValueString(),
+				})
+			}
+
+			// Apply all settings (function will iterate and call API for each)
+			err := r.client.CreateOrUpdateLogLabels(
+				plan.ProjectName.ValueString(),
+				r.client.Username,
+				settings,
+			)
+			if err != nil {
+				resp.Diagnostics.AddError(
+					"Error applying log label settings",
+					fmt.Sprintf("Could not apply log label settings: %s", err.Error()),
+				)
+				return
+			}
+
+			// Log labels applied successfully - use config values
+			plan.LogLabelSettings = config.LogLabelSettings
+		}
+	} else if config.LogLabelSettings.IsNull() {
 		// Explicitly set empty list if none configured
-		plan.LogLabelSettings = []logLabelSettingModel{}
+		emptyList, diags := types.ListValueFrom(ctx, types.ObjectType{
+			AttrTypes: map[string]attr.Type{
+				"label_type":       types.StringType,
+				"log_label_string": types.StringType,
+			},
+		}, []logLabelSettingModel{})
+		resp.Diagnostics.Append(diags...)
+		if !resp.Diagnostics.HasError() {
+			plan.LogLabelSettings = emptyList
+		}
 	}
 
 	// Preserve config-only fields that don't come from API
