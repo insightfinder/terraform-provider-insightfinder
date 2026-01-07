@@ -5,6 +5,16 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.1.0] - 2026-01-07
+
+### Fixed
+- **insightfinder_project**: Fixed state drift issue with log_label_settings
+  - Added support for missing label types: `featurelist`, `incidentlist`, `triagelist`, `anomalyFeature`, `dataFilter`, `instanceName`, `dataQualityCheck`, and `extractionBlacklist`
+  - Implemented order-preserving logic to maintain user-specified order of log_label_settings from configuration
+  - Prevents false change detection when API returns labels in different order than specified in Terraform configuration
+  - Resolves issue where `terraform plan` would continuously show changes even after `terraform apply`
+  - Removed unused wrapper function to fix linter errors
+
 ## [1.0.1] - 2026-01-07
 
 ### Fixed

@@ -7,7 +7,12 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/url"
+	"sync"
 )
+
+// logLabelMutex ensures log label operations are serialized to prevent race conditions
+// when multiple projects are being created/updated simultaneously
+var logLabelMutex sync.Mutex
 
 // LogLabelSetting represents a log label configuration
 type LogLabelSetting struct {
@@ -65,6 +70,10 @@ func (c *Client) GetLogLabels(projectName, username string) (map[string]string, 
 
 // CreateOrUpdateLogLabels creates or updates log labels for a project
 func (c *Client) CreateOrUpdateLogLabels(projectName, username string, settings []*LogLabelSetting) error {
+	// Lock to prevent race conditions when multiple projects are setting labels simultaneously
+	logLabelMutex.Lock()
+	defer logLabelMutex.Unlock()
+
 	// API endpoint for log labels
 	path := fmt.Sprintf("/api/external/v1/watch-tower-setting?projectName=%s&customerName=%s",
 		url.QueryEscape(projectName),
