@@ -164,11 +164,10 @@ type projectResourceModel struct {
 }
 
 type projectCreationConfigModel struct {
-	DataType            types.String `tfsdk:"data_type"`
-	InstanceType        types.String `tfsdk:"instance_type"`
-	ProjectCloudType    types.String `tfsdk:"project_cloud_type"`
-	InsightAgentType    types.String `tfsdk:"insight_agent_type"`
-	ProjectCreationType types.String `tfsdk:"project_creation_type"`
+	DataType         types.String `tfsdk:"data_type"`
+	InstanceType     types.String `tfsdk:"instance_type"`
+	ProjectCloudType types.String `tfsdk:"project_cloud_type"`
+	InsightAgentType types.String `tfsdk:"insight_agent_type"`
 }
 
 // Metadata returns the resource type name.
@@ -242,11 +241,6 @@ func (r *projectResource) Schema(_ context.Context, _ resource.SchemaRequest, re
 					},
 					"insight_agent_type": schema.StringAttribute{
 						Description: "The InsightFinder agent type.",
-						Optional:    true,
-						Computed:    true,
-					},
-					"project_creation_type": schema.StringAttribute{
-						Description: "The project creation type.",
 						Optional:    true,
 						Computed:    true,
 					},
@@ -1133,7 +1127,6 @@ func (r *projectResource) Create(ctx context.Context, req resource.CreateRequest
 		InstanceType:        plan.ProjectCreationConfig.InstanceType.ValueString(),
 		ProjectCloudType:    plan.ProjectCreationConfig.ProjectCloudType.ValueString(),
 		InsightAgentType:    plan.ProjectCreationConfig.InsightAgentType.ValueString(),
-		ProjectCreationType: plan.ProjectCreationConfig.ProjectCreationType.ValueString(),
 		CValue:              int(plan.CValue.ValueInt64()),
 		PValue:              plan.PValue.ValueFloat64(),
 	}
