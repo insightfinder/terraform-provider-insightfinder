@@ -1120,15 +1120,15 @@ func (r *projectResource) Create(ctx context.Context, req resource.CreateRequest
 
 	// Create the project via API
 	projectConfig := &client.ProjectConfig{
-		ProjectName:         plan.ProjectName.ValueString(),
-		ProjectDisplayName:  plan.ProjectDisplayName.ValueString(),
-		SystemName:          plan.SystemName.ValueString(),
-		DataType:            plan.ProjectCreationConfig.DataType.ValueString(),
-		InstanceType:        plan.ProjectCreationConfig.InstanceType.ValueString(),
-		ProjectCloudType:    plan.ProjectCreationConfig.ProjectCloudType.ValueString(),
-		InsightAgentType:    plan.ProjectCreationConfig.InsightAgentType.ValueString(),
-		CValue:              int(plan.CValue.ValueInt64()),
-		PValue:              plan.PValue.ValueFloat64(),
+		ProjectName:        plan.ProjectName.ValueString(),
+		ProjectDisplayName: plan.ProjectDisplayName.ValueString(),
+		SystemName:         plan.SystemName.ValueString(),
+		DataType:           plan.ProjectCreationConfig.DataType.ValueString(),
+		InstanceType:       plan.ProjectCreationConfig.InstanceType.ValueString(),
+		ProjectCloudType:   plan.ProjectCreationConfig.ProjectCloudType.ValueString(),
+		InsightAgentType:   plan.ProjectCreationConfig.InsightAgentType.ValueString(),
+		CValue:             int(plan.CValue.ValueInt64()),
+		PValue:             plan.PValue.ValueFloat64(),
 	}
 
 	err := r.client.CreateProject(projectConfig)
