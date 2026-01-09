@@ -5,6 +5,15 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.2.1] - 2026-01-09
+
+### Removed
+- **insightfinder_project**: Completely removed `project_creation_type` attribute
+  - Removed from resource schema definition
+  - Removed from internal structs and client code
+  - Removed from all test configurations
+  - This field was not needed for project creation and has been eliminated to simplify the API
+
 ## [1.2.0] - 2026-01-07
 
 ### Fixed
