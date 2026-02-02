@@ -12,17 +12,16 @@ import (
 
 // ProjectConfig represents a project configuration
 type ProjectConfig struct {
-	ProjectName         string                 `json:"projectName"`
-	ProjectDisplayName  string                 `json:"projectDisplayName,omitempty"`
-	SystemName          string                 `json:"systemName"`
-	DataType            string                 `json:"dataType"`
-	InstanceType        string                 `json:"instanceType"`
-	ProjectCloudType    string                 `json:"projectCloudType"`
-	InsightAgentType    string                 `json:"insightAgentType,omitempty"`
-	ProjectCreationType string                 `json:"projectCreationType,omitempty"`
-	CValue              int                    `json:"cValue,omitempty"`
-	PValue              float64                `json:"pValue,omitempty"`
-	Settings            map[string]interface{} `json:"settings,omitempty"`
+	ProjectName        string                 `json:"projectName"`
+	ProjectDisplayName string                 `json:"projectDisplayName,omitempty"`
+	SystemName         string                 `json:"systemName"`
+	DataType           string                 `json:"dataType"`
+	InstanceType       string                 `json:"instanceType"`
+	ProjectCloudType   string                 `json:"projectCloudType"`
+	InsightAgentType   string                 `json:"insightAgentType,omitempty"`
+	CValue             int                    `json:"cValue,omitempty"`
+	PValue             float64                `json:"pValue,omitempty"`
+	Settings           map[string]interface{} `json:"settings,omitempty"`
 }
 
 // Settings fields struct
@@ -266,9 +265,6 @@ func (c *Client) CreateProject(project *ProjectConfig) error {
 	}
 	if project.InsightAgentType != "" {
 		formData.Set("insightAgentType", project.InsightAgentType)
-	}
-	if project.ProjectCreationType != "" {
-		formData.Set("projectCreationType", project.ProjectCreationType)
 	}
 
 	body, statusCode, err := c.DoFormRequest("POST", "/api/v1/check-and-add-custom-project", formData)

@@ -106,7 +106,6 @@ resource "insightfinder_project" "test" {
     instance_type           = "PrivateCloud"
     project_cloud_type      = "PrivateCloud"
     insight_agent_type      = "LogStreaming"
-    project_creation_type   = "Kafka"
     sampling_interval       = 10
     sampling_interval_in_seconds = 600
   }
@@ -126,7 +125,6 @@ resource "insightfinder_project" "test" {
     instance_type           = "PrivateCloud"
     project_cloud_type      = "PrivateCloud"
     insight_agent_type      = "LogStreaming"
-    project_creation_type   = "Kafka"
     sampling_interval       = 10
     sampling_interval_in_seconds = 600
   }
@@ -148,7 +146,6 @@ resource "insightfinder_project" "test" {
     instance_type           = "PrivateCloud"
     project_cloud_type      = "PrivateCloud"
     insight_agent_type      = "LogStreaming"
-    project_creation_type   = "Kafka"
     sampling_interval       = 10
     sampling_interval_in_seconds = 600
   }
@@ -173,7 +170,6 @@ resource "insightfinder_project" "test" {
     instance_type           = "PrivateCloud"
     project_cloud_type      = "PrivateCloud"
     insight_agent_type      = "LogStreaming"
-    project_creation_type   = "Kafka"
     sampling_interval       = 10
     sampling_interval_in_seconds = 600
   }
