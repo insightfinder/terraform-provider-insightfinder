@@ -16,6 +16,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/types"
+	"github.com/hashicorp/terraform-plugin-framework/types/basetypes"
 	"github.com/hashicorp/terraform-plugin-log/tflog"
 
 	"github.com/insightfinder/terraform-provider-insightfinder/internal/provider/client"
@@ -152,15 +153,16 @@ type projectResourceModel struct {
 	ZoneNameKey                  types.String `tfsdk:"zone_name_key"`
 
 	// Complex object fields (will use types.String for JSON encoding)
-	BaseValueSetting       types.String `tfsdk:"base_value_setting"`
-	CdfSetting             types.String `tfsdk:"cdf_setting"`
-	EmailSetting           types.String `tfsdk:"email_setting"`
-	InstanceGroupingUpdate types.String `tfsdk:"instance_grouping_update"`
-	LlmEvaluationSetting   types.String `tfsdk:"llm_evaluation_setting"`
-	LogToLogSettingList    types.String `tfsdk:"log_to_log_setting_list"`
-	WebhookHeaderList      types.String `tfsdk:"webhook_header_list"`
-	SharedUsernames        types.String `tfsdk:"shared_usernames"`
-	LogLabelSettings       types.List   `tfsdk:"log_label_settings"`
+	BaseValueSetting          types.String `tfsdk:"base_value_setting"`
+	CdfSetting                types.String `tfsdk:"cdf_setting"`
+	EmailSetting              types.String `tfsdk:"email_setting"`
+	InstanceGroupingUpdate    types.String `tfsdk:"instance_grouping_update"`
+	LlmEvaluationSetting      types.String `tfsdk:"llm_evaluation_setting"`
+	LogToLogSettingList       types.String `tfsdk:"log_to_log_setting_list"`
+	WebhookHeaderList         types.String `tfsdk:"webhook_header_list"`
+	SharedUsernames           types.String `tfsdk:"shared_usernames"`
+	LogLabelSettings          types.List   `tfsdk:"log_label_settings"`
+	ProjectServiceNowSettings types.Object `tfsdk:"project_servicenow_settings"`
 }
 
 type projectCreationConfigModel struct {
@@ -168,6 +170,20 @@ type projectCreationConfigModel struct {
 	InstanceType     types.String `tfsdk:"instance_type"`
 	ProjectCloudType types.String `tfsdk:"project_cloud_type"`
 	InsightAgentType types.String `tfsdk:"insight_agent_type"`
+}
+
+type projectServiceNowSettingsModel struct {
+	Host               types.String `tfsdk:"host"`
+	SysparmQuery       types.String `tfsdk:"sysparm_query"`
+	Proxy              types.String `tfsdk:"proxy"`
+	ServiceNowUser     types.String `tfsdk:"servicenow_user"`
+	ServiceNowPassword types.String `tfsdk:"servicenow_password"`
+	InstanceField      types.String `tfsdk:"instance_field"`
+	InstanceFieldRegex types.String `tfsdk:"instance_field_regex"`
+	TimestampFormat    types.String `tfsdk:"timestamp_format"`
+	ClientID           types.String `tfsdk:"client_id"`
+	ClientSecret       types.String `tfsdk:"client_secret"`
+	AdditionalFields   types.List   `tfsdk:"additional_fields"`
 }
 
 // Metadata returns the resource type name.
@@ -726,6 +742,68 @@ func (r *projectResource) Schema(_ context.Context, _ resource.SchemaRequest, re
 							Description: "The log label value/pattern",
 							Required:    true,
 						},
+					},
+				},
+			},
+			"project_servicenow_settings": schema.SingleNestedAttribute{
+				Description: "ServiceNow third-party settings for the project. Only applies when project_cloud_type is 'ServiceNow' (case insensitive).",
+				Optional:    true,
+				Computed:    true,
+				Attributes: map[string]schema.Attribute{
+					"host": schema.StringAttribute{
+						Description: "ServiceNow instance host URL",
+						Required:    true,
+					},
+					"sysparm_query": schema.StringAttribute{
+						Description: "ServiceNow query parameter",
+						Optional:    true,
+						Computed:    true,
+					},
+					"proxy": schema.StringAttribute{
+						Description: "Proxy URL for ServiceNow connection",
+						Optional:    true,
+						Computed:    true,
+					},
+					"servicenow_user": schema.StringAttribute{
+						Description: "ServiceNow username for authentication",
+						Required:    true,
+					},
+					"servicenow_password": schema.StringAttribute{
+						Description: "ServiceNow password for authentication",
+						Required:    true,
+						Sensitive:   true,
+					},
+					"instance_field": schema.StringAttribute{
+						Description: "Field to use for instance identification",
+						Optional:    true,
+						Computed:    true,
+					},
+					"instance_field_regex": schema.StringAttribute{
+						Description: "Regex pattern for instance field",
+						Optional:    true,
+						Computed:    true,
+					},
+					"timestamp_format": schema.StringAttribute{
+						Description: "Timestamp format for ServiceNow data",
+						Optional:    true,
+						Computed:    true,
+					},
+					"client_id": schema.StringAttribute{
+						Description: "OAuth client ID for ServiceNow",
+						Optional:    true,
+						Computed:    true,
+					},
+					"client_secret": schema.StringAttribute{
+						Description: "OAuth client secret for ServiceNow",
+						Optional:    true,
+						Computed:    true,
+						Sensitive:   true,
+					},
+					"additional_fields": schema.ListAttribute{
+						Description: "Additional fields to fetch from ServiceNow",
+						Optional:    true,
+						Computed:    true,
+						ElementType: types.StringType,
 					},
 				},
 			},
@@ -1750,6 +1828,92 @@ func (r *projectResource) Create(ctx context.Context, req resource.CreateRequest
 		}
 	}
 
+	// Process project_servicenow_settings if project_cloud_type is ServiceNow
+	if !config.ProjectServiceNowSettings.IsNull() && !config.ProjectServiceNowSettings.IsUnknown() {
+		// Check if project_cloud_type is ServiceNow (case insensitive)
+		cloudType := config.ProjectCreationConfig.ProjectCloudType.ValueString()
+		if cloudType != "" && (cloudType == "ServiceNow" || cloudType == "servicenow" || cloudType == "SERVICENOW") {
+			var serviceNowSettings projectServiceNowSettingsModel
+			diags = config.ProjectServiceNowSettings.As(ctx, &serviceNowSettings, basetypes.ObjectAsOptions{})
+			resp.Diagnostics.Append(diags...)
+			if resp.Diagnostics.HasError() {
+				return
+			}
+
+			tflog.Info(ctx, "Processing ServiceNow third-party settings")
+
+			// Convert to client model
+			clientSettings := &client.ServiceNowThirdPartySettings{
+				Host:               serviceNowSettings.Host.ValueString(),
+				SysparmQuery:       serviceNowSettings.SysparmQuery.ValueString(),
+				Proxy:              serviceNowSettings.Proxy.ValueString(),
+				ServiceNowUser:     serviceNowSettings.ServiceNowUser.ValueString(),
+				ServiceNowPassword: serviceNowSettings.ServiceNowPassword.ValueString(),
+				InstanceField:      serviceNowSettings.InstanceField.ValueString(),
+				InstanceFieldRegex: serviceNowSettings.InstanceFieldRegex.ValueString(),
+				TimestampFormat:    serviceNowSettings.TimestampFormat.ValueString(),
+				ClientID:           serviceNowSettings.ClientID.ValueString(),
+				ClientSecret:       serviceNowSettings.ClientSecret.ValueString(),
+			}
+
+			// Convert additional fields list
+			if !serviceNowSettings.AdditionalFields.IsNull() && !serviceNowSettings.AdditionalFields.IsUnknown() {
+				var additionalFields []string
+				diags = serviceNowSettings.AdditionalFields.ElementsAs(ctx, &additionalFields, false)
+				resp.Diagnostics.Append(diags...)
+				if !resp.Diagnostics.HasError() {
+					clientSettings.AdditionalFields = additionalFields
+				}
+			}
+
+			// Apply ServiceNow settings
+			err := r.client.CreateOrUpdateServiceNowThirdPartySettings(plan.ProjectName.ValueString(), clientSettings)
+			if err != nil {
+				resp.Diagnostics.AddError(
+					"Error applying ServiceNow third-party settings",
+					fmt.Sprintf("Could not apply ServiceNow settings: %s", err.Error()),
+				)
+				return
+			}
+
+			// Store the config in plan
+			plan.ProjectServiceNowSettings = config.ProjectServiceNowSettings
+		} else {
+			tflog.Warn(ctx, "project_servicenow_settings provided but project_cloud_type is not ServiceNow, ignoring settings", map[string]any{
+				"project_cloud_type": cloudType,
+			})
+			// Set to null for non-ServiceNow projects
+			plan.ProjectServiceNowSettings = types.ObjectNull(map[string]attr.Type{
+				"host":                 types.StringType,
+				"sysparm_query":        types.StringType,
+				"proxy":                types.StringType,
+				"servicenow_user":      types.StringType,
+				"servicenow_password":  types.StringType,
+				"instance_field":       types.StringType,
+				"instance_field_regex": types.StringType,
+				"timestamp_format":     types.StringType,
+				"client_id":            types.StringType,
+				"client_secret":        types.StringType,
+				"additional_fields":    types.ListType{ElemType: types.StringType},
+			})
+		}
+	} else {
+		// No ServiceNow settings in config - explicitly set to null
+		plan.ProjectServiceNowSettings = types.ObjectNull(map[string]attr.Type{
+			"host":                 types.StringType,
+			"sysparm_query":        types.StringType,
+			"proxy":                types.StringType,
+			"servicenow_user":      types.StringType,
+			"servicenow_password":  types.StringType,
+			"instance_field":       types.StringType,
+			"instance_field_regex": types.StringType,
+			"timestamp_format":     types.StringType,
+			"client_id":            types.StringType,
+			"client_secret":        types.StringType,
+			"additional_fields":    types.ListType{ElemType: types.StringType},
+		})
+	}
+
 	// SystemName and ProjectCreationConfig are config-only (not returned by API)
 	plan.SystemName = config.SystemName
 	plan.ProjectCreationConfig = config.ProjectCreationConfig
@@ -2018,6 +2182,63 @@ func (r *projectResource) Read(ctx context.Context, req resource.ReadRequest, re
 		}
 	}
 
+	// Read ServiceNow third-party settings if project_cloud_type is ServiceNow
+	// Check if we have a ProjectCreationConfig in state first
+	if state.ProjectCreationConfig != nil {
+		cloudType := state.ProjectCreationConfig.ProjectCloudType.ValueString()
+		if cloudType != "" && (cloudType == "ServiceNow" || cloudType == "servicenow" || cloudType == "SERVICENOW") {
+			serviceNowSettings, err := r.client.GetServiceNowThirdPartySettings(state.ProjectName.ValueString())
+			if err != nil {
+				tflog.Warn(ctx, "Could not read ServiceNow third-party settings", map[string]any{"error": err.Error()})
+				// Keep existing state if we can't read from API
+			} else if serviceNowSettings != nil {
+				// Convert to terraform model
+				serviceNowModel := projectServiceNowSettingsModel{
+					Host:               types.StringValue(serviceNowSettings.Host),
+					SysparmQuery:       types.StringValue(serviceNowSettings.SysparmQuery),
+					Proxy:              types.StringValue(serviceNowSettings.Proxy),
+					ServiceNowUser:     types.StringValue(serviceNowSettings.ServiceNowUser),
+					ServiceNowPassword: types.StringValue(serviceNowSettings.ServiceNowPassword),
+					InstanceField:      types.StringValue(serviceNowSettings.InstanceField),
+					InstanceFieldRegex: types.StringValue(serviceNowSettings.InstanceFieldRegex),
+					TimestampFormat:    types.StringValue(serviceNowSettings.TimestampFormat),
+					ClientID:           types.StringValue(serviceNowSettings.ClientID),
+					ClientSecret:       types.StringValue(serviceNowSettings.ClientSecret),
+				}
+
+				// Convert additional fields
+				if len(serviceNowSettings.AdditionalFields) > 0 {
+					additionalFieldsList, diags := types.ListValueFrom(ctx, types.StringType, serviceNowSettings.AdditionalFields)
+					resp.Diagnostics.Append(diags...)
+					if !resp.Diagnostics.HasError() {
+						serviceNowModel.AdditionalFields = additionalFieldsList
+					}
+				} else {
+					serviceNowModel.AdditionalFields = types.ListNull(types.StringType)
+				}
+
+				// Convert to types.Object
+				serviceNowObject, diags := types.ObjectValueFrom(ctx, map[string]attr.Type{
+					"host":                 types.StringType,
+					"sysparm_query":        types.StringType,
+					"proxy":                types.StringType,
+					"servicenow_user":      types.StringType,
+					"servicenow_password":  types.StringType,
+					"instance_field":       types.StringType,
+					"instance_field_regex": types.StringType,
+					"timestamp_format":     types.StringType,
+					"client_id":            types.StringType,
+					"client_secret":        types.StringType,
+					"additional_fields":    types.ListType{ElemType: types.StringType},
+				}, serviceNowModel)
+				resp.Diagnostics.Append(diags...)
+				if !resp.Diagnostics.HasError() {
+					state.ProjectServiceNowSettings = serviceNowObject
+				}
+			}
+		}
+	}
+
 	diags = resp.State.Set(ctx, &state)
 	resp.Diagnostics.Append(diags...)
 	if resp.Diagnostics.HasError() {
@@ -2279,6 +2500,72 @@ func (r *projectResource) Update(ctx context.Context, req resource.UpdateRequest
 			return
 		}
 
+		// Get current API labels to detect what needs to be deleted
+		apiLabels, err := r.client.GetLogLabels(plan.ProjectName.ValueString(), r.client.Username)
+		if err != nil {
+			tflog.Warn(ctx, "Failed to get current log labels for comparison", map[string]any{"error": err.Error()})
+			apiLabels = make(map[string]string) // Continue with empty map
+		}
+
+		// Build a map of label types in config
+		configLabelTypes := make(map[string]bool)
+		for _, setting := range configSettings {
+			configLabelTypes[setting.LabelType.ValueString()] = true
+		}
+
+		// Map API field names to label types for comparison
+		apiFieldToLabelType := map[string]string{
+			"whitelist":                "whitelist",
+			"trainingWhitelist":        "trainingWhitelist",
+			"trainingBlacklistLabels":  "blacklist",
+			"featurelist":              "featurelist",
+			"incidentlist":             "incidentlist",
+			"triagelist":               "triagelist",
+			"patternNameLabels":        "patternName",
+			"patternSignatureLabels":   "patternSignature",
+			"patternMatchRegexLabels":  "patternMatchRegex",
+			"patternIgnoreRegexLabels": "patternIgnoreRegex",
+			"customActionLabels":       "customAction",
+			"logEventIDLabels":         "logEventID",
+			"logSeverityLabels":        "logSeverity",
+			"logStatusCodeLabels":      "logStatusCode",
+			"alertEventTypeLabels":     "alertEventType",
+			"anomalyFeatureLabels":     "anomalyFeature",
+			"dataFilterLabels":         "dataFilter",
+			"instanceNameLabels":       "instanceName",
+			"dataQualityCheckLabels":   "dataQualityCheck",
+			"extractionBlacklist":      "extractionBlacklist",
+		}
+
+		// Find labels in API that are not in config (need to be deleted)
+		labelsToDelete := []string{}
+		for apiField, jsonString := range apiLabels {
+			if labelType, ok := apiFieldToLabelType[apiField]; ok {
+				// Only delete if it has non-empty content and is not in config
+				if jsonString != "" && jsonString != "[]" && !configLabelTypes[labelType] {
+					labelsToDelete = append(labelsToDelete, labelType)
+					tflog.Info(ctx, "Label will be deleted (in API but not in config)", map[string]any{"label_type": labelType})
+				}
+			}
+		}
+
+		// Delete labels that are in API but not in config
+		if len(labelsToDelete) > 0 {
+			tflog.Info(ctx, "Deleting log labels not in config", map[string]any{"count": len(labelsToDelete)})
+			err := r.client.DeleteLogLabels(
+				plan.ProjectName.ValueString(),
+				r.client.Username,
+				labelsToDelete,
+			)
+			if err != nil {
+				resp.Diagnostics.AddError(
+					"Error deleting log label settings",
+					fmt.Sprintf("Could not delete log label settings: %s", err.Error()),
+				)
+				return
+			}
+		}
+
 		if len(configSettings) > 0 {
 			tflog.Info(ctx, "Processing log label settings", map[string]any{"count": len(configSettings)})
 
@@ -2320,6 +2607,92 @@ func (r *projectResource) Update(ctx context.Context, req resource.UpdateRequest
 		if !resp.Diagnostics.HasError() {
 			plan.LogLabelSettings = emptyList
 		}
+	}
+
+	// Process project_servicenow_settings if provided and project_cloud_type is ServiceNow
+	if !config.ProjectServiceNowSettings.IsNull() && !config.ProjectServiceNowSettings.IsUnknown() {
+		// Check if project_cloud_type is ServiceNow (case insensitive)
+		cloudType := config.ProjectCreationConfig.ProjectCloudType.ValueString()
+		if cloudType != "" && (cloudType == "ServiceNow" || cloudType == "servicenow" || cloudType == "SERVICENOW") {
+			var serviceNowSettings projectServiceNowSettingsModel
+			diags = config.ProjectServiceNowSettings.As(ctx, &serviceNowSettings, basetypes.ObjectAsOptions{})
+			resp.Diagnostics.Append(diags...)
+			if resp.Diagnostics.HasError() {
+				return
+			}
+
+			tflog.Info(ctx, "Updating ServiceNow third-party settings")
+
+			// Convert to client model
+			clientSettings := &client.ServiceNowThirdPartySettings{
+				Host:               serviceNowSettings.Host.ValueString(),
+				SysparmQuery:       serviceNowSettings.SysparmQuery.ValueString(),
+				Proxy:              serviceNowSettings.Proxy.ValueString(),
+				ServiceNowUser:     serviceNowSettings.ServiceNowUser.ValueString(),
+				ServiceNowPassword: serviceNowSettings.ServiceNowPassword.ValueString(),
+				InstanceField:      serviceNowSettings.InstanceField.ValueString(),
+				InstanceFieldRegex: serviceNowSettings.InstanceFieldRegex.ValueString(),
+				TimestampFormat:    serviceNowSettings.TimestampFormat.ValueString(),
+				ClientID:           serviceNowSettings.ClientID.ValueString(),
+				ClientSecret:       serviceNowSettings.ClientSecret.ValueString(),
+			}
+
+			// Convert additional fields list
+			if !serviceNowSettings.AdditionalFields.IsNull() && !serviceNowSettings.AdditionalFields.IsUnknown() {
+				var additionalFields []string
+				diags = serviceNowSettings.AdditionalFields.ElementsAs(ctx, &additionalFields, false)
+				resp.Diagnostics.Append(diags...)
+				if !resp.Diagnostics.HasError() {
+					clientSettings.AdditionalFields = additionalFields
+				}
+			}
+
+			// Apply ServiceNow settings
+			err := r.client.CreateOrUpdateServiceNowThirdPartySettings(plan.ProjectName.ValueString(), clientSettings)
+			if err != nil {
+				resp.Diagnostics.AddError(
+					"Error updating ServiceNow third-party settings",
+					fmt.Sprintf("Could not update ServiceNow settings: %s", err.Error()),
+				)
+				return
+			}
+
+			// Store the config in plan
+			plan.ProjectServiceNowSettings = config.ProjectServiceNowSettings
+		} else {
+			tflog.Warn(ctx, "project_servicenow_settings provided but project_cloud_type is not ServiceNow, ignoring settings", map[string]any{
+				"project_cloud_type": cloudType,
+			})
+			// Set to null for non-ServiceNow projects
+			plan.ProjectServiceNowSettings = types.ObjectNull(map[string]attr.Type{
+				"host":                 types.StringType,
+				"sysparm_query":        types.StringType,
+				"proxy":                types.StringType,
+				"servicenow_user":      types.StringType,
+				"servicenow_password":  types.StringType,
+				"instance_field":       types.StringType,
+				"instance_field_regex": types.StringType,
+				"timestamp_format":     types.StringType,
+				"client_id":            types.StringType,
+				"client_secret":        types.StringType,
+				"additional_fields":    types.ListType{ElemType: types.StringType},
+			})
+		}
+	} else {
+		// No ServiceNow settings in config - explicitly set to null
+		plan.ProjectServiceNowSettings = types.ObjectNull(map[string]attr.Type{
+			"host":                 types.StringType,
+			"sysparm_query":        types.StringType,
+			"proxy":                types.StringType,
+			"servicenow_user":      types.StringType,
+			"servicenow_password":  types.StringType,
+			"instance_field":       types.StringType,
+			"instance_field_regex": types.StringType,
+			"timestamp_format":     types.StringType,
+			"client_id":            types.StringType,
+			"client_secret":        types.StringType,
+			"additional_fields":    types.ListType{ElemType: types.StringType},
+		})
 	}
 
 	// Preserve config-only fields that don't come from API
@@ -2388,7 +2761,7 @@ func normalizeJSON(jsonStr string) string {
 }
 
 // convertLogLabelsToState converts API log labels response to Terraform state model
-// while preserving the order from existing state when possible
+// Compares labels in sorted order (order-independent) but preserves original order in state
 func convertLogLabelsToState(apiLabels map[string]string, existingState []logLabelSettingModel) []logLabelSettingModel {
 	var result []logLabelSettingModel
 
@@ -2432,11 +2805,36 @@ func convertLogLabelsToState(apiLabels map[string]string, existingState []logLab
 		}
 	}
 
-	// If we have existing state, preserve its order and only include items that exist in API
+	// Create a map of existing state for comparison (order-independent)
+	existingStateMap := make(map[string]string)
+	for _, existing := range existingState {
+		labelType := existing.LabelType.ValueString()
+		existingStateMap[labelType] = normalizeJSON(existing.LogLabelString.ValueString())
+	}
+
+	// Compare the two maps (order-independent comparison)
+	stateMatchesAPI := len(existingStateMap) == len(apiDataMap)
+	if stateMatchesAPI {
+		for labelType, existingValue := range existingStateMap {
+			apiValue, exists := apiDataMap[labelType]
+			if !exists || apiValue != existingValue {
+				stateMatchesAPI = false
+				break
+			}
+		}
+	}
+
+	// If state matches API (ignoring order), preserve the existing order
+	if stateMatchesAPI && len(existingState) > 0 {
+		return existingState
+	}
+
+	// State doesn't match API - rebuild from API data
+	// If we have existing state, preserve its order for labels that still exist
 	if len(existingState) > 0 {
 		processedTypes := make(map[string]bool)
 
-		// First pass: preserve order from existing state
+		// First pass: preserve order from existing state where labels still exist in API
 		for _, existing := range existingState {
 			labelType := existing.LabelType.ValueString()
 			if normalizedJSON, ok := apiDataMap[labelType]; ok {
@@ -2449,15 +2847,15 @@ func convertLogLabelsToState(apiLabels map[string]string, existingState []logLab
 		}
 
 		// Second pass: add any new types from API that weren't in existing state
-		// Use a consistent order for new types
+		// This allows detection of labels added in the UI
 		defaultOrder := []string{
 			"trainingWhitelist",
+			"whitelist",
+			"blacklist",
 			"featurelist",
 			"incidentlist",
 			"triagelist",
 			"patternName",
-			"whitelist",
-			"blacklist",
 			"patternSignature",
 			"patternMatchRegex",
 			"patternIgnoreRegex",

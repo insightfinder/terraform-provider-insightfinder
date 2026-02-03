@@ -134,12 +134,8 @@ func (c *Client) DeleteLogLabels(projectName, username string, labelTypes []stri
 			},
 		}
 
-		bodyJSON, err := json.Marshal(requestBody)
-		if err != nil {
-			return fmt.Errorf("failed to marshal log label delete request: %w", err)
-		}
-
-		body, statusCode, err := c.DoRequest("POST", path, bodyJSON)
+		// Pass the map directly to DoRequest - it will marshal it
+		body, statusCode, err := c.DoRequest("POST", path, requestBody)
 		if err != nil {
 			return err
 		}

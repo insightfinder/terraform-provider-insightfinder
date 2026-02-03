@@ -5,6 +5,29 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.3.0] - 2026-02-03
+
+### Added
+- **insightfinder_project**: Added `project_servicenow_settings` attribute for ServiceNow integration
+  - New optional nested object to configure ServiceNow third-party settings
+  - Only applies when `project_cloud_type` is "ServiceNow" (case-insensitive)
+  - Supports fields: `host`, `sysparm_query`, `proxy`, `servicenow_user`, `servicenow_password`, `instance_field`, `instance_field_regex`, `timestamp_format`, `client_id`, `client_secret`, and `additional_fields`
+  - Automatically creates/updates ServiceNow integration via `/api/external/v1/thirdpartysetting` endpoint
+  - Sensitive fields (`servicenow_password`, `client_secret`) are properly marked and protected
+
+### Fixed
+- **insightfinder_project**: Fixed log label drift detection and management
+  - Implemented order-independent comparison for `log_label_settings` to prevent false drift detection when labels are reordered
+  - Added automatic deletion of labels that exist in API but not in configuration
+  - Labels added via UI are now properly detected as drift and can be removed via `terraform apply`
+  - Fixed `DeleteLogLabels` function to properly send requests without double-marshaling JSON
+  - Preserves original order in state when no actual changes occur
+  
+- **insightfinder_project**: Fixed "unknown value" error for non-ServiceNow projects
+  - Explicitly set `project_servicenow_settings` to null for non-ServiceNow projects
+  - Resolves "Provider returned invalid result object after apply" error
+  - Ensures all computed values are known after create/update operations
+
 ## [1.2.1] - 2026-01-09
 
 ### Removed
