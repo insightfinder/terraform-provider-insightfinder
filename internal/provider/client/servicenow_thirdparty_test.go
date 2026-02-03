@@ -71,25 +71,25 @@ func TestGetServiceNowThirdPartySettings(t *testing.T) {
 				if r.Method != "GET" {
 					t.Errorf("Expected GET request, got %s", r.Method)
 				}
-		if r.Header.Get("X-User-Name") != "test_user" {
-			t.Errorf("Expected X-User-Name header")
-		}
-		if r.Header.Get("X-License-Key") != "test_key" {
-			t.Errorf("Expected X-License-Key header")
-		}
+				if r.Header.Get("X-User-Name") != "test_user" {
+					t.Errorf("Expected X-User-Name header")
+				}
+				if r.Header.Get("X-License-Key") != "test_key" {
+					t.Errorf("Expected X-License-Key header")
+				}
 				// Check query parameters
 				params := r.URL.Query()
 				if params.Get("projectName") != tt.projectName {
 					t.Errorf("Expected projectName=%s, got %s", tt.projectName, params.Get("projectName"))
-			}
-			if params.Get("cloudType") != "ServiceNow" {
-				t.Errorf("Expected cloudType=ServiceNow, got %s", params.Get("cloudType"))
-			}
+				}
+				if params.Get("cloudType") != "ServiceNow" {
+					t.Errorf("Expected cloudType=ServiceNow, got %s", params.Get("cloudType"))
+				}
 
-			w.WriteHeader(tt.statusCode)
-			_, _ = w.Write([]byte(tt.responseBody))
-		}))
-		defer server.Close()
+				w.WriteHeader(tt.statusCode)
+				_, _ = w.Write([]byte(tt.responseBody))
+			}))
+			defer server.Close()
 			client, _ := NewClient(server.URL, "test_user", "test_key")
 			settings, err := client.GetServiceNowThirdPartySettings(tt.projectName)
 
@@ -190,17 +190,17 @@ func TestCreateOrUpdateServiceNowThirdPartySettings(t *testing.T) {
 				}
 
 				// Verify additional fields is JSON encoded
-			if additionalFields := params.Get("additionalFields"); additionalFields != "" {
-				var fields []string
-				if err := json.Unmarshal([]byte(additionalFields), &fields); err != nil {
-					t.Errorf("additionalFields is not valid JSON: %v", err)
+				if additionalFields := params.Get("additionalFields"); additionalFields != "" {
+					var fields []string
+					if err := json.Unmarshal([]byte(additionalFields), &fields); err != nil {
+						t.Errorf("additionalFields is not valid JSON: %v", err)
+					}
 				}
-			}
 
-			w.WriteHeader(tt.statusCode)
-			_, _ = w.Write([]byte(tt.responseBody))
-		}))
-		defer server.Close()
+				w.WriteHeader(tt.statusCode)
+				_, _ = w.Write([]byte(tt.responseBody))
+			}))
+			defer server.Close()
 			client, _ := NewClient(server.URL, "test_user", "test_key")
 			err := client.CreateOrUpdateServiceNowThirdPartySettings(tt.projectName, tt.settings)
 
@@ -230,15 +230,14 @@ func TestServiceNowThirdPartySettings_URLEncoding(t *testing.T) {
 			t.Errorf("Password not properly encoded. Expected %s, got %s", settings.ServiceNowPassword, password)
 		}
 
+		if query := params.Get("sysparmQuery"); query != settings.SysparmQuery {
+			t.Errorf("sysparmQuery not properly encoded. Expected %s, got %s", settings.SysparmQuery, query)
+		}
 
-	if query := params.Get("sysparmQuery"); query != settings.SysparmQuery {
-		t.Errorf("sysparmQuery not properly encoded. Expected %s, got %s", settings.SysparmQuery, query)
-	}
-
-	w.WriteHeader(200)
-	_, _ = w.Write([]byte(`{"success": true}`))
-}))
-defer server.Close()
+		w.WriteHeader(200)
+		_, _ = w.Write([]byte(`{"success": true}`))
+	}))
+	defer server.Close()
 	client, _ := NewClient(server.URL, "test_user", "test_key")
 	err := client.CreateOrUpdateServiceNowThirdPartySettings("test-project", settings)
 	if err != nil {
