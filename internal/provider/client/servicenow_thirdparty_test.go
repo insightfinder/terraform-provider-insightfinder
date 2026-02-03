@@ -71,13 +71,12 @@ func TestGetServiceNowThirdPartySettings(t *testing.T) {
 				if r.Method != "GET" {
 					t.Errorf("Expected GET request, got %s", r.Method)
 				}
-				if r.Header.Get("X-User-Name") != "test_user" {
-					t.Errorf("Expected X-User-Name header")
-				}
-				if r.Header.Get("X-API-Key") != "test_key" {
-					t.Errorf("Expected X-API-Key header")
-				}
-
+		if r.Header.Get("X-User-Name") != "test_user" {
+			t.Errorf("Expected X-User-Name header")
+		}
+		if r.Header.Get("X-License-Key") != "test_key" {
+			t.Errorf("Expected X-License-Key header")
+		}
 				// Check query parameters
 				params := r.URL.Query()
 				if params.Get("projectName") != tt.projectName {
