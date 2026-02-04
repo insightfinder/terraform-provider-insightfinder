@@ -5,6 +5,15 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.3.1] - 2026-02-04
+
+### Fixed
+- **insightfinder_project**: Fixed panic when creating projects with nil JSON array fields
+  - Added proper nil checks for `cdf_setting`, `log_to_log_setting_list`, `webhook_header_list`, and `shared_usernames` fields
+  - Replaced unsafe type assertions with safe type checking using comma-ok idiom
+  - Prevents "interface conversion: interface {} is nil, not []interface {}" panic errors
+  - Resolves issue where projects would fail to create when these fields parsed to nil values
+
 ## [1.3.0] - 2026-02-03
 
 ### Added

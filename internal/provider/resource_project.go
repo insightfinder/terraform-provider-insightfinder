@@ -1135,7 +1135,11 @@ func populateSettings(plan *projectResourceModel) map[string]interface{} {
 		}
 	}
 	if !plan.CdfSetting.IsNull() {
-		projectSettings.CdfSetting = parseJSONField(plan.CdfSetting.ValueString()).([]interface{})
+		if parsed := parseJSONField(plan.CdfSetting.ValueString()); parsed != nil {
+			if cdfSetting, ok := parsed.([]interface{}); ok {
+				projectSettings.CdfSetting = cdfSetting
+			}
+		}
 	}
 	if !plan.EmailSetting.IsNull() {
 		if parsed := parseJSONField(plan.EmailSetting.ValueString()); parsed != nil {
@@ -1159,13 +1163,25 @@ func populateSettings(plan *projectResourceModel) map[string]interface{} {
 		}
 	}
 	if !plan.LogToLogSettingList.IsNull() {
-		projectSettings.LogToLogSettingList = parseJSONField(plan.LogToLogSettingList.ValueString()).([]interface{})
+		if parsed := parseJSONField(plan.LogToLogSettingList.ValueString()); parsed != nil {
+			if logToLogSettingList, ok := parsed.([]interface{}); ok {
+				projectSettings.LogToLogSettingList = logToLogSettingList
+			}
+		}
 	}
 	if !plan.WebhookHeaderList.IsNull() {
-		projectSettings.WebhookHeaderList = parseJSONField(plan.WebhookHeaderList.ValueString()).([]interface{})
+		if parsed := parseJSONField(plan.WebhookHeaderList.ValueString()); parsed != nil {
+			if webhookHeaderList, ok := parsed.([]interface{}); ok {
+				projectSettings.WebhookHeaderList = webhookHeaderList
+			}
+		}
 	}
 	if !plan.SharedUsernames.IsNull() {
-		projectSettings.SharedUsernames = parseJSONField(plan.SharedUsernames.ValueString()).([]interface{})
+		if parsed := parseJSONField(plan.SharedUsernames.ValueString()); parsed != nil {
+			if sharedUsernames, ok := parsed.([]interface{}); ok {
+				projectSettings.SharedUsernames = sharedUsernames
+			}
+		}
 	}
 
 	// Convert struct to map[string]interface{} using JSON marshal/unmarshal
