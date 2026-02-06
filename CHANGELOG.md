@@ -5,6 +5,16 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.3.2] - 2026-02-06
+
+### Added
+- **insightfinder_project**: Added `servicenow_table` field to `project_creation_config` for ServiceNow projects
+  - New optional field in project creation configuration
+  - When `project_cloud_type` is "ServiceNow", the `servicenow_table` field can be specified to set the ServiceNow table name
+  - The field is passed as `tableName` parameter to the `/api/v1/check-and-add-custom-project` API endpoint
+  - Backward compatible: only included in API request when project type is ServiceNow and the field has a value
+  - Updated documentation and examples to demonstrate ServiceNow project creation with table configuration
+
 ## [1.3.1] - 2026-02-04
 
 ### Fixed
