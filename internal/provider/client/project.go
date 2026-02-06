@@ -19,6 +19,7 @@ type ProjectConfig struct {
 	InstanceType       string                 `json:"instanceType"`
 	ProjectCloudType   string                 `json:"projectCloudType"`
 	InsightAgentType   string                 `json:"insightAgentType,omitempty"`
+	ServiceNowTable    string                 `json:"serviceNowTable,omitempty"`
 	CValue             int                    `json:"cValue,omitempty"`
 	PValue             float64                `json:"pValue,omitempty"`
 	Settings           map[string]interface{} `json:"settings,omitempty"`
@@ -265,6 +266,10 @@ func (c *Client) CreateProject(project *ProjectConfig) error {
 	}
 	if project.InsightAgentType != "" {
 		formData.Set("insightAgentType", project.InsightAgentType)
+	}
+	// Include tableName only for ServiceNow projects (backward compatible)
+	if strings.EqualFold(project.ProjectCloudType, "ServiceNow") && project.ServiceNowTable != "" {
+		formData.Set("tableName", project.ServiceNowTable)
 	}
 
 	body, statusCode, err := c.DoFormRequest("POST", "/api/v1/check-and-add-custom-project", formData)

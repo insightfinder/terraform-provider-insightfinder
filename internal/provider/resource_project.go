@@ -170,6 +170,7 @@ type projectCreationConfigModel struct {
 	InstanceType     types.String `tfsdk:"instance_type"`
 	ProjectCloudType types.String `tfsdk:"project_cloud_type"`
 	InsightAgentType types.String `tfsdk:"insight_agent_type"`
+	ServiceNowTable  types.String `tfsdk:"servicenow_table"`
 }
 
 type projectServiceNowSettingsModel struct {
@@ -257,6 +258,11 @@ func (r *projectResource) Schema(_ context.Context, _ resource.SchemaRequest, re
 					},
 					"insight_agent_type": schema.StringAttribute{
 						Description: "The InsightFinder agent type.",
+						Optional:    true,
+						Computed:    true,
+					},
+					"servicenow_table": schema.StringAttribute{
+						Description: "The ServiceNow table name. Required when project_cloud_type is ServiceNow.",
 						Optional:    true,
 						Computed:    true,
 					},
@@ -1221,6 +1227,7 @@ func (r *projectResource) Create(ctx context.Context, req resource.CreateRequest
 		InstanceType:       plan.ProjectCreationConfig.InstanceType.ValueString(),
 		ProjectCloudType:   plan.ProjectCreationConfig.ProjectCloudType.ValueString(),
 		InsightAgentType:   plan.ProjectCreationConfig.InsightAgentType.ValueString(),
+		ServiceNowTable:    plan.ProjectCreationConfig.ServiceNowTable.ValueString(),
 		CValue:             int(plan.CValue.ValueInt64()),
 		PValue:             plan.PValue.ValueFloat64(),
 	}

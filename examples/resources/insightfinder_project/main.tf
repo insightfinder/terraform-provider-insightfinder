@@ -80,6 +80,24 @@ resource "insightfinder_project" "advanced_logs" {
   maximum_root_cause_result_size   = 5
 }
 
+# ServiceNow project with table name
+resource "insightfinder_project" "servicenow_incidents" {
+  project_name = "servicenow-incidents"
+  system_name  = "Production"
+
+  project_creation_config = {
+    data_type          = "Log"
+    instance_type      = "ServiceNow"
+    project_cloud_type = "ServiceNow"
+    servicenow_table   = "incident"  # Required for ServiceNow projects
+  }
+
+  project_display_name = "ServiceNow Incidents"
+  project_time_zone    = "UTC"
+  sampling_interval    = 600
+  retention_time       = 90
+}
+
 variable "username" {
   description = "InsightFinder username"
   type        = string

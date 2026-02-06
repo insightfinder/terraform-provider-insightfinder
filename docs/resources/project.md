@@ -88,6 +88,7 @@ resource "insightfinder_project" "servicenow_project" {
     instance_type      = "ServiceNow"
     project_cloud_type = "ServiceNow"
     insight_agent_type = "Custom"
+    servicenow_table   = "incident"  # Required for ServiceNow projects
   }
 
   project_display_name = "ServiceNow Incidents"
@@ -120,9 +121,10 @@ resource "insightfinder_project" "servicenow_project" {
 - `system_name` (String) Name of the system this project belongs to
 - `project_creation_config` (Object) Project creation configuration
   - `data_type` (String) Type of data: `Log`, `Metric`, or `Alert`
-  - `instance_type` (String) Instance type: `AWS`, `Azure`, `GCP`, `PrivateCloud`, `OnPremise`
+  - `instance_type` (String) Instance type: `AWS`, `Azure`, `GCP`, `PrivateCloud`, `OnPremise`, `ServiceNow`
   - `project_cloud_type` (String) Cloud type (usually same as instance_type)
-  - `insight_agent_type` (String) Agent type: `LogStreaming`, `MetricFile`, `Historical`
+  - `insight_agent_type` (String) Agent type: `LogStreaming`, `MetricFile`, `Historical`, `Custom`
+  - `servicenow_table` (String) ServiceNow table name (required when `project_cloud_type` is `ServiceNow`)
 
 ### Optional
 
