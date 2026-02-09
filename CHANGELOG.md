@@ -5,6 +5,15 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.4.1] - 2026-02-09
+
+### Fixed
+- **insightfinder_project**: Fixed holiday_settings order inconsistency issue
+  - Holiday settings now preserve the order defined in configuration
+  - Resolved "Provider produced inconsistent result after apply" errors
+  - Read operation now maintains existing holiday order from state when refreshing
+  - Prevents unnecessary plan changes due to reordering
+
 ## [1.4.0] - 2026-02-09
 
 ### Added

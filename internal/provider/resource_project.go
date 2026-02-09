@@ -1975,14 +1975,9 @@ func (r *projectResource) Create(ctx context.Context, req resource.CreateRequest
 			return
 		}
 
-		// Sort holidays by name to maintain consistent order
-		sort.Slice(holidays, func(i, j int) bool {
-			return holidays[i].Name.ValueString() < holidays[j].Name.ValueString()
-		})
-
 		tflog.Info(ctx, "Processing holiday settings", map[string]any{"count": len(holidays)})
 
-		// Create each holiday
+		// Create each holiday (preserving config order)
 		for _, holiday := range holidays {
 			clientHoliday := &client.Holiday{
 				Name:      holiday.Name.ValueString(),
@@ -2000,19 +1995,8 @@ func (r *projectResource) Create(ctx context.Context, req resource.CreateRequest
 			}
 		}
 
-		// Convert sorted holidays back to types.List and store in plan
-		listValue, diags := types.ListValueFrom(ctx, types.ObjectType{
-			AttrTypes: map[string]attr.Type{
-				"name":       types.StringType,
-				"start_date": types.StringType,
-				"end_date":   types.StringType,
-			},
-		}, holidays)
-		resp.Diagnostics.Append(diags...)
-		if resp.Diagnostics.HasError() {
-			return
-		}
-		plan.HolidaySettings = listValue
+		// Preserve the config order in plan
+		plan.HolidaySettings = config.HolidaySettings
 	} else {
 		// No holiday settings in config - set to null
 		plan.HolidaySettings = types.ListNull(types.ObjectType{
@@ -2357,7 +2341,15 @@ func (r *projectResource) Read(ctx context.Context, req resource.ReadRequest, re
 	} else if holidays != nil {
 		// Convert API response to state model
 		// Response format: {"holidayName": "startDate,endDate", ...}
-		var holidaySettings []holidaySettingModel
+
+		// First, try to preserve the order from existing state
+		var existingHolidays []holidaySettingModel
+		if !state.HolidaySettings.IsNull() && !state.HolidaySettings.IsUnknown() {
+			state.HolidaySettings.ElementsAs(ctx, &existingHolidays, false)
+		}
+
+		// Create a map of API holidays for lookup
+		apiHolidayMap := make(map[string]holidaySettingModel)
 		for name, dates := range holidays {
 			// Parse the dates string "MM-DD,MM-DD"
 			var startDate, endDate string
@@ -2386,17 +2378,38 @@ func (r *projectResource) Read(ctx context.Context, req resource.ReadRequest, re
 				}
 			}
 
-			holidaySettings = append(holidaySettings, holidaySettingModel{
+			apiHolidayMap[name] = holidaySettingModel{
 				Name:      types.StringValue(name),
 				StartDate: types.StringValue(startDate),
 				EndDate:   types.StringValue(endDate),
-			})
+			}
 		}
 
-		// Sort holidays by name to maintain consistent order
-		sort.Slice(holidaySettings, func(i, j int) bool {
-			return holidaySettings[i].Name.ValueString() < holidaySettings[j].Name.ValueString()
+		// Build the final list, preserving existing order where possible
+		var holidaySettings []holidaySettingModel
+		seenNames := make(map[string]bool)
+
+		// First, add holidays that were in the existing state (preserving order)
+		for _, existing := range existingHolidays {
+			name := existing.Name.ValueString()
+			if apiHoliday, exists := apiHolidayMap[name]; exists {
+				holidaySettings = append(holidaySettings, apiHoliday)
+				seenNames[name] = true
+			}
+		}
+
+		// Then, add any new holidays from API that weren't in existing state (sorted)
+		var newHolidays []holidaySettingModel
+		for name, holiday := range apiHolidayMap {
+			if !seenNames[name] {
+				newHolidays = append(newHolidays, holiday)
+			}
+		}
+		// Sort new holidays by name
+		sort.Slice(newHolidays, func(i, j int) bool {
+			return newHolidays[i].Name.ValueString() < newHolidays[j].Name.ValueString()
 		})
+		holidaySettings = append(holidaySettings, newHolidays...)
 
 		// Convert to types.List
 		if len(holidaySettings) > 0 {
@@ -2887,11 +2900,6 @@ func (r *projectResource) Update(ctx context.Context, req resource.UpdateRequest
 			return
 		}
 
-		// Sort holidays by name to maintain consistent order
-		sort.Slice(configHolidays, func(i, j int) bool {
-			return configHolidays[i].Name.ValueString() < configHolidays[j].Name.ValueString()
-		})
-
 		tflog.Info(ctx, "Processing holiday settings update", map[string]any{"count": len(configHolidays)})
 
 		// Get current holidays from API
@@ -2991,19 +2999,8 @@ func (r *projectResource) Update(ctx context.Context, req resource.UpdateRequest
 			}
 		}
 
-		// Convert sorted holidays back to types.List and store in plan
-		listValue, diags := types.ListValueFrom(ctx, types.ObjectType{
-			AttrTypes: map[string]attr.Type{
-				"name":       types.StringType,
-				"start_date": types.StringType,
-				"end_date":   types.StringType,
-			},
-		}, configHolidays)
-		resp.Diagnostics.Append(diags...)
-		if resp.Diagnostics.HasError() {
-			return
-		}
-		plan.HolidaySettings = listValue
+		// Preserve the config order in plan
+		plan.HolidaySettings = config.HolidaySettings
 	} else {
 		// No holiday settings in config - delete all existing holidays
 		tflog.Info(ctx, "Holiday settings removed from config, deleting all holidays")
