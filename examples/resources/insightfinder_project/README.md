@@ -58,6 +58,44 @@ resource "insightfinder_project" "infrastructure_metrics" {
 }
 ```
 
+## Project with Holiday Settings
+
+```hcl
+resource "insightfinder_project" "project_with_holidays" {
+  project_name = "seasonal-app"
+  system_name  = "Production"
+
+  project_creation_config = {
+    data_type          = "Log"
+    instance_type      = "PrivateCloud"
+    project_cloud_type = "PrivateCloud"
+  }
+
+  project_display_name = "Seasonal Application"
+  sampling_interval    = 600
+
+  # Define holidays that affect anomaly detection
+  # Date format is MM-DD (e.g., "12-25" for December 25th)
+  holiday_settings = [
+    {
+      name       = "christmas"
+      start_date = "12-25"
+      end_date   = "12-26"
+    },
+    {
+      name       = "new_year"
+      start_date = "01-01"
+      end_date   = "01-01"
+    },
+    {
+      name       = "thanksgiving"
+      start_date = "11-28"
+      end_date   = "11-29"
+    }
+  ]
+}
+```
+
 ## Complete Project with All Settings
 
 See `complete-project.tf` for a comprehensive example.

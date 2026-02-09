@@ -8,6 +8,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"sort"
 
 	"github.com/hashicorp/terraform-plugin-framework/attr"
 	"github.com/hashicorp/terraform-plugin-framework/path"
@@ -163,6 +164,13 @@ type projectResourceModel struct {
 	SharedUsernames           types.String `tfsdk:"shared_usernames"`
 	LogLabelSettings          types.List   `tfsdk:"log_label_settings"`
 	ProjectServiceNowSettings types.Object `tfsdk:"project_servicenow_settings"`
+	HolidaySettings           types.List   `tfsdk:"holiday_settings"`
+}
+
+type holidaySettingModel struct {
+	Name      types.String `tfsdk:"name"`
+	StartDate types.String `tfsdk:"start_date"`
+	EndDate   types.String `tfsdk:"end_date"`
 }
 
 type projectCreationConfigModel struct {
@@ -810,6 +818,27 @@ func (r *projectResource) Schema(_ context.Context, _ resource.SchemaRequest, re
 						Optional:    true,
 						Computed:    true,
 						ElementType: types.StringType,
+					},
+				},
+			},
+			"holiday_settings": schema.ListNestedAttribute{
+				Description: "List of holiday settings for the project. Each holiday has a name, start date, and end date (MM-DD format).",
+				Optional:    true,
+				Computed:    true,
+				NestedObject: schema.NestedAttributeObject{
+					Attributes: map[string]schema.Attribute{
+						"name": schema.StringAttribute{
+							Description: "Name of the holiday",
+							Required:    true,
+						},
+						"start_date": schema.StringAttribute{
+							Description: "Start date of the holiday in MM-DD format (e.g., '12-25')",
+							Required:    true,
+						},
+						"end_date": schema.StringAttribute{
+							Description: "End date of the holiday in MM-DD format (e.g., '12-26')",
+							Required:    true,
+						},
 					},
 				},
 			},
@@ -1937,6 +1966,64 @@ func (r *projectResource) Create(ctx context.Context, req resource.CreateRequest
 		})
 	}
 
+	// Process holiday_settings
+	if !config.HolidaySettings.IsNull() && !config.HolidaySettings.IsUnknown() {
+		var holidays []holidaySettingModel
+		diags = config.HolidaySettings.ElementsAs(ctx, &holidays, false)
+		resp.Diagnostics.Append(diags...)
+		if resp.Diagnostics.HasError() {
+			return
+		}
+
+		// Sort holidays by name to maintain consistent order
+		sort.Slice(holidays, func(i, j int) bool {
+			return holidays[i].Name.ValueString() < holidays[j].Name.ValueString()
+		})
+
+		tflog.Info(ctx, "Processing holiday settings", map[string]any{"count": len(holidays)})
+
+		// Create each holiday
+		for _, holiday := range holidays {
+			clientHoliday := &client.Holiday{
+				Name:      holiday.Name.ValueString(),
+				StartDate: holiday.StartDate.ValueString(),
+				EndDate:   holiday.EndDate.ValueString(),
+			}
+
+			err := r.client.CreateHoliday(plan.ProjectName.ValueString(), clientHoliday)
+			if err != nil {
+				resp.Diagnostics.AddError(
+					"Error creating holiday",
+					fmt.Sprintf("Could not create holiday '%s': %s", clientHoliday.Name, err.Error()),
+				)
+				return
+			}
+		}
+
+		// Convert sorted holidays back to types.List and store in plan
+		listValue, diags := types.ListValueFrom(ctx, types.ObjectType{
+			AttrTypes: map[string]attr.Type{
+				"name":       types.StringType,
+				"start_date": types.StringType,
+				"end_date":   types.StringType,
+			},
+		}, holidays)
+		resp.Diagnostics.Append(diags...)
+		if resp.Diagnostics.HasError() {
+			return
+		}
+		plan.HolidaySettings = listValue
+	} else {
+		// No holiday settings in config - set to null
+		plan.HolidaySettings = types.ListNull(types.ObjectType{
+			AttrTypes: map[string]attr.Type{
+				"name":       types.StringType,
+				"start_date": types.StringType,
+				"end_date":   types.StringType,
+			},
+		})
+	}
+
 	// SystemName and ProjectCreationConfig are config-only (not returned by API)
 	plan.SystemName = config.SystemName
 	plan.ProjectCreationConfig = config.ProjectCreationConfig
@@ -2259,6 +2346,79 @@ func (r *projectResource) Read(ctx context.Context, req resource.ReadRequest, re
 					state.ProjectServiceNowSettings = serviceNowObject
 				}
 			}
+		}
+	}
+
+	// Read holiday settings from API
+	holidays, err := r.client.GetHolidays(state.ProjectName.ValueString())
+	if err != nil {
+		tflog.Warn(ctx, "Could not read holidays", map[string]any{"error": err.Error()})
+		// Keep existing state if we can't read from API
+	} else if holidays != nil {
+		// Convert API response to state model
+		// Response format: {"holidayName": "startDate,endDate", ...}
+		var holidaySettings []holidaySettingModel
+		for name, dates := range holidays {
+			// Parse the dates string "MM-DD,MM-DD"
+			var startDate, endDate string
+			if dates != "" {
+				// Simple split by comma
+				parts := []string{}
+				current := ""
+				for _, c := range dates {
+					if c == ',' {
+						parts = append(parts, current)
+						current = ""
+					} else {
+						current += string(c)
+					}
+				}
+				if current != "" {
+					parts = append(parts, current)
+				}
+
+				if len(parts) >= 2 {
+					startDate = parts[0]
+					endDate = parts[1]
+				} else if len(parts) == 1 {
+					startDate = parts[0]
+					endDate = parts[0]
+				}
+			}
+
+			holidaySettings = append(holidaySettings, holidaySettingModel{
+				Name:      types.StringValue(name),
+				StartDate: types.StringValue(startDate),
+				EndDate:   types.StringValue(endDate),
+			})
+		}
+
+		// Sort holidays by name to maintain consistent order
+		sort.Slice(holidaySettings, func(i, j int) bool {
+			return holidaySettings[i].Name.ValueString() < holidaySettings[j].Name.ValueString()
+		})
+
+		// Convert to types.List
+		if len(holidaySettings) > 0 {
+			listValue, diags := types.ListValueFrom(ctx, types.ObjectType{
+				AttrTypes: map[string]attr.Type{
+					"name":       types.StringType,
+					"start_date": types.StringType,
+					"end_date":   types.StringType,
+				},
+			}, holidaySettings)
+			resp.Diagnostics.Append(diags...)
+			if !resp.Diagnostics.HasError() {
+				state.HolidaySettings = listValue
+			}
+		} else {
+			state.HolidaySettings = types.ListNull(types.ObjectType{
+				AttrTypes: map[string]attr.Type{
+					"name":       types.StringType,
+					"start_date": types.StringType,
+					"end_date":   types.StringType,
+				},
+			})
 		}
 	}
 
@@ -2715,6 +2875,168 @@ func (r *projectResource) Update(ctx context.Context, req resource.UpdateRequest
 			"client_id":            types.StringType,
 			"client_secret":        types.StringType,
 			"additional_fields":    types.ListType{ElemType: types.StringType},
+		})
+	}
+
+	// Process holiday_settings
+	if !config.HolidaySettings.IsNull() && !config.HolidaySettings.IsUnknown() {
+		var configHolidays []holidaySettingModel
+		diags = config.HolidaySettings.ElementsAs(ctx, &configHolidays, false)
+		resp.Diagnostics.Append(diags...)
+		if resp.Diagnostics.HasError() {
+			return
+		}
+
+		// Sort holidays by name to maintain consistent order
+		sort.Slice(configHolidays, func(i, j int) bool {
+			return configHolidays[i].Name.ValueString() < configHolidays[j].Name.ValueString()
+		})
+
+		tflog.Info(ctx, "Processing holiday settings update", map[string]any{"count": len(configHolidays)})
+
+		// Get current holidays from API
+		currentHolidays, err := r.client.GetHolidays(plan.ProjectName.ValueString())
+		if err != nil {
+			tflog.Warn(ctx, "Could not get current holidays", map[string]any{"error": err.Error()})
+			currentHolidays = make(map[string]string)
+		}
+
+		// Create a map of config holiday names
+		configHolidayNames := make(map[string]bool)
+		for _, h := range configHolidays {
+			configHolidayNames[h.Name.ValueString()] = true
+		}
+
+		// Find holidays to delete (in API but not in config)
+		var holidaysToDelete []string
+		for name := range currentHolidays {
+			if !configHolidayNames[name] {
+				holidaysToDelete = append(holidaysToDelete, name)
+			}
+		}
+
+		// Delete holidays not in config
+		if len(holidaysToDelete) > 0 {
+			tflog.Info(ctx, "Deleting holidays not in config", map[string]any{"count": len(holidaysToDelete)})
+			err := r.client.DeleteHolidays(plan.ProjectName.ValueString(), holidaysToDelete)
+			if err != nil {
+				resp.Diagnostics.AddError(
+					"Error deleting holidays",
+					fmt.Sprintf("Could not delete holidays: %s", err.Error()),
+				)
+				return
+			}
+		}
+
+		// Create or update holidays from config
+		for _, holiday := range configHolidays {
+			clientHoliday := &client.Holiday{
+				Name:      holiday.Name.ValueString(),
+				StartDate: holiday.StartDate.ValueString(),
+				EndDate:   holiday.EndDate.ValueString(),
+			}
+
+			// Check if holiday needs to be updated
+			if existingDates, exists := currentHolidays[clientHoliday.Name]; exists {
+				// Parse existing dates
+				parts := []string{}
+				current := ""
+				for _, c := range existingDates {
+					if c == ',' {
+						parts = append(parts, current)
+						current = ""
+					} else {
+						current += string(c)
+					}
+				}
+				if current != "" {
+					parts = append(parts, current)
+				}
+
+				var existingStart, existingEnd string
+				if len(parts) >= 2 {
+					existingStart = parts[0]
+					existingEnd = parts[1]
+				} else if len(parts) == 1 {
+					existingStart = parts[0]
+					existingEnd = parts[0]
+				}
+
+				// Skip if dates are the same
+				if existingStart == clientHoliday.StartDate && existingEnd == clientHoliday.EndDate {
+					tflog.Debug(ctx, "Holiday unchanged, skipping", map[string]any{"name": clientHoliday.Name})
+					continue
+				}
+
+				// Delete and recreate to update
+				tflog.Info(ctx, "Updating holiday", map[string]any{"name": clientHoliday.Name})
+				err := r.client.DeleteHolidays(plan.ProjectName.ValueString(), []string{clientHoliday.Name})
+				if err != nil {
+					resp.Diagnostics.AddError(
+						"Error updating holiday",
+						fmt.Sprintf("Could not delete existing holiday '%s': %s", clientHoliday.Name, err.Error()),
+					)
+					return
+				}
+			}
+
+			// Create the holiday
+			err := r.client.CreateHoliday(plan.ProjectName.ValueString(), clientHoliday)
+			if err != nil {
+				resp.Diagnostics.AddError(
+					"Error creating holiday",
+					fmt.Sprintf("Could not create holiday '%s': %s", clientHoliday.Name, err.Error()),
+				)
+				return
+			}
+		}
+
+		// Convert sorted holidays back to types.List and store in plan
+		listValue, diags := types.ListValueFrom(ctx, types.ObjectType{
+			AttrTypes: map[string]attr.Type{
+				"name":       types.StringType,
+				"start_date": types.StringType,
+				"end_date":   types.StringType,
+			},
+		}, configHolidays)
+		resp.Diagnostics.Append(diags...)
+		if resp.Diagnostics.HasError() {
+			return
+		}
+		plan.HolidaySettings = listValue
+	} else {
+		// No holiday settings in config - delete all existing holidays
+		tflog.Info(ctx, "Holiday settings removed from config, deleting all holidays")
+
+		// Get current holidays from API
+		currentHolidays, err := r.client.GetHolidays(plan.ProjectName.ValueString())
+		if err != nil {
+			tflog.Warn(ctx, "Could not get current holidays for deletion", map[string]any{"error": err.Error()})
+		} else if len(currentHolidays) > 0 {
+			// Delete all holidays
+			var holidaysToDelete []string
+			for name := range currentHolidays {
+				holidaysToDelete = append(holidaysToDelete, name)
+			}
+
+			tflog.Info(ctx, "Deleting all holidays", map[string]any{"count": len(holidaysToDelete)})
+			err := r.client.DeleteHolidays(plan.ProjectName.ValueString(), holidaysToDelete)
+			if err != nil {
+				resp.Diagnostics.AddError(
+					"Error deleting holidays",
+					fmt.Sprintf("Could not delete holidays: %s", err.Error()),
+				)
+				return
+			}
+		}
+
+		// Set to null
+		plan.HolidaySettings = types.ListNull(types.ObjectType{
+			AttrTypes: map[string]attr.Type{
+				"name":       types.StringType,
+				"start_date": types.StringType,
+				"end_date":   types.StringType,
+			},
 		})
 	}
 
