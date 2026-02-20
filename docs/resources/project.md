@@ -113,6 +113,43 @@ resource "insightfinder_project" "servicenow_project" {
 }
 ```
 
+### Project with Holiday Settings
+
+```terraform
+resource "insightfinder_project" "holidays_example" {
+  project_name = "project-with-holidays"
+  system_name  = "Production"
+
+  project_creation_config = {
+    data_type          = "Log"
+    instance_type      = "PrivateCloud"
+    project_cloud_type = "PrivateCloud"
+  }
+
+  project_display_name = "Project with Holiday Settings"
+  sampling_interval    = 600
+
+  # Define holidays that affect anomaly detection
+  holiday_settings = [
+    {
+      name       = "christmas"
+      start_date = "12-25"
+      end_date   = "12-26"
+    },
+    {
+      name       = "new_year"
+      start_date = "01-01"
+      end_date   = "01-01"
+    },
+    {
+      name       = "independence_day"
+      start_date = "07-04"
+      end_date   = "07-04"
+    }
+  ]
+}
+```
+
 ## Schema
 
 ### Required
@@ -153,6 +190,10 @@ resource "insightfinder_project" "servicenow_project" {
   - `sysparm_query` (String, Optional) ServiceNow query parameter
   - `proxy` (String, Optional) Proxy URL for ServiceNow connection
   - `additional_fields` (List of String, Optional) Additional fields to fetch from ServiceNow
+- `holiday_settings` (List of Objects) List of holiday settings for the project. Each holiday defines a period that should be treated as a holiday for anomaly detection purposes.
+  - `name` (String, Required) Name of the holiday (must be unique within the project)
+  - `start_date` (String, Required) Start date of the holiday in MM-DD format (e.g., `12-25`)
+  - `end_date` (String, Required) End date of the holiday in MM-DD format (e.g., `12-26`)
 
 See full schema in the [complete example](https://github.com/insightfinder/terraform-provider-insightfinder/tree/main/examples/resources/insightfinder_project).
 

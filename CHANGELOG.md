@@ -5,6 +5,27 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.4.1] - 2026-02-09
+
+### Fixed
+- **insightfinder_project**: Fixed holiday_settings order inconsistency issue
+  - Holiday settings now preserve the order defined in configuration
+  - Resolved "Provider produced inconsistent result after apply" errors
+  - Read operation now maintains existing holiday order from state when refreshing
+  - Prevents unnecessary plan changes due to reordering
+
+## [1.4.0] - 2026-02-09
+
+### Added
+- **insightfinder_project**: Added `holiday_settings` attribute for managing project holidays
+  - New optional nested list to define holiday periods for anomaly detection
+  - Each holiday requires `name`, `start_date` (MM-DD format), and `end_date` (MM-DD format)
+  - Holidays are automatically created, updated, and deleted to match configuration
+  - Supports full CRUD operations via `/api/external/v1/holiday` endpoint
+  - Holidays are sorted by name to maintain consistent ordering
+  - Updated documentation and examples to demonstrate holiday configuration
+  - Helps improve anomaly detection accuracy during expected holiday periods
+
 ## [1.3.2] - 2026-02-06
 
 ### Added

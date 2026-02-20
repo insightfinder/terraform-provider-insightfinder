@@ -79,6 +79,43 @@ func (c *Client) DoRequest(method, path string, body interface{}) ([]byte, int, 
 	return respBody, resp.StatusCode, nil
 }
 
+// DoRequestWithLicenseKeyHeader performs an HTTP request with X-License-Key header
+// Some API endpoints (like holiday API) use X-License-Key instead of X-API-Key
+func (c *Client) DoRequestWithLicenseKeyHeader(method, path string, body interface{}) ([]byte, int, error) {
+	var reqBody io.Reader
+	if body != nil {
+		jsonBody, err := json.Marshal(body)
+		if err != nil {
+			return nil, 0, fmt.Errorf("failed to marshal request body: %w", err)
+		}
+		reqBody = bytes.NewBuffer(jsonBody)
+	}
+
+	url := fmt.Sprintf("%s%s", c.BaseURL, path)
+	req, err := http.NewRequest(method, url, reqBody)
+	if err != nil {
+		return nil, 0, fmt.Errorf("failed to create request: %w", err)
+	}
+
+	// Add authentication headers with X-License-Key
+	req.Header.Set("X-User-Name", c.Username)
+	req.Header.Set("X-License-Key", c.LicenseKey)
+	req.Header.Set("Content-Type", "application/json")
+
+	resp, err := c.HTTPClient.Do(req)
+	if err != nil {
+		return nil, 0, fmt.Errorf("failed to execute request: %w", err)
+	}
+	defer resp.Body.Close()
+
+	respBody, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, resp.StatusCode, fmt.Errorf("failed to read response body: %w", err)
+	}
+
+	return respBody, resp.StatusCode, nil
+}
+
 // DoFormRequest performs an HTTP request with form data
 func (c *Client) DoFormRequest(method, path string, formData url.Values) ([]byte, int, error) {
 	// Add authentication to form data
