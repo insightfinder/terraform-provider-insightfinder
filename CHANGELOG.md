@@ -5,6 +5,23 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.5.0] - 2026-02-20
+
+### Added
+- **insightfinder_project**: Added `json_key_settings` attribute for managing custom JSON fields in logs
+  - New optional nested list to define custom JSON fields extracted from logs
+  - Each JSON key requires `json_key`, `type`, and `summary_setting` fields
+  - `json_key`: The JSON field name to extract from logs
+  - `type`: The data type (e.g., `string`, `number`, `JSONArray`)
+  - `summary_setting`: Boolean flag to include the field in summary statistics
+  - Supports full CRUD operations via two separate endpoints:
+    - `GET/POST /api/external/v1/logjsontype` for JSON key type management
+    - `GET/POST /api/external/v1/logsummarysettings` for summary setting management
+  - API response order is not relied upon; preserves configuration order in state
+  - JSON keys are tracked by name to maintain consistent ordering across API calls
+  - Updated documentation and examples to demonstrate JSON key configuration
+  - Helps extract and analyze custom fields from structured JSON logs
+
 ## [1.4.1] - 2026-02-09
 
 ### Fixed

@@ -98,6 +98,52 @@ resource "insightfinder_project" "servicenow_incidents" {
   retention_time       = 90
 }
 
+# Project with custom JSON key settings
+resource "insightfinder_project" "json_logs" {
+  project_name = "json-structured-logs"
+  system_name  = "Production"
+
+  project_creation_config = {
+    data_type          = "Log"
+    instance_type      = "PrivateCloud"
+    project_cloud_type = "PrivateCloud"
+    insight_agent_type = "LogStreaming"
+  }
+
+  project_display_name = "Structured JSON Logs"
+  project_time_zone    = "UTC"
+  sampling_interval    = 600
+  retention_time       = 90
+
+  # Define JSON key settings for extracting custom fields from logs
+  json_key_settings = [
+    {
+      json_key       = "api"
+      type           = "string"
+      summary_setting = false
+    },
+    {
+      json_key       = "api2"
+      type           = "string"
+      summary_setting = true
+    },
+    {
+      json_key       = "state"
+      type           = "number"
+      summary_setting = true
+    },
+    {
+      json_key       = "status"
+      type           = "string"
+      summary_setting = false
+    },
+    {
+      json_key       = "user"
+      type           = "JSONArray"
+      summary_setting = false
+    }
+  ]
+}
 variable "username" {
   description = "InsightFinder username"
   type        = string
