@@ -163,6 +163,7 @@ type projectResourceModel struct {
 	WebhookHeaderList         types.String `tfsdk:"webhook_header_list"`
 	SharedUsernames           types.String `tfsdk:"shared_usernames"`
 	LogLabelSettings          types.List   `tfsdk:"log_label_settings"`
+	JsonKeySettings           types.List   `tfsdk:"json_key_settings"`
 	ProjectServiceNowSettings types.Object `tfsdk:"project_servicenow_settings"`
 	HolidaySettings           types.List   `tfsdk:"holiday_settings"`
 }
@@ -171,6 +172,12 @@ type holidaySettingModel struct {
 	Name      types.String `tfsdk:"name"`
 	StartDate types.String `tfsdk:"start_date"`
 	EndDate   types.String `tfsdk:"end_date"`
+}
+
+type jsonKeySettingModel struct {
+	JsonKey        types.String `tfsdk:"json_key"`
+	Type           types.String `tfsdk:"type"`
+	SummarySetting types.Bool   `tfsdk:"summary_setting"`
 }
 
 type projectCreationConfigModel struct {
@@ -837,6 +844,27 @@ func (r *projectResource) Schema(_ context.Context, _ resource.SchemaRequest, re
 						},
 						"end_date": schema.StringAttribute{
 							Description: "End date of the holiday in MM-DD format (e.g., '12-26')",
+							Required:    true,
+						},
+					},
+				},
+			},
+			"json_key_settings": schema.ListNestedAttribute{
+				Description: "List of JSON key settings for the project. Manages custom JSON fields extracted from logs.",
+				Optional:    true,
+				Computed:    true,
+				NestedObject: schema.NestedAttributeObject{
+					Attributes: map[string]schema.Attribute{
+						"json_key": schema.StringAttribute{
+							Description: "The JSON key name to extract from logs",
+							Required:    true,
+						},
+						"type": schema.StringAttribute{
+							Description: "The data type of the JSON value (e.g., 'string', 'number', 'JSONArray')",
+							Required:    true,
+						},
+						"summary_setting": schema.BoolAttribute{
+							Description: "Whether to include this key in the summary",
 							Required:    true,
 						},
 					},
@@ -2008,6 +2036,70 @@ func (r *projectResource) Create(ctx context.Context, req resource.CreateRequest
 		})
 	}
 
+	// Process json_key_settings
+	if !config.JsonKeySettings.IsNull() && !config.JsonKeySettings.IsUnknown() {
+		var configJsonKeys []jsonKeySettingModel
+		diags = config.JsonKeySettings.ElementsAs(ctx, &configJsonKeys, false)
+		resp.Diagnostics.Append(diags...)
+		if resp.Diagnostics.HasError() {
+			return
+		}
+
+		tflog.Info(ctx, "Processing JSON key settings", map[string]any{"count": len(configJsonKeys)})
+
+		// Convert to client format
+		var jsonKeysToUpdate []client.JsonKeyType
+		var summaryKeys []string
+
+		for _, jsonKeySetting := range configJsonKeys {
+			jsonKeyType := client.JsonKeyType{
+				JsonKey:      jsonKeySetting.JsonKey.ValueString(),
+				Type:         jsonKeySetting.Type.ValueString(),
+				SummaryCheck: jsonKeySetting.SummarySetting.ValueBool(),
+			}
+			jsonKeysToUpdate = append(jsonKeysToUpdate, jsonKeyType)
+
+			// Track which keys have summary settings enabled
+			if jsonKeySetting.SummarySetting.ValueBool() {
+				summaryKeys = append(summaryKeys, jsonKeySetting.JsonKey.ValueString())
+			}
+		}
+
+		// Update JSON key types
+		if len(jsonKeysToUpdate) > 0 {
+			err := r.client.UpdateJsonKeyTypes(plan.ProjectName.ValueString(), jsonKeysToUpdate)
+			if err != nil {
+				resp.Diagnostics.AddError(
+					"Error updating JSON key types",
+					fmt.Sprintf("Could not update JSON key types: %s", err.Error()),
+				)
+				return
+			}
+		}
+
+		// Update summary settings
+		err := r.client.UpdateJsonKeySummarySettings(plan.ProjectName.ValueString(), summaryKeys)
+		if err != nil {
+			resp.Diagnostics.AddError(
+				"Error updating JSON key summary settings",
+				fmt.Sprintf("Could not update summary settings: %s", err.Error()),
+			)
+			return
+		}
+
+		// Preserve the config order in plan
+		plan.JsonKeySettings = config.JsonKeySettings
+	} else {
+		// No JSON key settings in config - set to null
+		plan.JsonKeySettings = types.ListNull(types.ObjectType{
+			AttrTypes: map[string]attr.Type{
+				"json_key":        types.StringType,
+				"type":            types.StringType,
+				"summary_setting": types.BoolType,
+			},
+		})
+	}
+
 	// SystemName and ProjectCreationConfig are config-only (not returned by API)
 	plan.SystemName = config.SystemName
 	plan.ProjectCreationConfig = config.ProjectCreationConfig
@@ -2433,6 +2525,99 @@ func (r *projectResource) Read(ctx context.Context, req resource.ReadRequest, re
 				},
 			})
 		}
+	}
+
+	// Read JSON key settings from API
+	jsonKeyTypes, err := r.client.GetJsonKeyTypes(state.ProjectName.ValueString())
+	if err != nil {
+		tflog.Warn(ctx, "Could not read JSON key types", map[string]any{"error": err.Error()})
+		// Keep existing state if we can't read from API
+	} else if len(jsonKeyTypes) > 0 {
+		// Get summary settings
+		summarySettings, err := r.client.GetJsonKeySummarySettings(state.ProjectName.ValueString())
+		if err != nil {
+			tflog.Warn(ctx, "Could not read JSON key summary settings", map[string]any{"error": err.Error()})
+			summarySettings = []string{}
+		}
+
+		// Create a set for quick lookup of summary keys
+		summarySet := make(map[string]bool)
+		for _, key := range summarySettings {
+			summarySet[key] = true
+		}
+
+		// Extract existing state for order preservation
+		var existingJsonKeys []jsonKeySettingModel
+		if !state.JsonKeySettings.IsNull() && !state.JsonKeySettings.IsUnknown() {
+			state.JsonKeySettings.ElementsAs(ctx, &existingJsonKeys, false)
+		}
+
+		// Create a map of API JSON keys for lookup
+		apiJsonKeyMap := make(map[string]jsonKeySettingModel)
+		for _, jsonKey := range jsonKeyTypes {
+			apiJsonKeyMap[jsonKey.JsonKey] = jsonKeySettingModel{
+				JsonKey:        types.StringValue(jsonKey.JsonKey),
+				Type:           types.StringValue(jsonKey.Type),
+				SummarySetting: types.BoolValue(summarySet[jsonKey.JsonKey]),
+			}
+		}
+
+		// Build the final list, preserving existing order where possible
+		var jsonKeySettings []jsonKeySettingModel
+		seenKeys := make(map[string]bool)
+
+		// First, add JSON keys that were in the existing state (preserving order)
+		for _, existing := range existingJsonKeys {
+			key := existing.JsonKey.ValueString()
+			if apiKey, exists := apiJsonKeyMap[key]; exists {
+				jsonKeySettings = append(jsonKeySettings, apiKey)
+				seenKeys[key] = true
+			}
+		}
+
+		// Then, add any new JSON keys from API that weren't in existing state (sorted)
+		var newKeys []jsonKeySettingModel
+		for key, jsonKey := range apiJsonKeyMap {
+			if !seenKeys[key] {
+				newKeys = append(newKeys, jsonKey)
+			}
+		}
+		// Sort new keys by json_key name for consistent ordering
+		sort.Slice(newKeys, func(i, j int) bool {
+			return newKeys[i].JsonKey.ValueString() < newKeys[j].JsonKey.ValueString()
+		})
+		jsonKeySettings = append(jsonKeySettings, newKeys...)
+
+		// Convert to types.List
+		if len(jsonKeySettings) > 0 {
+			listValue, diags := types.ListValueFrom(ctx, types.ObjectType{
+				AttrTypes: map[string]attr.Type{
+					"json_key":        types.StringType,
+					"type":            types.StringType,
+					"summary_setting": types.BoolType,
+				},
+			}, jsonKeySettings)
+			resp.Diagnostics.Append(diags...)
+			if !resp.Diagnostics.HasError() {
+				state.JsonKeySettings = listValue
+			}
+		} else {
+			state.JsonKeySettings = types.ListNull(types.ObjectType{
+				AttrTypes: map[string]attr.Type{
+					"json_key":        types.StringType,
+					"type":            types.StringType,
+					"summary_setting": types.BoolType,
+				},
+			})
+		}
+	} else {
+		state.JsonKeySettings = types.ListNull(types.ObjectType{
+			AttrTypes: map[string]attr.Type{
+				"json_key":        types.StringType,
+				"type":            types.StringType,
+				"summary_setting": types.BoolType,
+			},
+		})
 	}
 
 	diags = resp.State.Set(ctx, &state)
@@ -3033,6 +3218,70 @@ func (r *projectResource) Update(ctx context.Context, req resource.UpdateRequest
 				"name":       types.StringType,
 				"start_date": types.StringType,
 				"end_date":   types.StringType,
+			},
+		})
+	}
+
+	// Process json_key_settings
+	if !config.JsonKeySettings.IsNull() && !config.JsonKeySettings.IsUnknown() {
+		var configJsonKeys []jsonKeySettingModel
+		diags = config.JsonKeySettings.ElementsAs(ctx, &configJsonKeys, false)
+		resp.Diagnostics.Append(diags...)
+		if resp.Diagnostics.HasError() {
+			return
+		}
+
+		tflog.Info(ctx, "Processing JSON key settings", map[string]any{"count": len(configJsonKeys)})
+
+		// Convert to client format
+		var jsonKeysToUpdate []client.JsonKeyType
+		var summaryKeys []string
+
+		for _, jsonKeySetting := range configJsonKeys {
+			jsonKeyType := client.JsonKeyType{
+				JsonKey:      jsonKeySetting.JsonKey.ValueString(),
+				Type:         jsonKeySetting.Type.ValueString(),
+				SummaryCheck: jsonKeySetting.SummarySetting.ValueBool(),
+			}
+			jsonKeysToUpdate = append(jsonKeysToUpdate, jsonKeyType)
+
+			// Track which keys have summary settings enabled
+			if jsonKeySetting.SummarySetting.ValueBool() {
+				summaryKeys = append(summaryKeys, jsonKeySetting.JsonKey.ValueString())
+			}
+		}
+
+		// Update JSON key types
+		if len(jsonKeysToUpdate) > 0 {
+			err := r.client.UpdateJsonKeyTypes(plan.ProjectName.ValueString(), jsonKeysToUpdate)
+			if err != nil {
+				resp.Diagnostics.AddError(
+					"Error updating JSON key types",
+					fmt.Sprintf("Could not update JSON key types: %s", err.Error()),
+				)
+				return
+			}
+		}
+
+		// Update summary settings
+		err := r.client.UpdateJsonKeySummarySettings(plan.ProjectName.ValueString(), summaryKeys)
+		if err != nil {
+			resp.Diagnostics.AddError(
+				"Error updating JSON key summary settings",
+				fmt.Sprintf("Could not update summary settings: %s", err.Error()),
+			)
+			return
+		}
+
+		// Preserve the config order in plan
+		plan.JsonKeySettings = config.JsonKeySettings
+	} else {
+		// No JSON key settings in config - set to null
+		plan.JsonKeySettings = types.ListNull(types.ObjectType{
+			AttrTypes: map[string]attr.Type{
+				"json_key":        types.StringType,
+				"type":            types.StringType,
+				"summary_setting": types.BoolType,
 			},
 		})
 	}
