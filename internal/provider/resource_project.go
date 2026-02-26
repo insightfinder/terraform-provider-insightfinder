@@ -1540,7 +1540,8 @@ func (r *projectResource) Create(ctx context.Context, req resource.CreateRequest
 		// JSON String Fields
 		plan.BaseValueSetting = getJSONString("baseValueSetting")
 		plan.CdfSetting = getJSONString("cdfSetting")
-		plan.EmailSetting = getJSONString("emailSetting")
+		// Preserve user's email_setting from config to avoid drift from API-enriched values
+		plan.EmailSetting = config.EmailSetting
 		plan.InstanceGroupingUpdate = getJSONString("instanceGroupingUpdate")
 		plan.LlmEvaluationSetting = getJSONString("llmEvaluationSetting")
 		plan.LogToLogSettingList = getJSONString("logToLogSettingList")
@@ -2887,7 +2888,8 @@ func (r *projectResource) Update(ctx context.Context, req resource.UpdateRequest
 		// JSON String Fields
 		plan.BaseValueSetting = getJSONString("baseValueSetting")
 		plan.CdfSetting = getJSONString("cdfSetting")
-		plan.EmailSetting = getJSONString("emailSetting")
+		// Preserve user's email_setting from config to avoid drift from API-enriched values
+		plan.EmailSetting = config.EmailSetting
 		plan.InstanceGroupingUpdate = getJSONString("instanceGroupingUpdate")
 		plan.LlmEvaluationSetting = getJSONString("llmEvaluationSetting")
 		plan.LogToLogSettingList = getJSONString("logToLogSettingList")
