@@ -400,10 +400,10 @@ func (c *Client) DeleteProject(projectName string) error {
 
 // JsonKeyType represents a JSON key configuration
 type JsonKeyType struct {
-	JsonKey       string `json:"jsonKey"`
-	Type          string `json:"type"`
-	SummaryCheck  bool   `json:"summaryCheck"`
-	MetaFieldCheck bool  `json:"metaFieldCheck"`
+	JsonKey        string `json:"jsonKey"`
+	Type           string `json:"type"`
+	SummaryCheck   bool   `json:"summaryCheck"`
+	MetaFieldCheck bool   `json:"metaFieldCheck"`
 }
 
 // GetJsonKeyTypes retrieves the list of JSON key types for a project
@@ -434,7 +434,7 @@ func (c *Client) GetJsonKeyTypes(projectName string) ([]JsonKeyType, error) {
 
 // JsonKeySummarySettings represents the response from logsummarysettings API
 type JsonKeySummarySettings struct {
-	SummarySetting  []string `json:"summarySetting"`
+	SummarySetting   []string `json:"summarySetting"`
 	MetaFieldSetting []string `json:"metaFieldSetting"`
 }
 
@@ -503,7 +503,7 @@ func (c *Client) UpdateJsonKeySummarySettings(projectName string, summaryKeys []
 	path := fmt.Sprintf("/api/external/v1/logsummarysettings?projectName=%s", url.QueryEscape(projectQualifiedName))
 
 	payload := map[string][]string{
-		"summarySetting":  summaryKeys,
+		"summarySetting":   summaryKeys,
 		"metaFieldSetting": metafieldKeys,
 	}
 

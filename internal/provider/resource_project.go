@@ -2105,9 +2105,9 @@ func (r *projectResource) Create(ctx context.Context, req resource.CreateRequest
 		// No JSON key settings in config - set to null
 		plan.JsonKeySettings = types.ListNull(types.ObjectType{
 			AttrTypes: map[string]attr.Type{
-				"json_key":           types.StringType,
-				"type":               types.StringType,
-				"summary_setting":    types.BoolType,
+				"json_key":          types.StringType,
+				"type":              types.StringType,
+				"summary_setting":   types.BoolType,
 				"metafield_setting": types.BoolType,
 			},
 		})
@@ -2611,9 +2611,9 @@ func (r *projectResource) Read(ctx context.Context, req resource.ReadRequest, re
 		if len(jsonKeySettings) > 0 {
 			listValue, diags := types.ListValueFrom(ctx, types.ObjectType{
 				AttrTypes: map[string]attr.Type{
-					"json_key":           types.StringType,
-					"type":               types.StringType,
-					"summary_setting":    types.BoolType,
+					"json_key":          types.StringType,
+					"type":              types.StringType,
+					"summary_setting":   types.BoolType,
 					"metafield_setting": types.BoolType,
 				},
 			}, jsonKeySettings)
@@ -2624,9 +2624,9 @@ func (r *projectResource) Read(ctx context.Context, req resource.ReadRequest, re
 		} else {
 			state.JsonKeySettings = types.ListNull(types.ObjectType{
 				AttrTypes: map[string]attr.Type{
-					"json_key":           types.StringType,
-					"type":               types.StringType,
-					"summary_setting":    types.BoolType,
+					"json_key":          types.StringType,
+					"type":              types.StringType,
+					"summary_setting":   types.BoolType,
 					"metafield_setting": types.BoolType,
 				},
 			})
@@ -2634,9 +2634,9 @@ func (r *projectResource) Read(ctx context.Context, req resource.ReadRequest, re
 	} else {
 		state.JsonKeySettings = types.ListNull(types.ObjectType{
 			AttrTypes: map[string]attr.Type{
-				"json_key":           types.StringType,
-				"type":               types.StringType,
-				"summary_setting":    types.BoolType,
+				"json_key":          types.StringType,
+				"type":              types.StringType,
+				"summary_setting":   types.BoolType,
 				"metafield_setting": types.BoolType,
 			},
 		})
@@ -3308,9 +3308,9 @@ func (r *projectResource) Update(ctx context.Context, req resource.UpdateRequest
 		// No JSON key settings in config - set to null
 		plan.JsonKeySettings = types.ListNull(types.ObjectType{
 			AttrTypes: map[string]attr.Type{
-				"json_key":           types.StringType,
-				"type":               types.StringType,
-				"summary_setting":    types.BoolType,
+				"json_key":          types.StringType,
+				"type":              types.StringType,
+				"summary_setting":   types.BoolType,
 				"metafield_setting": types.BoolType,
 			},
 		})
