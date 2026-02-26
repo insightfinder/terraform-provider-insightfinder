@@ -118,29 +118,34 @@ resource "insightfinder_project" "json_logs" {
   # Define JSON key settings for extracting custom fields from logs
   json_key_settings = [
     {
-      json_key       = "api"
-      type           = "string"
-      summary_setting = false
+      json_key           = "api"
+      type               = "string"
+      summary_setting    = false
+      metafield_setting  = false
     },
     {
-      json_key       = "api2"
-      type           = "string"
-      summary_setting = true
+      json_key           = "api2"
+      type               = "string"
+      summary_setting    = true
+      metafield_setting  = false
     },
     {
-      json_key       = "state"
-      type           = "number"
-      summary_setting = true
+      json_key           = "state"
+      type               = "number"
+      summary_setting    = true
+      metafield_setting  = true
     },
     {
-      json_key       = "status"
-      type           = "string"
-      summary_setting = false
+      json_key           = "status"
+      type               = "string"
+      summary_setting    = false
+      metafield_setting  = true
     },
     {
-      json_key       = "user"
-      type           = "JSONArray"
-      summary_setting = false
+      json_key           = "user"
+      type               = "JSONArray"
+      summary_setting    = false
+      metafield_setting  = false
     }
   ]
 }
