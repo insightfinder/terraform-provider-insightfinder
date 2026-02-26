@@ -472,21 +472,20 @@ func (c *Client) UpdateJsonKeyTypes(projectName string, jsonKeys []JsonKeyType) 
 
 	projectQualifiedName := fmt.Sprintf("%s@%s", projectName, c.Username)
 
-	// Build the request payload
-	payload := map[string]interface{}{
-		"projectName": projectQualifiedName,
-		"jsonTypes":   jsonKeys,
-	}
-
-	// Marshal the payload to JSON
-	payloadJSON, err := json.Marshal(payload)
+	// Marshal the JSON keys to JSON
+	jsonKeysJSON, err := json.Marshal(jsonKeys)
 	if err != nil {
-		return fmt.Errorf("failed to marshal request payload: %w", err)
+		return fmt.Errorf("failed to marshal JSON keys: %w", err)
 	}
 
-	// Make the POST request with JSON body
+	// Build form data payload
+	formData := url.Values{}
+	formData.Set("projectName", projectQualifiedName)
+	formData.Set("jsonTypes", string(jsonKeysJSON))
+
 	path := "/api/external/v1/logjsontype"
-	body, statusCode, err := c.DoRequest("POST", path, payloadJSON)
+
+	body, statusCode, err := c.DoFormRequest("POST", path, formData)
 	if err != nil {
 		return err
 	}
