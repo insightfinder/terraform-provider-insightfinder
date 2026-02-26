@@ -1341,7 +1341,8 @@ func (r *projectResource) Create(ctx context.Context, req resource.CreateRequest
 			"error": err.Error(),
 			"note":  "State may not reflect all API values",
 		})
-		// If we can't read from API, use the config as state
+		// If we can't read from API, use the config as state but with ID set
+		config.ID = plan.ProjectName
 		resp.State.Set(ctx, config)
 		return
 	}
