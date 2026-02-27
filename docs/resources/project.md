@@ -171,29 +171,34 @@ resource "insightfinder_project" "json_logs_example" {
   # Define JSON key settings for extracting custom fields from logs
   json_key_settings = [
     {
-      json_key        = "api"
-      type            = "string"
-      summary_setting = false
+      json_key           = "api"
+      type               = "string"
+      summary_setting    = false
+      metafield_setting  = false
     },
     {
-      json_key        = "api2"
-      type            = "string"
-      summary_setting = true
+      json_key           = "api2"
+      type               = "string"
+      summary_setting    = true
+      metafield_setting  = false
     },
     {
-      json_key        = "state"
-      type            = "number"
-      summary_setting = true
+      json_key           = "state"
+      type               = "number"
+      summary_setting    = true
+      metafield_setting  = true
     },
     {
-      json_key        = "status"
-      type            = "string"
-      summary_setting = false
+      json_key           = "status"
+      type               = "string"
+      summary_setting    = false
+      metafield_setting  = true
     },
     {
-      json_key        = "user"
-      type            = "JSONArray"
-      summary_setting = false
+      json_key           = "user"
+      type               = "JSONArray"
+      summary_setting    = false
+      metafield_setting  = false
     }
   ]
 }
@@ -242,10 +247,11 @@ resource "insightfinder_project" "json_logs_example" {
   - `name` (String, Required) Name of the holiday (must be unique within the project)
   - `start_date` (String, Required) Start date of the holiday in MM-DD format (e.g., `12-25`)
   - `end_date` (String, Required) End date of the holiday in MM-DD format (e.g., `12-26`)
-- `json_key_settings` (List of Objects) List of JSON key settings for extracting custom fields from JSON-structured logs. Manages which JSON keys are available for analysis and which should be included in summary statistics.
+- `json_key_settings` (List of Objects) List of JSON key settings for extracting custom fields from JSON-structured logs. Manages which JSON keys are available for analysis and which should be included in summary and metafield statistics.
   - `json_key` (String, Required) The JSON key name to extract from logs
   - `type` (String, Required) The data type of the JSON value (e.g., `string`, `number`, `JSONArray`)
   - `summary_setting` (Boolean, Required) Whether to include this key in the summary statistics. When `true`, the key's values will be aggregated in summary reports.
+  - `metafield_setting` (Boolean, Required) Whether to include this key in the metafield statistics. When `true`, the key's values will be tracked as metafield data for enhanced log analysis.
 
 See full schema in the [complete example](https://github.com/insightfinder/terraform-provider-insightfinder/tree/main/examples/resources/insightfinder_project).
 

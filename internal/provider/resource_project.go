@@ -175,9 +175,10 @@ type holidaySettingModel struct {
 }
 
 type jsonKeySettingModel struct {
-	JsonKey        types.String `tfsdk:"json_key"`
-	Type           types.String `tfsdk:"type"`
-	SummarySetting types.Bool   `tfsdk:"summary_setting"`
+	JsonKey          types.String `tfsdk:"json_key"`
+	Type             types.String `tfsdk:"type"`
+	SummarySetting   types.Bool   `tfsdk:"summary_setting"`
+	MetafieldSetting types.Bool   `tfsdk:"metafield_setting"`
 }
 
 type projectCreationConfigModel struct {
@@ -864,7 +865,11 @@ func (r *projectResource) Schema(_ context.Context, _ resource.SchemaRequest, re
 							Required:    true,
 						},
 						"summary_setting": schema.BoolAttribute{
-							Description: "Whether to include this key in the summary",
+							Description: "Whether to include this key in the summary statistics",
+							Required:    true,
+						},
+						"metafield_setting": schema.BoolAttribute{
+							Description: "Whether to include this key in the metafield settings",
 							Required:    true,
 						},
 					},
@@ -1336,7 +1341,8 @@ func (r *projectResource) Create(ctx context.Context, req resource.CreateRequest
 			"error": err.Error(),
 			"note":  "State may not reflect all API values",
 		})
-		// If we can't read from API, use the config as state
+		// If we can't read from API, use the config as state but with ID set
+		config.ID = plan.ProjectName
 		resp.State.Set(ctx, config)
 		return
 	}
@@ -1534,7 +1540,8 @@ func (r *projectResource) Create(ctx context.Context, req resource.CreateRequest
 		// JSON String Fields
 		plan.BaseValueSetting = getJSONString("baseValueSetting")
 		plan.CdfSetting = getJSONString("cdfSetting")
-		plan.EmailSetting = getJSONString("emailSetting")
+		// Preserve user's email_setting from config to avoid drift from API-enriched values
+		plan.EmailSetting = config.EmailSetting
 		plan.InstanceGroupingUpdate = getJSONString("instanceGroupingUpdate")
 		plan.LlmEvaluationSetting = getJSONString("llmEvaluationSetting")
 		plan.LogToLogSettingList = getJSONString("logToLogSettingList")
@@ -2050,18 +2057,25 @@ func (r *projectResource) Create(ctx context.Context, req resource.CreateRequest
 		// Convert to client format
 		var jsonKeysToUpdate []client.JsonKeyType
 		var summaryKeys []string
+		var metafieldKeys []string
 
 		for _, jsonKeySetting := range configJsonKeys {
 			jsonKeyType := client.JsonKeyType{
-				JsonKey:      jsonKeySetting.JsonKey.ValueString(),
-				Type:         jsonKeySetting.Type.ValueString(),
-				SummaryCheck: jsonKeySetting.SummarySetting.ValueBool(),
+				JsonKey:        jsonKeySetting.JsonKey.ValueString(),
+				Type:           jsonKeySetting.Type.ValueString(),
+				SummaryCheck:   jsonKeySetting.SummarySetting.ValueBool(),
+				MetaFieldCheck: jsonKeySetting.MetafieldSetting.ValueBool(),
 			}
 			jsonKeysToUpdate = append(jsonKeysToUpdate, jsonKeyType)
 
 			// Track which keys have summary settings enabled
 			if jsonKeySetting.SummarySetting.ValueBool() {
 				summaryKeys = append(summaryKeys, jsonKeySetting.JsonKey.ValueString())
+			}
+
+			// Track which keys have metafield settings enabled
+			if jsonKeySetting.MetafieldSetting.ValueBool() {
+				metafieldKeys = append(metafieldKeys, jsonKeySetting.JsonKey.ValueString())
 			}
 		}
 
@@ -2077,12 +2091,12 @@ func (r *projectResource) Create(ctx context.Context, req resource.CreateRequest
 			}
 		}
 
-		// Update summary settings
-		err := r.client.UpdateJsonKeySummarySettings(plan.ProjectName.ValueString(), summaryKeys)
+		// Update summary and metafield settings
+		err := r.client.UpdateJsonKeySummarySettings(plan.ProjectName.ValueString(), summaryKeys, metafieldKeys)
 		if err != nil {
 			resp.Diagnostics.AddError(
-				"Error updating JSON key summary settings",
-				fmt.Sprintf("Could not update summary settings: %s", err.Error()),
+				"Error updating JSON key summary and metafield settings",
+				fmt.Sprintf("Could not update settings: %s", err.Error()),
 			)
 			return
 		}
@@ -2093,9 +2107,10 @@ func (r *projectResource) Create(ctx context.Context, req resource.CreateRequest
 		// No JSON key settings in config - set to null
 		plan.JsonKeySettings = types.ListNull(types.ObjectType{
 			AttrTypes: map[string]attr.Type{
-				"json_key":        types.StringType,
-				"type":            types.StringType,
-				"summary_setting": types.BoolType,
+				"json_key":          types.StringType,
+				"type":              types.StringType,
+				"summary_setting":   types.BoolType,
+				"metafield_setting": types.BoolType,
 			},
 		})
 	}
@@ -2533,17 +2548,22 @@ func (r *projectResource) Read(ctx context.Context, req resource.ReadRequest, re
 		tflog.Warn(ctx, "Could not read JSON key types", map[string]any{"error": err.Error()})
 		// Keep existing state if we can't read from API
 	} else if len(jsonKeyTypes) > 0 {
-		// Get summary settings
-		summarySettings, err := r.client.GetJsonKeySummarySettings(state.ProjectName.ValueString())
+		// Get summary and metafield settings
+		summarySettingsResp, err := r.client.GetJsonKeySummarySettings(state.ProjectName.ValueString())
 		if err != nil {
 			tflog.Warn(ctx, "Could not read JSON key summary settings", map[string]any{"error": err.Error()})
-			summarySettings = []string{}
+			summarySettingsResp = &client.JsonKeySummarySettings{}
 		}
 
-		// Create a set for quick lookup of summary keys
+		// Create sets for quick lookup
 		summarySet := make(map[string]bool)
-		for _, key := range summarySettings {
+		for _, key := range summarySettingsResp.SummarySetting {
 			summarySet[key] = true
+		}
+
+		metafieldSet := make(map[string]bool)
+		for _, key := range summarySettingsResp.MetaFieldSetting {
+			metafieldSet[key] = true
 		}
 
 		// Extract existing state for order preservation
@@ -2556,9 +2576,10 @@ func (r *projectResource) Read(ctx context.Context, req resource.ReadRequest, re
 		apiJsonKeyMap := make(map[string]jsonKeySettingModel)
 		for _, jsonKey := range jsonKeyTypes {
 			apiJsonKeyMap[jsonKey.JsonKey] = jsonKeySettingModel{
-				JsonKey:        types.StringValue(jsonKey.JsonKey),
-				Type:           types.StringValue(jsonKey.Type),
-				SummarySetting: types.BoolValue(summarySet[jsonKey.JsonKey]),
+				JsonKey:          types.StringValue(jsonKey.JsonKey),
+				Type:             types.StringValue(jsonKey.Type),
+				SummarySetting:   types.BoolValue(summarySet[jsonKey.JsonKey]),
+				MetafieldSetting: types.BoolValue(metafieldSet[jsonKey.JsonKey]),
 			}
 		}
 
@@ -2592,9 +2613,10 @@ func (r *projectResource) Read(ctx context.Context, req resource.ReadRequest, re
 		if len(jsonKeySettings) > 0 {
 			listValue, diags := types.ListValueFrom(ctx, types.ObjectType{
 				AttrTypes: map[string]attr.Type{
-					"json_key":        types.StringType,
-					"type":            types.StringType,
-					"summary_setting": types.BoolType,
+					"json_key":          types.StringType,
+					"type":              types.StringType,
+					"summary_setting":   types.BoolType,
+					"metafield_setting": types.BoolType,
 				},
 			}, jsonKeySettings)
 			resp.Diagnostics.Append(diags...)
@@ -2604,18 +2626,20 @@ func (r *projectResource) Read(ctx context.Context, req resource.ReadRequest, re
 		} else {
 			state.JsonKeySettings = types.ListNull(types.ObjectType{
 				AttrTypes: map[string]attr.Type{
-					"json_key":        types.StringType,
-					"type":            types.StringType,
-					"summary_setting": types.BoolType,
+					"json_key":          types.StringType,
+					"type":              types.StringType,
+					"summary_setting":   types.BoolType,
+					"metafield_setting": types.BoolType,
 				},
 			})
 		}
 	} else {
 		state.JsonKeySettings = types.ListNull(types.ObjectType{
 			AttrTypes: map[string]attr.Type{
-				"json_key":        types.StringType,
-				"type":            types.StringType,
-				"summary_setting": types.BoolType,
+				"json_key":          types.StringType,
+				"type":              types.StringType,
+				"summary_setting":   types.BoolType,
+				"metafield_setting": types.BoolType,
 			},
 		})
 	}
@@ -2864,7 +2888,8 @@ func (r *projectResource) Update(ctx context.Context, req resource.UpdateRequest
 		// JSON String Fields
 		plan.BaseValueSetting = getJSONString("baseValueSetting")
 		plan.CdfSetting = getJSONString("cdfSetting")
-		plan.EmailSetting = getJSONString("emailSetting")
+		// Preserve user's email_setting from config to avoid drift from API-enriched values
+		plan.EmailSetting = config.EmailSetting
 		plan.InstanceGroupingUpdate = getJSONString("instanceGroupingUpdate")
 		plan.LlmEvaluationSetting = getJSONString("llmEvaluationSetting")
 		plan.LogToLogSettingList = getJSONString("logToLogSettingList")
@@ -3236,18 +3261,25 @@ func (r *projectResource) Update(ctx context.Context, req resource.UpdateRequest
 		// Convert to client format
 		var jsonKeysToUpdate []client.JsonKeyType
 		var summaryKeys []string
+		var metafieldKeys []string
 
 		for _, jsonKeySetting := range configJsonKeys {
 			jsonKeyType := client.JsonKeyType{
-				JsonKey:      jsonKeySetting.JsonKey.ValueString(),
-				Type:         jsonKeySetting.Type.ValueString(),
-				SummaryCheck: jsonKeySetting.SummarySetting.ValueBool(),
+				JsonKey:        jsonKeySetting.JsonKey.ValueString(),
+				Type:           jsonKeySetting.Type.ValueString(),
+				SummaryCheck:   jsonKeySetting.SummarySetting.ValueBool(),
+				MetaFieldCheck: jsonKeySetting.MetafieldSetting.ValueBool(),
 			}
 			jsonKeysToUpdate = append(jsonKeysToUpdate, jsonKeyType)
 
 			// Track which keys have summary settings enabled
 			if jsonKeySetting.SummarySetting.ValueBool() {
 				summaryKeys = append(summaryKeys, jsonKeySetting.JsonKey.ValueString())
+			}
+
+			// Track which keys have metafield settings enabled
+			if jsonKeySetting.MetafieldSetting.ValueBool() {
+				metafieldKeys = append(metafieldKeys, jsonKeySetting.JsonKey.ValueString())
 			}
 		}
 
@@ -3263,12 +3295,12 @@ func (r *projectResource) Update(ctx context.Context, req resource.UpdateRequest
 			}
 		}
 
-		// Update summary settings
-		err := r.client.UpdateJsonKeySummarySettings(plan.ProjectName.ValueString(), summaryKeys)
+		// Update summary and metafield settings
+		err := r.client.UpdateJsonKeySummarySettings(plan.ProjectName.ValueString(), summaryKeys, metafieldKeys)
 		if err != nil {
 			resp.Diagnostics.AddError(
-				"Error updating JSON key summary settings",
-				fmt.Sprintf("Could not update summary settings: %s", err.Error()),
+				"Error updating JSON key summary and metafield settings",
+				fmt.Sprintf("Could not update settings: %s", err.Error()),
 			)
 			return
 		}
@@ -3279,9 +3311,10 @@ func (r *projectResource) Update(ctx context.Context, req resource.UpdateRequest
 		// No JSON key settings in config - set to null
 		plan.JsonKeySettings = types.ListNull(types.ObjectType{
 			AttrTypes: map[string]attr.Type{
-				"json_key":        types.StringType,
-				"type":            types.StringType,
-				"summary_setting": types.BoolType,
+				"json_key":          types.StringType,
+				"type":              types.StringType,
+				"summary_setting":   types.BoolType,
+				"metafield_setting": types.BoolType,
 			},
 		})
 	}

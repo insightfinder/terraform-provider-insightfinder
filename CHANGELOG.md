@@ -5,6 +5,19 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.6.0] - 2026-02-26
+
+### Added
+- **insightfinder_project**: Extended `json_key_settings` with `metafield_setting` field
+  - Added `metafield_setting` Boolean field to json_key_settings for metafield statistics management
+  - Each JSON key now requires `json_key`, `type`, `summary_setting`, and `metafield_setting` fields
+  - `metafield_setting`: Boolean flag to include the field in metafield statistics for enhanced log analysis
+  - Both summary and metafield settings are collected separately during Create/Update operations
+  - Both setting types are sent in a single API call with separate arrays for efficiency
+  - Read operation fetches both settings from API and properly merges with configuration
+  - Updated documentation and examples to demonstrate metafield_setting usage
+  - Enables flexible statistics collection: track fields in summary stats, metafield stats, both, or neither
+
 ## [1.5.0] - 2026-02-20
 
 ### Added

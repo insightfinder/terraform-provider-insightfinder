@@ -400,9 +400,10 @@ func (c *Client) DeleteProject(projectName string) error {
 
 // JsonKeyType represents a JSON key configuration
 type JsonKeyType struct {
-	JsonKey      string `json:"jsonKey"`
-	Type         string `json:"type"`
-	SummaryCheck bool   `json:"summaryCheck"`
+	JsonKey        string `json:"jsonKey"`
+	Type           string `json:"type"`
+	SummaryCheck   bool   `json:"summaryCheck"`
+	MetaFieldCheck bool   `json:"metaFieldCheck"`
 }
 
 // GetJsonKeyTypes retrieves the list of JSON key types for a project
@@ -431,8 +432,14 @@ func (c *Client) GetJsonKeyTypes(projectName string) ([]JsonKeyType, error) {
 	return jsonKeys, nil
 }
 
-// GetJsonKeySummarySettings retrieves which JSON keys have summary settings enabled
-func (c *Client) GetJsonKeySummarySettings(projectName string) ([]string, error) {
+// JsonKeySummarySettings represents the response from logsummarysettings API
+type JsonKeySummarySettings struct {
+	SummarySetting   []string `json:"summarySetting"`
+	MetaFieldSetting []string `json:"metaFieldSetting"`
+}
+
+// GetJsonKeySummarySettings retrieves which JSON keys have summary and metafield settings enabled
+func (c *Client) GetJsonKeySummarySettings(projectName string) (*JsonKeySummarySettings, error) {
 	projectQualifiedName := fmt.Sprintf("%s@%s", projectName, c.Username)
 	path := fmt.Sprintf("/api/external/v1/logsummarysettings?projectName=%s", url.QueryEscape(projectQualifiedName))
 
@@ -442,24 +449,19 @@ func (c *Client) GetJsonKeySummarySettings(projectName string) ([]string, error)
 	}
 
 	if statusCode == 404 {
-		return []string{}, nil // No summary settings
+		return &JsonKeySummarySettings{}, nil // No settings
 	}
 
 	if statusCode != 200 {
 		return nil, fmt.Errorf("failed to get JSON key summary settings: HTTP %d - %s", statusCode, string(body))
 	}
 
-	var response map[string][]string
+	var response JsonKeySummarySettings
 	if err := json.Unmarshal(body, &response); err != nil {
 		return nil, fmt.Errorf("failed to parse summary settings: %w", err)
 	}
 
-	summarySettings, ok := response["summarySetting"]
-	if !ok {
-		return []string{}, nil
-	}
-
-	return summarySettings, nil
+	return &response, nil
 }
 
 // UpdateJsonKeyTypes updates the JSON key types for a project
@@ -476,12 +478,14 @@ func (c *Client) UpdateJsonKeyTypes(projectName string, jsonKeys []JsonKeyType) 
 		return fmt.Errorf("failed to marshal JSON keys: %w", err)
 	}
 
-	// Build the URL with query parameters
-	path := fmt.Sprintf("/api/external/v1/logjsontype?projectName=%s&jsonTypes=%s",
-		url.QueryEscape(projectQualifiedName),
-		url.QueryEscape(string(jsonKeysJSON)))
+	// Build form data payload
+	formData := url.Values{}
+	formData.Set("projectName", projectQualifiedName)
+	formData.Set("jsonTypes", string(jsonKeysJSON))
 
-	body, statusCode, err := c.DoRequest("POST", path, nil)
+	path := "/api/external/v1/logjsontype"
+
+	body, statusCode, err := c.DoFormRequest("POST", path, formData)
 	if err != nil {
 		return err
 	}
@@ -493,13 +497,14 @@ func (c *Client) UpdateJsonKeyTypes(projectName string, jsonKeys []JsonKeyType) 
 	return nil
 }
 
-// UpdateJsonKeySummarySettings updates which JSON keys have summary settings enabled
-func (c *Client) UpdateJsonKeySummarySettings(projectName string, summaryKeys []string) error {
+// UpdateJsonKeySummarySettings updates which JSON keys have summary settings and metafield settings enabled
+func (c *Client) UpdateJsonKeySummarySettings(projectName string, summaryKeys []string, metafieldKeys []string) error {
 	projectQualifiedName := fmt.Sprintf("%s@%s", projectName, c.Username)
 	path := fmt.Sprintf("/api/external/v1/logsummarysettings?projectName=%s", url.QueryEscape(projectQualifiedName))
 
 	payload := map[string][]string{
-		"summarySetting": summaryKeys,
+		"summarySetting":   summaryKeys,
+		"metaFieldSetting": metafieldKeys,
 	}
 
 	body, statusCode, err := c.DoRequest("POST", path, payload)
