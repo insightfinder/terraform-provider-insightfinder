@@ -5,6 +5,15 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.6.1] - 2026-02-27
+
+### Fixed
+- **insightfinder_project**: Fixed missing log label type mappings
+  - Added support for `incidentFieldVerification` label type
+  - Added support for `incidentPriority` label type
+  - Updated label type to API field name mappings to include all label types
+  - Fixes issue where incident field verification and incident priority labels were not properly handled
+
 ## [1.6.0] - 2026-02-26
 
 ### Added
