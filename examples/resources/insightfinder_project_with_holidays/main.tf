@@ -33,23 +33,23 @@ resource "insightfinder_project" "example_with_holidays" {
   holiday_settings = [
     {
       name       = "christmas"
-      start_date = "12-25"  # December 25th
-      end_date   = "12-26"  # December 26th
+      start_date = "12-25" # December 25th
+      end_date   = "12-26" # December 26th
     },
     {
       name       = "new_year"
-      start_date = "01-01"  # January 1st
-      end_date   = "01-01"  # January 1st
+      start_date = "01-01" # January 1st
+      end_date   = "01-01" # January 1st
     },
     {
       name       = "independence_day"
-      start_date = "07-04"  # July 4th
-      end_date   = "07-04"  # July 4th
+      start_date = "07-04" # July 4th
+      end_date   = "07-04" # July 4th
     },
     {
       name       = "thanksgiving"
-      start_date = "11-28"  # Example: November 28th
-      end_date   = "11-29"  # Through November 29th
+      start_date = "11-28" # Example: November 28th
+      end_date   = "11-29" # Through November 29th
     }
   ]
 }
