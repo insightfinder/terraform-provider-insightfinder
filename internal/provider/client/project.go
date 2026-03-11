@@ -434,8 +434,9 @@ func (c *Client) GetJsonKeyTypes(projectName string) ([]JsonKeyType, error) {
 
 // JsonKeySummarySettings represents the response from logsummarysettings API
 type JsonKeySummarySettings struct {
-	SummarySetting   []string `json:"summarySetting"`
-	MetaFieldSetting []string `json:"metaFieldSetting"`
+	SummarySetting        []string `json:"summarySetting"`
+	MetaFieldSetting      []string `json:"metaFieldSetting"`
+	DampeningFieldSetting []string `json:"dampeningFieldSetting"`
 }
 
 // GetJsonKeySummarySettings retrieves which JSON keys have summary and metafield settings enabled
@@ -497,14 +498,15 @@ func (c *Client) UpdateJsonKeyTypes(projectName string, jsonKeys []JsonKeyType) 
 	return nil
 }
 
-// UpdateJsonKeySummarySettings updates which JSON keys have summary settings and metafield settings enabled
-func (c *Client) UpdateJsonKeySummarySettings(projectName string, summaryKeys []string, metafieldKeys []string) error {
+// UpdateJsonKeySummarySettings updates which JSON keys have summary settings, metafield settings, and dampening field settings enabled
+func (c *Client) UpdateJsonKeySummarySettings(projectName string, summaryKeys []string, metafieldKeys []string, dampeningFieldKeys []string) error {
 	projectQualifiedName := fmt.Sprintf("%s@%s", projectName, c.Username)
 	path := fmt.Sprintf("/api/external/v1/logsummarysettings?projectName=%s", url.QueryEscape(projectQualifiedName))
 
 	payload := map[string][]string{
-		"summarySetting":   summaryKeys,
-		"metaFieldSetting": metafieldKeys,
+		"summarySetting":        summaryKeys,
+		"metaFieldSetting":      metafieldKeys,
+		"dampeningFieldSetting": dampeningFieldKeys,
 	}
 
 	body, statusCode, err := c.DoRequest("POST", path, payload)
