@@ -154,10 +154,11 @@ func TestProviderResources(t *testing.T) {
 	resources := p.Resources(context.Background())
 
 	expectedResources := map[string]bool{
-		"insightfinder_project":    false,
-		"insightfinder_servicenow": false,
-		"insightfinder_jwt_config": false,
-		"insightfinder_log_labels": false,
+		"insightfinder_project":         false,
+		"insightfinder_servicenow":      false,
+		"insightfinder_jwt_config":      false,
+		"insightfinder_log_labels":      false,
+		"insightfinder_system_settings": false,
 	}
 
 	if len(resources) != len(expectedResources) {
