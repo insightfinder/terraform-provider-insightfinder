@@ -23,8 +23,8 @@ func TestGetGlobalKBSetting(t *testing.T) {
 		expectedEGB  bool
 	}{
 		{
-			name:     "successful get",
-			systemID: "sys-abc123",
+			name:       "successful get",
+			systemID:   "sys-abc123",
 			statusCode: 200,
 			responseBody: `[{
 				"systemId": "sys-abc123",
@@ -150,9 +150,9 @@ func TestSetGlobalKBSetting(t *testing.T) {
 			expectError:  false,
 		},
 		{
-			name:     "api returns success false",
-			systemID: "sys-abc123",
-			setting:  &GlobalKBSetting{},
+			name:         "api returns success false",
+			systemID:     "sys-abc123",
+			setting:      &GlobalKBSetting{},
 			statusCode:   200,
 			responseBody: `{"success": false, "message": "not found"}`,
 			expectError:  true,
@@ -213,8 +213,8 @@ func TestGetIncidentPredictionSetting(t *testing.T) {
 		expectedRAT  float64
 	}{
 		{
-			name:     "successful get",
-			systemID: "sys-abc123",
+			name:       "successful get",
+			systemID:   "sys-abc123",
 			statusCode: 200,
 			responseBody: `[{
 				"systemId": "sys-abc123",
@@ -360,17 +360,17 @@ func TestSetIncidentPredictionSetting(t *testing.T) {
 
 func TestGetHealthViewSetting(t *testing.T) {
 	tests := []struct {
-		name              string
-		systemID          string
-		statusCode        int
-		responseBody      string
-		expectError       bool
-		expectNil         bool
-		expectedEmail     string
+		name          string
+		systemID      string
+		statusCode    int
+		responseBody  string
+		expectError   bool
+		expectNil     bool
+		expectedEmail string
 	}{
 		{
-			name:     "successful get - system found in map",
-			systemID: "sys-abc123",
+			name:       "successful get - system found in map",
+			systemID:   "sys-abc123",
 			statusCode: 200,
 			responseBody: `{
 				"sys-abc123": {
@@ -392,8 +392,8 @@ func TestGetHealthViewSetting(t *testing.T) {
 			expectedEmail: "alert@example.com",
 		},
 		{
-			name:     "system not in map",
-			systemID: "sys-notfound",
+			name:       "system not in map",
+			systemID:   "sys-notfound",
 			statusCode: 200,
 			responseBody: `{
 				"sys-other": {
