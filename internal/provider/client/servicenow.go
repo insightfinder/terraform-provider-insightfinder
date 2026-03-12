@@ -12,18 +12,22 @@ import (
 
 // ServiceNowConfig represents ServiceNow integration configuration
 type ServiceNowConfig struct {
-	Account         string   `json:"account"`
-	ServiceHost     string   `json:"service_host"`
-	Password        string   `json:"password"`
-	Proxy           string   `json:"proxy,omitempty"`
-	DampeningPeriod int      `json:"dampening_period"`
-	AppID           string   `json:"app_id,omitempty"`
-	AppKey          string   `json:"app_key,omitempty"`
-	AuthType        string   `json:"auth_type,omitempty"`
-	SystemIDs       []string `json:"system_ids"`
-	SystemNames     []string `json:"system_names,omitempty"`
-	Options         []string `json:"options"`
-	ContentOption   []string `json:"content_option"`
+	Account              string     `json:"account"`
+	ServiceHost          string     `json:"service_host"`
+	Password             string     `json:"password"`
+	Proxy                string     `json:"proxy,omitempty"`
+	DampeningPeriod      int        `json:"dampening_period"`
+	AppID                string     `json:"app_id,omitempty"`
+	AppKey               string     `json:"app_key,omitempty"`
+	AuthType             string     `json:"auth_type,omitempty"`
+	SystemIDs            []string   `json:"system_ids"`
+	SystemNames          []string   `json:"system_names,omitempty"`
+	Options              []string   `json:"options"`
+	ContentOption        []string   `json:"content_option"`
+	ServiceNowField      string     `json:"service_now_field,omitempty"`
+	ContentSource        string     `json:"content_source,omitempty"`
+	TriggerWindowInMills int64      `json:"trigger_window_in_mills,omitempty"`
+	TableMapping         [][]string `json:"table_mapping,omitempty"`
 }
 
 // ServiceNowResponse represents the API response for ServiceNow operations
@@ -36,14 +40,10 @@ type ServiceNowResponse struct {
 // GetServiceNowConfig retrieves ServiceNow integration configuration
 func (c *Client) GetServiceNowConfig(account, serviceHost, username string) (*ServiceNowConfig, error) {
 	params := url.Values{}
-	params.Add("tzOffset", "0")
-	params.Add("account", account)
-	params.Add("customerName", username)
 	params.Add("serviceProvider", "ServiceNow")
-	params.Add("operation", "display")
-	params.Add("service_host", serviceHost)
+	params.Add("tzOffset", "-14400000")
 
-	path := fmt.Sprintf("/api/external/v1/service-integration?%s", params.Encode())
+	path := fmt.Sprintf("/api/external/v1/system/externalServlies/list?%s", params.Encode())
 	body, statusCode, err := c.DoRequest("GET", path, nil)
 	if err != nil {
 		return nil, err
@@ -57,72 +57,118 @@ func (c *Client) GetServiceNowConfig(account, serviceHost, username string) (*Se
 		return nil, fmt.Errorf("failed to get ServiceNow config: HTTP %d", statusCode)
 	}
 
-	var response map[string]interface{}
+	var response struct {
+		ExtServiceAllInfo []map[string]interface{} `json:"extServiceAllInfo"`
+		Success           bool                     `json:"success"`
+		Message           string                   `json:"message"`
+	}
 	if err := json.Unmarshal(body, &response); err != nil {
 		return nil, fmt.Errorf("failed to parse response: %w", err)
 	}
 
-	// Check if the key exists - if not, configuration doesn't exist
-	if _, ok := response["key"]; !ok {
-		return nil, nil // Configuration doesn't exist
+	if !response.Success {
+		return nil, nil
 	}
 
-	// Parse the configuration
+	// Find the entry matching account and service_host
+	normalizeHost := func(h string) string {
+		return strings.TrimRight(strings.TrimSpace(h), "/")
+	}
+	var entry map[string]interface{}
+	for _, info := range response.ExtServiceAllInfo {
+		entryAccount, _ := info["account"].(string)
+		entryHost, _ := info["service_host"].(string)
+		if strings.EqualFold(strings.TrimSpace(entryAccount), strings.TrimSpace(account)) &&
+			normalizeHost(entryHost) == normalizeHost(serviceHost) {
+			entry = info
+			break
+		}
+	}
+
+	if entry == nil {
+		return nil, nil // Not found
+	}
+
 	config := &ServiceNowConfig{
 		Account:     account,
 		ServiceHost: serviceHost,
 	}
 
-	// Extract configuration fields from response (root level)
-	if pwd, ok := response["password"].(string); ok {
+	if pwd, ok := entry["password"].(string); ok {
 		config.Password = pwd
 	}
-	if dampening, ok := response["dampeningPeriod"].(float64); ok {
+	if dampening, ok := entry["dampeningPeriod"].(float64); ok {
 		config.DampeningPeriod = int(dampening)
 	}
-	if appID, ok := response["appId"].(string); ok {
+	if appID, ok := entry["appId"].(string); ok {
 		config.AppID = appID
 	}
-	if appKey, ok := response["appKey"].(string); ok {
+	if appKey, ok := entry["appKey"].(string); ok {
 		config.AppKey = appKey
 	}
-	if authType, ok := response["authType"].(string); ok && authType != "" {
-		config.AuthType = strings.ToLower(authType)
+	if proxy, ok := entry["proxy"].(string); ok {
+		config.Proxy = proxy
+	}
+	if serviceNowField, ok := entry["serviceNowField"].(string); ok {
+		config.ServiceNowField = serviceNowField
+	}
+	if contentSource, ok := entry["contentSource"].(string); ok {
+		config.ContentSource = contentSource
 	}
 
-	// Parse serviceNowIntegrationConfig JSON string
-	if integrationConfigStr, ok := response["serviceNowIntegrationConfig"].(string); ok && integrationConfigStr != "" {
-		var integrationConfig map[string]interface{}
-		if err := json.Unmarshal([]byte(integrationConfigStr), &integrationConfig); err == nil {
-			if systemIDs, ok := integrationConfig["systemIds"].([]interface{}); ok {
+	// Determine auth type from appId/appKey presence
+	if config.AppID != "" && config.AppKey != "" {
+		config.AuthType = "oauth"
+	} else {
+		config.AuthType = "basic"
+	}
+
+	// Parse configs JSON string for systemIds, contentOption, and triggerWindowInMills
+	if configsStr, ok := entry["configs"].(string); ok && configsStr != "" {
+		var configs map[string]interface{}
+		if err := json.Unmarshal([]byte(configsStr), &configs); err == nil {
+			if systemIDs, ok := configs["systemIds"].([]interface{}); ok {
 				for _, id := range systemIDs {
 					if idStr, ok := id.(string); ok {
 						config.SystemIDs = append(config.SystemIDs, idStr)
 					}
 				}
 			}
-			if contentOpt, ok := integrationConfig["contentOption"].([]interface{}); ok {
+			if contentOpt, ok := configs["contentOption"].([]interface{}); ok {
 				for _, opt := range contentOpt {
 					if optStr, ok := opt.(string); ok {
 						config.ContentOption = append(config.ContentOption, optStr)
 					}
 				}
 			}
-			if systemNames, ok := integrationConfig["systemNames"].([]interface{}); ok {
-				for _, name := range systemNames {
-					if nameStr, ok := name.(string); ok {
-						config.SystemNames = append(config.SystemNames, nameStr)
-					}
+			if triggerWindow, ok := configs["triggerWindowInMills"].(float64); ok {
+				config.TriggerWindowInMills = int64(triggerWindow)
+			}
+			// contentSource in configs takes priority if root level is empty
+			if config.ContentSource == "" {
+				if cs, ok := configs["contentSource"].(string); ok {
+					config.ContentSource = cs
 				}
 			}
 		}
 	}
 
 	// Parse options JSON array string
-	if optionsStr, ok := response["options"].(string); ok && optionsStr != "" {
+	if optionsStr, ok := entry["options"].(string); ok && optionsStr != "" {
 		var options []string
 		if err := json.Unmarshal([]byte(optionsStr), &options); err == nil {
 			config.Options = options
+		}
+	}
+
+	// Parse tableMapping array of [projectName, tableName] pairs
+	if tableMappingRaw, ok := entry["tableMapping"].([]interface{}); ok {
+		for _, row := range tableMappingRaw {
+			if rowSlice, ok := row.([]interface{}); ok && len(rowSlice) == 2 {
+				project, _ := rowSlice[0].(string)
+				table, _ := rowSlice[1].(string)
+				config.TableMapping = append(config.TableMapping, []string{project, table})
+			}
 		}
 	}
 
@@ -173,9 +219,24 @@ func (c *Client) CreateOrUpdateServiceNowConfig(config *ServiceNowConfig, userna
 	formData.Set("appKey", config.AppKey)
 	formData.Set("auth_type", config.AuthType)
 	formData.Set("customerName", username)
-	formData.Set("systemIds", string(systemIDsJSON))
-	formData.Set("options", string(optionsJSON))
-	formData.Set("contentOption", string(contentOptionJSON))
+	formData.Set("stored_account", config.Account)
+	formData.Set("storedHost", config.ServiceHost)
+	contentSource := config.ContentSource
+	if contentSource == "" {
+		contentSource = "work_notes"
+	}
+	formData.Set("contentSource", contentSource)
+	if !verify {
+		formData.Set("systemIds", string(systemIDsJSON))
+		formData.Set("options", string(optionsJSON))
+		formData.Set("contentOption", string(contentOptionJSON))
+		if config.ServiceNowField != "" {
+			formData.Set("serviceNowField", config.ServiceNowField)
+		}
+		if config.TriggerWindowInMills > 0 {
+			formData.Set("triggerWindowInMills", fmt.Sprintf("%d", config.TriggerWindowInMills))
+		}
+	}
 
 	path := "/api/external/v1/service-integration"
 	body, statusCode, err := c.DoFormRequest("POST", path, formData)
@@ -229,6 +290,43 @@ func (c *Client) DeleteServiceNowConfig(account, serviceHost, username string) e
 	// 200 or 404 are both acceptable for deletion
 	if statusCode != 200 && statusCode != 404 {
 		return fmt.Errorf("failed to delete ServiceNow config: HTTP %d - %s", statusCode, string(body))
+	}
+
+	return nil
+}
+
+// UpdateServiceNowTableMapping updates the table mapping for a ServiceNow integration
+func (c *Client) UpdateServiceNowTableMapping(account, serviceHost, username string, tableMapping [][]string) error {
+	mappingJSON, err := json.Marshal(tableMapping)
+	if err != nil {
+		return fmt.Errorf("failed to marshal table mapping: %w", err)
+	}
+
+	formData := url.Values{}
+	formData.Set("operation", "ServiceNow")
+	formData.Set("customerName", username)
+	formData.Set("serviceProvider", "ServiceNow")
+	formData.Set("account", account)
+	formData.Set("service_host", serviceHost)
+	formData.Set("mappingList", string(mappingJSON))
+
+	path := "/api/external/v1/service-integration?tzOffset=-14400000"
+	body, statusCode, err := c.DoFormRequest("PUT", path, formData)
+	if err != nil {
+		return err
+	}
+
+	if statusCode != 200 {
+		return fmt.Errorf("failed to update ServiceNow table mapping: HTTP %d - %s", statusCode, string(body))
+	}
+
+	var response ServiceNowResponse
+	if err := json.Unmarshal(body, &response); err != nil {
+		return nil
+	}
+
+	if !response.Success {
+		return fmt.Errorf("ServiceNow table mapping update failed: %s", response.Message)
 	}
 
 	return nil

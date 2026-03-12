@@ -5,6 +5,21 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.7.1] - 2026-03-12
+
+### Changed
+- **insightfinder_servicenow**: Extended resource with new fields and updated API integration
+  - Added `service_now_field` (String, Optional): ServiceNow field to write integration content to (e.g., `u_probable_cause`)
+  - Added `content_source` (String, Optional, Computed): ServiceNow content source field (e.g., `work_notes`). Defaults to `work_notes`
+  - Added `trigger_window_in_mills` (Number, Optional): Trigger window in milliseconds (e.g., `604800000` for 7 days)
+  - Added `table_mapping` (Map of String, Optional): Mapping of InsightFinder project names to ServiceNow table names
+  - Changed `options` and `content_option` from `List` to `Set` type to avoid order-sensitivity drift
+  - Removed `system_ids` computed attribute — system resolution is now handled internally
+  - Updated `GetServiceNowConfig` to use the new `/api/external/v1/system/externalServlies/list` endpoint and match entries by `account` + `service_host`
+  - Added `UpdateServiceNowTableMapping` client method using a dedicated PUT endpoint
+  - `contentSource` and `serviceNowField` are now sent in the Create/Update API call
+  - Auth type is inferred from `app_id`/`app_key` presence during Read
+
 ## [1.7.0] - 2026-03-11
 
 ### Added

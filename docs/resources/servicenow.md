@@ -43,10 +43,10 @@ resource "insightfinder_servicenow" "oauth" {
 }
 ```
 
-### Multiple Systems
+### Full Configuration with Table Mapping
 
 ```terraform
-resource "insightfinder_servicenow" "multi" {
+resource "insightfinder_servicenow" "full" {
   account          = "serviceaccount"
   service_host     = "https://company.service-now.com/"
   password         = var.servicenow_password
@@ -60,6 +60,21 @@ resource "insightfinder_servicenow" "multi" {
   content_option = ["SUMMARY"]
   auth_type      = "basic"
   proxy          = "http://proxy.company.com:8080"
+
+  # Write content to a custom ServiceNow field
+  service_now_field = "u_probable_cause"
+
+  # Use comments instead of work notes
+  content_source = "comments"
+
+  # Only correlate events within a 7-day window
+  trigger_window_in_mills = 604800000
+
+  # Map InsightFinder projects to ServiceNow tables
+  table_mapping = {
+    "my-project"      = "incident"
+    "another-project" = "problem"
+  }
 }
 ```
 
@@ -67,25 +82,28 @@ resource "insightfinder_servicenow" "multi" {
 
 ### Required
 
-- `account` (String) ServiceNow account username
-- `service_host` (String) ServiceNow instance URL (e.g., `https://dev12345.service-now.com/`)
-- `password` (String, Sensitive) ServiceNow account password
-- `dampening_period` (Number) Dampening period in milliseconds (e.g., `3600000` for 1 hour)
-- `system_names` (List of String) List of InsightFinder system names to integrate
-- `options` (List of String) Integration options: `Root Cause`, `Prediction`
-- `content_option` (List of String) Incident content fields: `SUMMARY`, `DESCRIPTION`, `IMPACT`
+- `account` (String) ServiceNow account username. Forces replacement on change.
+- `service_host` (String) ServiceNow instance URL (e.g., `https://dev12345.service-now.com/`). Forces replacement on change.
+- `password` (String, Sensitive) ServiceNow account password.
+- `dampening_period` (Number) Dampening period in milliseconds (e.g., `3600000` for 1 hour).
+- `options` (Set of String) Integration options (e.g., `Root Cause`, `Prediction`).
+- `content_option` (Set of String) Incident content fields (e.g., `SUMMARY`, `DESCRIPTION`, `IMPACT`).
 
 ### Optional
 
-- `auth_type` (String) Authentication type: `basic` or `oauth`. Default: `basic`
-- `app_id` (String) ServiceNow OAuth application ID (required when `auth_type = "oauth"`)
-- `app_key` (String, Sensitive) ServiceNow OAuth application key (required when `auth_type = "oauth"`)
-- `proxy` (String) Proxy server URL if required
-- `system_ids` (List of String, Computed) Resolved system IDs (computed from system_names)
+- `auth_type` (String) Authentication type: `basic` or `oauth`. Default: `basic`.
+- `app_id` (String) ServiceNow OAuth application ID (required when `auth_type = "oauth"`).
+- `app_key` (String, Sensitive) ServiceNow OAuth application key (required when `auth_type = "oauth"`).
+- `proxy` (String, Computed) Proxy server URL if required.
+- `system_names` (List of String) List of InsightFinder system names to integrate.
+- `service_now_field` (String) ServiceNow field to write integration content to (e.g., `u_probable_cause`).
+- `content_source` (String, Computed) ServiceNow field to write incident notes to (e.g., `work_notes`, `comments`). Defaults to `work_notes`.
+- `trigger_window_in_mills` (Number) Time window in milliseconds within which events are correlated into a single incident (e.g., `604800000` for 7 days).
+- `table_mapping` (Map of String) Mapping of InsightFinder project names to ServiceNow table names (e.g., `{ "my-project" = "incident" }`).
 
 ### Read-Only
 
-- `id` (String) Integration identifier (`account@service_host`)
+- `id` (String) Integration identifier (`account@service_host`).
 
 ## Import
 
@@ -97,7 +115,8 @@ terraform import insightfinder_servicenow.example admin@https://dev12345.service
 
 ## Notes
 
-- The `system_names` list order is preserved in the configuration
-- When using OAuth authentication, both `app_id` and `app_key` are required
-- System names are automatically resolved to system IDs
-- The dampening period prevents duplicate incidents within the specified time window
+- When using OAuth authentication, both `app_id` and `app_key` are required.
+- `options` and `content_option` are sets — order does not matter and will not cause plan drift.
+- System names are automatically resolved to system IDs internally.
+- The `dampening_period` prevents duplicate incidents within the specified time window.
+- `table_mapping` sends each `[projectName, tableName]` pair to a dedicated PUT endpoint.
