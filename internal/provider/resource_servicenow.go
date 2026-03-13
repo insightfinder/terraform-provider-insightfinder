@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/hashicorp/terraform-plugin-framework/attr"
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
@@ -39,19 +40,22 @@ type servicenowResource struct {
 
 // servicenowResourceModel maps the resource schema data.
 type servicenowResourceModel struct {
-	ID              types.String `tfsdk:"id"`
-	Account         types.String `tfsdk:"account"`
-	ServiceHost     types.String `tfsdk:"service_host"`
-	Password        types.String `tfsdk:"password"`
-	Proxy           types.String `tfsdk:"proxy"`
-	DampeningPeriod types.Int64  `tfsdk:"dampening_period"`
-	AppID           types.String `tfsdk:"app_id"`
-	AppKey          types.String `tfsdk:"app_key"`
-	AuthType        types.String `tfsdk:"auth_type"`
-	SystemNames     types.List   `tfsdk:"system_names"`
-	SystemIDs       types.List   `tfsdk:"system_ids"`
-	Options         types.List   `tfsdk:"options"`
-	ContentOption   types.List   `tfsdk:"content_option"`
+	ID                   types.String `tfsdk:"id"`
+	Account              types.String `tfsdk:"account"`
+	ServiceHost          types.String `tfsdk:"service_host"`
+	Password             types.String `tfsdk:"password"`
+	Proxy                types.String `tfsdk:"proxy"`
+	DampeningPeriod      types.Int64  `tfsdk:"dampening_period"`
+	AppID                types.String `tfsdk:"app_id"`
+	AppKey               types.String `tfsdk:"app_key"`
+	AuthType             types.String `tfsdk:"auth_type"`
+	SystemNames          types.List   `tfsdk:"system_names"`
+	Options              types.Set    `tfsdk:"options"`
+	ContentOption        types.Set    `tfsdk:"content_option"`
+	ServiceNowField      types.String `tfsdk:"service_now_field"`
+	ContentSource        types.String `tfsdk:"content_source"`
+	TriggerWindowInMills types.Int64  `tfsdk:"trigger_window_in_mills"`
+	TableMapping         types.Map    `tfsdk:"table_mapping"`
 }
 
 // Metadata returns the resource type name.
@@ -93,6 +97,7 @@ func (r *servicenowResource) Schema(_ context.Context, _ resource.SchemaRequest,
 			"proxy": schema.StringAttribute{
 				Description: "Proxy server URL (optional).",
 				Optional:    true,
+				Computed:    true,
 			},
 			"dampening_period": schema.Int64Attribute{
 				Description: "Dampening period in seconds.",
@@ -114,24 +119,37 @@ func (r *servicenowResource) Schema(_ context.Context, _ resource.SchemaRequest,
 				Default:     stringdefault.StaticString("basic"),
 			},
 			"system_names": schema.ListAttribute{
-				Description: "List of system names to integrate (will be resolved to system IDs).",
+				Description: "List of system names to integrate.",
 				Optional:    true,
 				ElementType: types.StringType,
 			},
-			"system_ids": schema.ListAttribute{
-				Description: "List of system IDs to integrate (computed from system_names if not provided).",
-				Optional:    true,
-				Computed:    true,
-				ElementType: types.StringType,
-			},
-			"options": schema.ListAttribute{
+			"options": schema.SetAttribute{
 				Description: "ServiceNow integration options.",
 				Required:    true,
 				ElementType: types.StringType,
 			},
-			"content_option": schema.ListAttribute{
+			"content_option": schema.SetAttribute{
 				Description: "ServiceNow content options.",
 				Required:    true,
+				ElementType: types.StringType,
+			},
+			"service_now_field": schema.StringAttribute{
+				Description: "ServiceNow field to write integration content to (e.g., 'u_probable_cause').",
+				Optional:    true,
+			},
+			"content_source": schema.StringAttribute{
+				Description: "ServiceNow content source field (e.g., 'work_notes'). Defaults to 'work_notes'.",
+				Optional:    true,
+				Computed:    true,
+				Default:     stringdefault.StaticString("work_notes"),
+			},
+			"trigger_window_in_mills": schema.Int64Attribute{
+				Description: "Trigger window in milliseconds for ServiceNow integration (e.g., 604800000 for 7 days).",
+				Optional:    true,
+			},
+			"table_mapping": schema.MapAttribute{
+				Description: "Mapping of InsightFinder project names to ServiceNow table names (e.g., {\"my-project\" = \"incident\"}).",
+				Optional:    true,
 				ElementType: types.StringType,
 			},
 		},
@@ -202,9 +220,8 @@ func (r *servicenowResource) Create(ctx context.Context, req resource.CreateRequ
 		}
 	}
 
-	// Resolve system names to system IDs if system_names is provided
+	// Resolve system names to system IDs for the API call.
 	var systemIDs []string
-	resolvedNames := make([]string, 0)
 	if !plan.SystemNames.IsNull() && !plan.SystemNames.IsUnknown() {
 		var systemNames []string
 		diags = plan.SystemNames.ElementsAs(ctx, &systemNames, false)
@@ -212,7 +229,6 @@ func (r *servicenowResource) Create(ctx context.Context, req resource.CreateRequ
 		if resp.Diagnostics.HasError() {
 			return
 		}
-
 		resolvedIDs, err := r.client.ResolveSystemNameToIDs(systemNames, r.client.Username)
 		if err != nil {
 			resp.Diagnostics.AddError(
@@ -222,29 +238,8 @@ func (r *servicenowResource) Create(ctx context.Context, req resource.CreateRequ
 			return
 		}
 		systemIDs = resolvedIDs
-		resolvedNames = systemNames
-	} else if !plan.SystemIDs.IsNull() && !plan.SystemIDs.IsUnknown() {
-		// Use provided system IDs directly
-		diags = plan.SystemIDs.ElementsAs(ctx, &systemIDs, false)
-		resp.Diagnostics.Append(diags...)
-		if resp.Diagnostics.HasError() {
-			return
-		}
-		// Resolve IDs to names
-		names, err := r.client.ResolveSystemIDsToNames(systemIDs, r.client.Username)
-		if err != nil {
-			resp.Diagnostics.AddError(
-				"Error Resolving System IDs",
-				fmt.Sprintf("Could not resolve system IDs to names: %s", err.Error()),
-			)
-			return
-		}
-		resolvedNames = names
 	}
 
-	systemIDs, resolvedNames = alignSystemMappings(systemIDs, resolvedNames)
-
-	// Get options and content options
 	var options []string
 	diags = plan.Options.ElementsAs(ctx, &options, false)
 	resp.Diagnostics.Append(diags...)
@@ -259,23 +254,23 @@ func (r *servicenowResource) Create(ctx context.Context, req resource.CreateRequ
 		return
 	}
 
-	// Create ServiceNow config
 	config := &client.ServiceNowConfig{
-		Account:         plan.Account.ValueString(),
-		ServiceHost:     plan.ServiceHost.ValueString(),
-		Password:        plan.Password.ValueString(),
-		Proxy:           plan.Proxy.ValueString(),
-		DampeningPeriod: int(plan.DampeningPeriod.ValueInt64()),
-		AppID:           plan.AppID.ValueString(),
-		AppKey:          plan.AppKey.ValueString(),
-		AuthType:        authType,
-		SystemIDs:       systemIDs,
-		SystemNames:     resolvedNames,
-		Options:         options,
-		ContentOption:   contentOption,
+		Account:              plan.Account.ValueString(),
+		ServiceHost:          plan.ServiceHost.ValueString(),
+		Password:             plan.Password.ValueString(),
+		Proxy:                plan.Proxy.ValueString(),
+		DampeningPeriod:      int(plan.DampeningPeriod.ValueInt64()),
+		AppID:                plan.AppID.ValueString(),
+		AppKey:               plan.AppKey.ValueString(),
+		AuthType:             authType,
+		SystemIDs:            systemIDs,
+		Options:              options,
+		ContentOption:        contentOption,
+		ServiceNowField:      plan.ServiceNowField.ValueString(),
+		ContentSource:        plan.ContentSource.ValueString(),
+		TriggerWindowInMills: plan.TriggerWindowInMills.ValueInt64(),
 	}
 
-	// First call with verify=true
 	err := r.client.CreateOrUpdateServiceNowConfig(config, r.client.Username, true)
 	if err != nil {
 		resp.Diagnostics.AddError(
@@ -285,7 +280,6 @@ func (r *servicenowResource) Create(ctx context.Context, req resource.CreateRequ
 		return
 	}
 
-	// Second call without verify flag
 	err = r.client.CreateOrUpdateServiceNowConfig(config, r.client.Username, false)
 	if err != nil {
 		resp.Diagnostics.AddError(
@@ -295,23 +289,29 @@ func (r *servicenowResource) Create(ctx context.Context, req resource.CreateRequ
 		return
 	}
 
-	// Set state
+	if !plan.TableMapping.IsNull() && !plan.TableMapping.IsUnknown() {
+		tableMapping, err := tableMappingFromTF(ctx, plan.TableMapping)
+		if err != nil {
+			resp.Diagnostics.AddError("Error Reading table_mapping", err.Error())
+			return
+		}
+		if len(tableMapping) > 0 {
+			if err := r.client.UpdateServiceNowTableMapping(
+				plan.Account.ValueString(),
+				plan.ServiceHost.ValueString(),
+				r.client.Username,
+				tableMapping,
+			); err != nil {
+				resp.Diagnostics.AddError(
+					"Error Creating ServiceNow Table Mapping",
+					"Could not set table mapping: "+err.Error(),
+				)
+				return
+			}
+		}
+	}
+
 	plan.ID = types.StringValue(fmt.Sprintf("%s@%s", plan.Account.ValueString(), plan.ServiceHost.ValueString()))
-
-	// Convert system IDs and names to Terraform values
-	systemIDsList, diags := types.ListValueFrom(ctx, types.StringType, systemIDs)
-	resp.Diagnostics.Append(diags...)
-	if resp.Diagnostics.HasError() {
-		return
-	}
-	plan.SystemIDs = systemIDsList
-
-	systemNamesList, diags := types.ListValueFrom(ctx, types.StringType, resolvedNames)
-	resp.Diagnostics.Append(diags...)
-	if resp.Diagnostics.HasError() {
-		return
-	}
-	plan.SystemNames = systemNamesList
 	plan.AuthType = types.StringValue(authType)
 
 	diags = resp.State.Set(ctx, plan)
@@ -332,7 +332,6 @@ func (r *servicenowResource) Read(ctx context.Context, req resource.ReadRequest,
 		"service_host": state.ServiceHost.ValueString(),
 	})
 
-	// Get current ServiceNow configuration
 	config, err := r.client.GetServiceNowConfig(
 		state.Account.ValueString(),
 		state.ServiceHost.ValueString(),
@@ -346,108 +345,42 @@ func (r *servicenowResource) Read(ctx context.Context, req resource.ReadRequest,
 		return
 	}
 
-	// If config doesn't exist, remove from state
 	if config == nil {
 		resp.State.RemoveResource(ctx)
 		return
 	}
 
-	// Update state with current values
-	// Note: Don't update sensitive fields (password, app_id, app_key) if they come back empty
-	// as the API doesn't return the actual values for security reasons.
-	// We keep the existing values in state.
-	if strings.TrimSpace(config.Proxy) == "" {
-		state.Proxy = types.StringNull()
-	} else {
-		state.Proxy = types.StringValue(config.Proxy)
-	}
+	state.Proxy = types.StringValue(config.Proxy)
 	state.DampeningPeriod = types.Int64Value(int64(config.DampeningPeriod))
 
-	// Update system IDs and names - preserve state order where possible
-	var stateSystemNames []string
-	if !state.SystemNames.IsNull() && !state.SystemNames.IsUnknown() {
-		diags := state.SystemNames.ElementsAs(ctx, &stateSystemNames, false)
-		resp.Diagnostics.Append(diags...)
-		// Continue even if there's an error; just use API order as fallback
-	}
-
-	var stateSystemIDs []string
-	if !state.SystemIDs.IsNull() && !state.SystemIDs.IsUnknown() {
-		diags := state.SystemIDs.ElementsAs(ctx, &stateSystemIDs, false)
-		resp.Diagnostics.Append(diags...)
-	}
-
-	var resolvedNames []string
+	// Resolve system IDs from API to names and store only the names.
 	if len(config.SystemIDs) > 0 {
-		// Try to preserve state order
-		if len(stateSystemIDs) == len(config.SystemIDs) {
-			// Build map from API
-			apiIDSet := make(map[string]struct{}, len(config.SystemIDs))
-			for _, id := range config.SystemIDs {
-				apiIDSet[strings.TrimSpace(id)] = struct{}{}
+		names, err := r.client.ResolveSystemIDsToNames(config.SystemIDs, r.client.Username)
+		if err == nil && len(names) > 0 {
+			systemNamesList, diags := types.ListValueFrom(ctx, types.StringType, names)
+			resp.Diagnostics.Append(diags...)
+			if resp.Diagnostics.HasError() {
+				return
 			}
-
-			// Check if state IDs are still valid
-			allValid := true
-			for _, stateID := range stateSystemIDs {
-				if _, exists := apiIDSet[strings.TrimSpace(stateID)]; !exists {
-					allValid = false
-					break
-				}
-			}
-
-			if allValid {
-				// Preserve state order
-				config.SystemIDs = stateSystemIDs
-				resolvedNames = stateSystemNames
-			}
+			state.SystemNames = systemNamesList
 		}
-
-		// If we didn't preserve state order, resolve fresh
-		if len(resolvedNames) == 0 {
-			if names, err := r.client.ResolveSystemIDsToNames(config.SystemIDs, r.client.Username); err == nil {
-				config.SystemIDs, resolvedNames = alignSystemMappings(config.SystemIDs, names)
-			} else if len(config.SystemNames) > 0 {
-				config.SystemIDs, resolvedNames = alignSystemMappings(config.SystemIDs, config.SystemNames)
-			} else {
-				config.SystemIDs, resolvedNames = alignSystemMappings(config.SystemIDs, nil)
-			}
-		}
+		// If resolution fails, keep state.SystemNames as-is.
 	}
+	// If API returned no system IDs, keep state.SystemNames as-is.
 
-	systemIDsList, diags := types.ListValueFrom(ctx, types.StringType, config.SystemIDs)
+	optionsSet, diags := types.SetValueFrom(ctx, types.StringType, config.Options)
 	resp.Diagnostics.Append(diags...)
 	if resp.Diagnostics.HasError() {
 		return
 	}
-	state.SystemIDs = systemIDsList
+	state.Options = optionsSet
 
-	if resolvedNames != nil {
-		systemNamesList, diags := types.ListValueFrom(ctx, types.StringType, resolvedNames)
-		resp.Diagnostics.Append(diags...)
-		if resp.Diagnostics.HasError() {
-			return
-		}
-		state.SystemNames = systemNamesList
-	} else {
-		state.SystemNames = types.ListNull(types.StringType)
-	}
-
-	// Update options
-	optionsList, diags := types.ListValueFrom(ctx, types.StringType, config.Options)
+	contentOptionSet, diags := types.SetValueFrom(ctx, types.StringType, config.ContentOption)
 	resp.Diagnostics.Append(diags...)
 	if resp.Diagnostics.HasError() {
 		return
 	}
-	state.Options = optionsList
-
-	// Update content options
-	contentOptionList, diags := types.ListValueFrom(ctx, types.StringType, config.ContentOption)
-	resp.Diagnostics.Append(diags...)
-	if resp.Diagnostics.HasError() {
-		return
-	}
-	state.ContentOption = contentOptionList
+	state.ContentOption = contentOptionSet
 
 	authType := strings.ToLower(strings.TrimSpace(config.AuthType))
 	if authType == "" {
@@ -459,6 +392,41 @@ func (r *servicenowResource) Read(ctx context.Context, req resource.ReadRequest,
 		}
 	}
 	state.AuthType = types.StringValue(authType)
+
+	if config.ServiceNowField != "" {
+		state.ServiceNowField = types.StringValue(config.ServiceNowField)
+	} else {
+		state.ServiceNowField = types.StringNull()
+	}
+
+	if config.ContentSource != "" {
+		state.ContentSource = types.StringValue(config.ContentSource)
+	} else {
+		state.ContentSource = types.StringValue("work_notes")
+	}
+
+	if config.TriggerWindowInMills > 0 {
+		state.TriggerWindowInMills = types.Int64Value(config.TriggerWindowInMills)
+	} else {
+		state.TriggerWindowInMills = types.Int64Null()
+	}
+
+	if len(config.TableMapping) > 0 {
+		tableMappingValues := make(map[string]attr.Value, len(config.TableMapping))
+		for _, row := range config.TableMapping {
+			if len(row) == 2 {
+				tableMappingValues[row[0]] = types.StringValue(row[1])
+			}
+		}
+		tableMappingMap, d := types.MapValue(types.StringType, tableMappingValues)
+		resp.Diagnostics.Append(d...)
+		if resp.Diagnostics.HasError() {
+			return
+		}
+		state.TableMapping = tableMappingMap
+	} else {
+		state.TableMapping = types.MapNull(types.StringType)
+	}
 
 	diags = resp.State.Set(ctx, &state)
 	resp.Diagnostics.Append(diags...)
@@ -478,11 +446,6 @@ func (r *servicenowResource) Update(ctx context.Context, req resource.UpdateRequ
 	resp.Diagnostics.Append(diags...)
 	if resp.Diagnostics.HasError() {
 		return
-	}
-
-	effectiveSystemNames := plan.SystemNames
-	if plan.SystemNames.IsUnknown() && !priorState.SystemNames.IsNull() && !priorState.SystemNames.IsUnknown() {
-		effectiveSystemNames = priorState.SystemNames
 	}
 
 	authType := "basic"
@@ -533,17 +496,15 @@ func (r *servicenowResource) Update(ctx context.Context, req resource.UpdateRequ
 		"service_host": plan.ServiceHost.ValueString(),
 	})
 
-	// Resolve system names to system IDs if system_names is provided
+	// Resolve system names to system IDs for the API call.
 	var systemIDs []string
-	resolvedNames := make([]string, 0)
-	if !effectiveSystemNames.IsNull() && !effectiveSystemNames.IsUnknown() {
+	if !plan.SystemNames.IsNull() && !plan.SystemNames.IsUnknown() {
 		var systemNames []string
-		diags = effectiveSystemNames.ElementsAs(ctx, &systemNames, false)
+		diags = plan.SystemNames.ElementsAs(ctx, &systemNames, false)
 		resp.Diagnostics.Append(diags...)
 		if resp.Diagnostics.HasError() {
 			return
 		}
-
 		resolvedIDs, err := r.client.ResolveSystemNameToIDs(systemNames, r.client.Username)
 		if err != nil {
 			resp.Diagnostics.AddError(
@@ -553,29 +514,8 @@ func (r *servicenowResource) Update(ctx context.Context, req resource.UpdateRequ
 			return
 		}
 		systemIDs = resolvedIDs
-		resolvedNames = systemNames
-	} else if !plan.SystemIDs.IsNull() && !plan.SystemIDs.IsUnknown() {
-		// Use provided system IDs directly
-		diags = plan.SystemIDs.ElementsAs(ctx, &systemIDs, false)
-		resp.Diagnostics.Append(diags...)
-		if resp.Diagnostics.HasError() {
-			return
-		}
-		// Resolve IDs to names
-		names, err := r.client.ResolveSystemIDsToNames(systemIDs, r.client.Username)
-		if err != nil {
-			resp.Diagnostics.AddError(
-				"Error Resolving System IDs",
-				fmt.Sprintf("Could not resolve system IDs to names: %s", err.Error()),
-			)
-			return
-		}
-		resolvedNames = names
 	}
 
-	systemIDs, resolvedNames = alignSystemMappings(systemIDs, resolvedNames)
-
-	// Get options and content options
 	var options []string
 	diags = plan.Options.ElementsAs(ctx, &options, false)
 	resp.Diagnostics.Append(diags...)
@@ -590,23 +530,23 @@ func (r *servicenowResource) Update(ctx context.Context, req resource.UpdateRequ
 		return
 	}
 
-	// Update ServiceNow config
 	config := &client.ServiceNowConfig{
-		Account:         plan.Account.ValueString(),
-		ServiceHost:     plan.ServiceHost.ValueString(),
-		Password:        plan.Password.ValueString(),
-		Proxy:           plan.Proxy.ValueString(),
-		DampeningPeriod: int(plan.DampeningPeriod.ValueInt64()),
-		AppID:           appIDValue,
-		AppKey:          appKeyValue,
-		AuthType:        authType,
-		SystemIDs:       systemIDs,
-		SystemNames:     resolvedNames,
-		Options:         options,
-		ContentOption:   contentOption,
+		Account:              plan.Account.ValueString(),
+		ServiceHost:          plan.ServiceHost.ValueString(),
+		Password:             plan.Password.ValueString(),
+		Proxy:                plan.Proxy.ValueString(),
+		DampeningPeriod:      int(plan.DampeningPeriod.ValueInt64()),
+		AppID:                appIDValue,
+		AppKey:               appKeyValue,
+		AuthType:             authType,
+		SystemIDs:            systemIDs,
+		Options:              options,
+		ContentOption:        contentOption,
+		ServiceNowField:      plan.ServiceNowField.ValueString(),
+		ContentSource:        plan.ContentSource.ValueString(),
+		TriggerWindowInMills: plan.TriggerWindowInMills.ValueInt64(),
 	}
 
-	// First call with verify=true
 	err := r.client.CreateOrUpdateServiceNowConfig(config, r.client.Username, true)
 	if err != nil {
 		resp.Diagnostics.AddError(
@@ -616,7 +556,6 @@ func (r *servicenowResource) Update(ctx context.Context, req resource.UpdateRequ
 		return
 	}
 
-	// Second call without verify flag
 	err = r.client.CreateOrUpdateServiceNowConfig(config, r.client.Username, false)
 	if err != nil {
 		resp.Diagnostics.AddError(
@@ -626,20 +565,28 @@ func (r *servicenowResource) Update(ctx context.Context, req resource.UpdateRequ
 		return
 	}
 
-	// Update system IDs and names in state
-	systemIDsList, diags := types.ListValueFrom(ctx, types.StringType, systemIDs)
-	resp.Diagnostics.Append(diags...)
-	if resp.Diagnostics.HasError() {
-		return
+	if !plan.TableMapping.IsNull() && !plan.TableMapping.IsUnknown() {
+		tableMapping, err := tableMappingFromTF(ctx, plan.TableMapping)
+		if err != nil {
+			resp.Diagnostics.AddError("Error Reading table_mapping", err.Error())
+			return
+		}
+		if len(tableMapping) > 0 {
+			if err := r.client.UpdateServiceNowTableMapping(
+				plan.Account.ValueString(),
+				plan.ServiceHost.ValueString(),
+				r.client.Username,
+				tableMapping,
+			); err != nil {
+				resp.Diagnostics.AddError(
+					"Error Updating ServiceNow Table Mapping",
+					"Could not set table mapping: "+err.Error(),
+				)
+				return
+			}
+		}
 	}
-	plan.SystemIDs = systemIDsList
 
-	systemNamesList, diags := types.ListValueFrom(ctx, types.StringType, resolvedNames)
-	resp.Diagnostics.Append(diags...)
-	if resp.Diagnostics.HasError() {
-		return
-	}
-	plan.SystemNames = systemNamesList
 	plan.AuthType = types.StringValue(authType)
 	if appIDValue == "" {
 		plan.AppID = types.StringNull()
@@ -686,7 +633,6 @@ func (r *servicenowResource) Delete(ctx context.Context, req resource.DeleteRequ
 
 // ImportState imports the resource state.
 func (r *servicenowResource) ImportState(ctx context.Context, req resource.ImportStateRequest, resp *resource.ImportStateResponse) {
-	// Import using format: account@service_host
 	parts := strings.Split(req.ID, "@")
 	if len(parts) != 2 {
 		resp.Diagnostics.AddError(
@@ -701,45 +647,16 @@ func (r *servicenowResource) ImportState(ctx context.Context, req resource.Impor
 	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("id"), req.ID)...)
 }
 
-func alignSystemMappings(systemIDs []string, systemNames []string) ([]string, []string) {
-	if len(systemIDs) == 0 {
-		return []string{}, systemNames
+// tableMappingFromTF converts a Terraform types.Map to [][]string for the API
+func tableMappingFromTF(ctx context.Context, m types.Map) ([][]string, error) {
+	var tableMap map[string]string
+	diags := m.ElementsAs(ctx, &tableMap, false)
+	if diags.HasError() {
+		return nil, fmt.Errorf("failed to read table_mapping: %s", diags[0].Detail())
 	}
-
-	// Build map of ID -> Name for quick lookup
-	idToName := make(map[string]string, len(systemIDs))
-	for i, id := range systemIDs {
-		trimmedID := strings.TrimSpace(id)
-		if trimmedID == "" {
-			continue
-		}
-		var name string
-		if i < len(systemNames) {
-			name = strings.TrimSpace(systemNames[i])
-		}
-		if name == "" {
-			name = trimmedID
-		}
-		idToName[trimmedID] = name
+	result := make([][]string, 0, len(tableMap))
+	for project, table := range tableMap {
+		result = append(result, []string{project, table})
 	}
-
-	// Preserve order from systemIDs, remove duplicates
-	seen := make(map[string]struct{}, len(systemIDs))
-	alignedIDs := make([]string, 0, len(systemIDs))
-	alignedNames := make([]string, 0, len(systemIDs))
-
-	for _, rawID := range systemIDs {
-		id := strings.TrimSpace(rawID)
-		if id == "" {
-			continue
-		}
-		if _, exists := seen[id]; exists {
-			continue
-		}
-		seen[id] = struct{}{}
-		alignedIDs = append(alignedIDs, id)
-		alignedNames = append(alignedNames, idToName[id])
-	}
-
-	return alignedIDs, alignedNames
+	return result, nil
 }
