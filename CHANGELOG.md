@@ -5,6 +5,25 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.7.0] - 2026-03-11
+
+### Added
+- **insightfinder_project**: Extended `json_key_settings` with `dampening_field_setting` field
+  - Added `dampening_field_setting` Boolean field to `json_key_settings` for dampening field management
+  - Each JSON key now requires `json_key`, `type`, `summary_setting`, `metafield_setting`, and `dampening_field_setting` fields
+  - `dampening_field_setting`: Boolean flag to include the field in the dampening field list, controlling which fields are used for alert dampening logic
+  - Dampening field keys are collected alongside summary and metafield keys during Create/Update operations
+  - All three setting types (`summarySetting`, `metaFieldSetting`, `dampeningFieldSetting`) are sent in a single POST to `/api/external/v1/logsummarysettings`
+  - Read operation fetches `dampeningFieldSetting` array from API response and maps it back to state
+  - Updated documentation and examples to demonstrate `dampening_field_setting` usage
+
+- **insightfinder_system_settings**: Added documentation for `knowledgebase_settings` and `notifications_settings`
+  - Added `docs/resources/system_settings.md` with full schema reference for both nested blocks
+  - `knowledgebase_settings`: covers global KB fields (`enable_global_knowledge_base`, `satellite_system_set`, `composite_valid_threshold`, `timeline_top_k`, etc.) and incident prediction fields (`rule_active_threshold`, `rule_inactive_threshold`, `kb_training_length`, `tolerance`, etc.)
+  - `notifications_settings`: covers health view display, alert thresholds, email dampening periods, per-event-type email toggles, recipient addresses, and the JSON-encoded map fields (`incident_count_threshold`, `assignment_map`)
+  - Includes example usage blocks for full configuration, KB-only, and satellite system linking
+  - Documents import behavior (`terraform import insightfinder_system_settings.example <system_name>`) and delete-only semantics
+
 ## [1.6.1] - 2026-02-27
 
 ### Fixed
@@ -246,7 +265,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## Version History
 
+- **1.7.0** - Added `dampening_field_setting` to `json_key_settings`; fixed system settings and email_setting generation in CLI tool
 - **1.0.0** - Initial release with core functionality
 
+[1.7.0]: https://github.com/insightfinder/terraform-provider-insightfinder/releases/tag/v1.7.0
 [1.0.0]: https://github.com/insightfinder/terraform-provider-insightfinder/releases/tag/v1.0.0
-[Unreleased]: https://github.com/insightfinder/terraform-provider-insightfinder/compare/v1.0.0...HEAD
+[Unreleased]: https://github.com/insightfinder/terraform-provider-insightfinder/compare/v1.7.0...HEAD

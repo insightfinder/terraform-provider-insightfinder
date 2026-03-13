@@ -1,0 +1,870 @@
+// Copyright (c) InsightFinder Inc.
+// SPDX-License-Identifier: MPL-2.0
+
+package provider
+
+import (
+	"context"
+	"encoding/json"
+	"fmt"
+
+	"github.com/hashicorp/terraform-plugin-framework/path"
+	"github.com/hashicorp/terraform-plugin-framework/resource"
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema/boolplanmodifier"
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema/float64planmodifier"
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema/int64planmodifier"
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
+	"github.com/hashicorp/terraform-plugin-framework/types"
+	"github.com/hashicorp/terraform-plugin-log/tflog"
+
+	"github.com/insightfinder/terraform-provider-insightfinder/internal/provider/client"
+)
+
+// Ensure the implementation satisfies the expected interfaces.
+var (
+	_ resource.Resource                = &systemSettingsResource{}
+	_ resource.ResourceWithConfigure   = &systemSettingsResource{}
+	_ resource.ResourceWithImportState = &systemSettingsResource{}
+)
+
+// NewSystemSettingsResource is a helper function to simplify the provider implementation.
+func NewSystemSettingsResource() resource.Resource {
+	return &systemSettingsResource{}
+}
+
+// systemSettingsResource is the resource implementation.
+type systemSettingsResource struct {
+	client *client.Client
+}
+
+// systemSettingsResourceModel maps the resource schema data.
+type systemSettingsResourceModel struct {
+	ID                    types.String                `tfsdk:"id"`
+	SystemName            types.String                `tfsdk:"system_name"`
+	KnowledgebaseSettings *knowledgebaseSettingsModel `tfsdk:"knowledgebase_settings"`
+	NotificationsSettings *notificationsSettingsModel `tfsdk:"notifications_settings"`
+}
+
+// knowledgebaseSettingsModel holds both global KB and incident prediction settings
+type knowledgebaseSettingsModel struct {
+	// Global KB fields
+	EnableGlobalKnowledgeBase      types.Bool   `tfsdk:"enable_global_knowledge_base"`
+	SatelliteSystemSet             types.String `tfsdk:"satellite_system_set"`
+	CompositeValidThreshold        types.Int64  `tfsdk:"composite_valid_threshold"`
+	TimelineTopK                   types.Int64  `tfsdk:"timeline_top_k"`
+	EnableIgnoreInstancePrediction types.Bool   `tfsdk:"enable_ignore_instance_prediction"`
+	PredictionSource               types.Int64  `tfsdk:"prediction_source"`
+	ShareSystemType                types.Int64  `tfsdk:"share_system_type"`
+	ActionExecutionTime            types.Int64  `tfsdk:"action_execution_time"`
+	AutoFixValidationWindow        types.Int64  `tfsdk:"auto_fix_validation_window"`
+	FilterSelfToSelf               types.Bool   `tfsdk:"filter_self_to_self"`
+	RuleSourceType                 types.Int64  `tfsdk:"rule_source_type"`
+	// Incident prediction fields
+	RuleActiveThreshold           types.Float64 `tfsdk:"rule_active_threshold"`
+	RuleInactiveThreshold         types.Float64 `tfsdk:"rule_inactive_threshold"`
+	RuleActiveCondition           types.Int64   `tfsdk:"rule_active_condition"`
+	FalsePositiveTolerance        types.Int64   `tfsdk:"false_positive_tolerance"`
+	KBTrainingLength              types.Int64   `tfsdk:"kb_training_length"`
+	Tolerance                     types.Float64 `tfsdk:"tolerance"`
+	EnableInsensitiveRuleMatching types.Bool    `tfsdk:"enable_insensitive_rule_matching"`
+}
+
+// notificationsSettingsModel holds notification/health view settings
+type notificationsSettingsModel struct {
+	Order                              types.Int64   `tfsdk:"order"`
+	HideFlag                           types.Bool    `tfsdk:"hide_flag"`
+	AggregationInterval                types.Int64   `tfsdk:"aggregation_interval"`
+	EnableSplunkExport                 types.Bool    `tfsdk:"enable_splunk_export"`
+	IncidentCountThreshold             types.String  `tfsdk:"incident_count_threshold"`
+	AssignmentMap                      types.String  `tfsdk:"assignment_map"`
+	PredictionEmail                    types.String  `tfsdk:"prediction_email"`
+	AlertHealthScore                   types.Float64 `tfsdk:"alert_health_score"`
+	AlertFrequency                     types.Int64   `tfsdk:"alert_frequency"`
+	EmailDampeningPeriod               types.Int64   `tfsdk:"email_dampening_period"`
+	AlertsEmailDampeningPeriod         types.Int64   `tfsdk:"alerts_email_dampening_period"`
+	PredictionEmailDampeningPeriod     types.Int64   `tfsdk:"prediction_email_dampening_period"`
+	EnableSystemDownEmailAlert         types.Bool    `tfsdk:"enable_system_down_email_alert"`
+	OnlySendWithRCA                    types.Bool    `tfsdk:"only_send_with_rca"`
+	EnableIncidentPredictionEmailAlert types.Bool    `tfsdk:"enable_incident_prediction_email_alert"`
+	EnableIncidentDetectionEmailAlert  types.Bool    `tfsdk:"enable_incident_detection_email_alert"`
+	EnableAlertsEmail                  types.Bool    `tfsdk:"enable_alerts_email"`
+	EnableHealthEmailAlert             types.Bool    `tfsdk:"enable_health_email_alert"`
+	AlertEmail                         types.String  `tfsdk:"alert_email"`
+	HealthAlertEmail                   types.String  `tfsdk:"health_alert_email"`
+	IncidentDetectionEmail             types.String  `tfsdk:"incident_detection_email"`
+	EnableRootCauseEmailAlert          types.Bool    `tfsdk:"enable_root_cause_email_alert"`
+	RootCauseEmail                     types.String  `tfsdk:"root_cause_email"`
+	IncidentDampeningWindow            types.Int64   `tfsdk:"incident_dampening_window"`
+}
+
+// Metadata returns the resource type name.
+func (r *systemSettingsResource) Metadata(_ context.Context, req resource.MetadataRequest, resp *resource.MetadataResponse) {
+	resp.TypeName = req.ProviderTypeName + "_system_settings"
+}
+
+// Schema defines the schema for the resource.
+func (r *systemSettingsResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *resource.SchemaResponse) {
+	resp.Schema = schema.Schema{
+		Description: "Manages InsightFinder system-level settings including knowledge base and notifications configuration.",
+		Attributes: map[string]schema.Attribute{
+			"id": schema.StringAttribute{
+				Description: "Identifier for the system settings (system_name).",
+				Computed:    true,
+				PlanModifiers: []planmodifier.String{
+					stringplanmodifier.UseStateForUnknown(),
+				},
+			},
+			"system_name": schema.StringAttribute{
+				Description: "The display name of the system. Used to resolve the system ID via the system framework API.",
+				Required:    true,
+				PlanModifiers: []planmodifier.String{
+					stringplanmodifier.RequiresReplace(),
+				},
+			},
+			"knowledgebase_settings": schema.SingleNestedAttribute{
+				Description: "Knowledge base and incident prediction settings for the system.",
+				Optional:    true,
+				Attributes: map[string]schema.Attribute{
+					// Global KB fields
+					"enable_global_knowledge_base": schema.BoolAttribute{
+						Description: "Enable global knowledge base for the system.",
+						Optional:    true,
+						Computed:    true,
+						PlanModifiers: []planmodifier.Bool{
+							boolplanmodifier.UseStateForUnknown(),
+						},
+					},
+					"composite_valid_threshold": schema.Int64Attribute{
+						Description: "Composite valid threshold in milliseconds.",
+						Optional:    true,
+						Computed:    true,
+						PlanModifiers: []planmodifier.Int64{
+							int64planmodifier.UseStateForUnknown(),
+						},
+					},
+					"timeline_top_k": schema.Int64Attribute{
+						Description: "Number of top timeline entries to keep.",
+						Optional:    true,
+						Computed:    true,
+						PlanModifiers: []planmodifier.Int64{
+							int64planmodifier.UseStateForUnknown(),
+						},
+					},
+					"enable_ignore_instance_prediction": schema.BoolAttribute{
+						Description: "Enable ignoring instance prediction in KB.",
+						Optional:    true,
+						Computed:    true,
+						PlanModifiers: []planmodifier.Bool{
+							boolplanmodifier.UseStateForUnknown(),
+						},
+					},
+					"prediction_source": schema.Int64Attribute{
+						Description: "Prediction source type (0 = default).",
+						Optional:    true,
+						Computed:    true,
+						PlanModifiers: []planmodifier.Int64{
+							int64planmodifier.UseStateForUnknown(),
+						},
+					},
+					"share_system_type": schema.Int64Attribute{
+						Description: "Share system type for KB.",
+						Optional:    true,
+						Computed:    true,
+						PlanModifiers: []planmodifier.Int64{
+							int64planmodifier.UseStateForUnknown(),
+						},
+					},
+					"action_execution_time": schema.Int64Attribute{
+						Description: "Action execution time in minutes.",
+						Optional:    true,
+						Computed:    true,
+						PlanModifiers: []planmodifier.Int64{
+							int64planmodifier.UseStateForUnknown(),
+						},
+					},
+					"auto_fix_validation_window": schema.Int64Attribute{
+						Description: "Auto fix validation window.",
+						Optional:    true,
+						Computed:    true,
+						PlanModifiers: []planmodifier.Int64{
+							int64planmodifier.UseStateForUnknown(),
+						},
+					},
+					"filter_self_to_self": schema.BoolAttribute{
+						Description: "Filter self-to-self KB entries.",
+						Optional:    true,
+						Computed:    true,
+						PlanModifiers: []planmodifier.Bool{
+							boolplanmodifier.UseStateForUnknown(),
+						},
+					},
+					"rule_source_type": schema.Int64Attribute{
+						Description: "Rule source type (0 = default).",
+						Optional:    true,
+						Computed:    true,
+						PlanModifiers: []planmodifier.Int64{
+							int64planmodifier.UseStateForUnknown(),
+						},
+					},
+					"satellite_system_set": schema.StringAttribute{
+						Description: "JSON array of satellite systems linked to this system's knowledge base. " +
+							"Each entry has systemPartitionKey (userName, systemName, envName) and replay fields. " +
+							"Example: jsonencode([{systemPartitionKey={userName=\"u\",systemName=\"<id>\",envName=\"All\"},replay=false}])",
+						Optional: true,
+						Computed: true,
+						PlanModifiers: []planmodifier.String{
+							stringplanmodifier.UseStateForUnknown(),
+						},
+					},
+					// Incident prediction fields
+					"rule_active_threshold": schema.Float64Attribute{
+						Description: "Threshold to activate a prediction rule (0.0 - 1.0).",
+						Optional:    true,
+						Computed:    true,
+						PlanModifiers: []planmodifier.Float64{
+							float64planmodifier.UseStateForUnknown(),
+						},
+					},
+					"rule_inactive_threshold": schema.Float64Attribute{
+						Description: "Threshold to deactivate a prediction rule (0.0 - 1.0).",
+						Optional:    true,
+						Computed:    true,
+						PlanModifiers: []planmodifier.Float64{
+							float64planmodifier.UseStateForUnknown(),
+						},
+					},
+					"rule_active_condition": schema.Int64Attribute{
+						Description: "Condition for rule activation (0 = default).",
+						Optional:    true,
+						Computed:    true,
+						PlanModifiers: []planmodifier.Int64{
+							int64planmodifier.UseStateForUnknown(),
+						},
+					},
+					"false_positive_tolerance": schema.Int64Attribute{
+						Description: "Number of false positives tolerated before deactivating a rule.",
+						Optional:    true,
+						Computed:    true,
+						PlanModifiers: []planmodifier.Int64{
+							int64planmodifier.UseStateForUnknown(),
+						},
+					},
+					"kb_training_length": schema.Int64Attribute{
+						Description: "Length of KB training window in milliseconds.",
+						Optional:    true,
+						Computed:    true,
+						PlanModifiers: []planmodifier.Int64{
+							int64planmodifier.UseStateForUnknown(),
+						},
+					},
+					"tolerance": schema.Float64Attribute{
+						Description: "Tolerance value for incident prediction.",
+						Optional:    true,
+						Computed:    true,
+						PlanModifiers: []planmodifier.Float64{
+							float64planmodifier.UseStateForUnknown(),
+						},
+					},
+					"enable_insensitive_rule_matching": schema.BoolAttribute{
+						Description: "Enable insensitive rule matching for KB.",
+						Optional:    true,
+						Computed:    true,
+						PlanModifiers: []planmodifier.Bool{
+							boolplanmodifier.UseStateForUnknown(),
+						},
+					},
+				},
+			},
+			"notifications_settings": schema.SingleNestedAttribute{
+				Description: "Notification and alert email settings for the system.",
+				Optional:    true,
+				Attributes: map[string]schema.Attribute{
+					"order": schema.Int64Attribute{
+						Description: "Display order for the system in the health view.",
+						Optional:    true,
+						Computed:    true,
+						PlanModifiers: []planmodifier.Int64{
+							int64planmodifier.UseStateForUnknown(),
+						},
+					},
+					"hide_flag": schema.BoolAttribute{
+						Description: "Hide this system from the health view.",
+						Optional:    true,
+						Computed:    true,
+						PlanModifiers: []planmodifier.Bool{
+							boolplanmodifier.UseStateForUnknown(),
+						},
+					},
+					"aggregation_interval": schema.Int64Attribute{
+						Description: "Aggregation interval in minutes for health view metrics.",
+						Optional:    true,
+						Computed:    true,
+						PlanModifiers: []planmodifier.Int64{
+							int64planmodifier.UseStateForUnknown(),
+						},
+					},
+					"enable_splunk_export": schema.BoolAttribute{
+						Description: "Enable exporting data to Splunk.",
+						Optional:    true,
+						Computed:    true,
+						PlanModifiers: []planmodifier.Bool{
+							boolplanmodifier.UseStateForUnknown(),
+						},
+					},
+					"incident_count_threshold": schema.StringAttribute{
+						Description: "JSON map of project names to incident count thresholds, e.g. {\"MyProject@user\": 5}.",
+						Optional:    true,
+						Computed:    true,
+						PlanModifiers: []planmodifier.String{
+							stringplanmodifier.UseStateForUnknown(),
+						},
+					},
+					"assignment_map": schema.StringAttribute{
+						Description: "JSON map of zone/component keys to assignee lists (jiraAssignees, emailAssignees, serviceNowAssignees).",
+						Optional:    true,
+						Computed:    true,
+						PlanModifiers: []planmodifier.String{
+							stringplanmodifier.UseStateForUnknown(),
+						},
+					},
+					"prediction_email": schema.StringAttribute{
+						Description: "Email address for prediction notifications.",
+						Optional:    true,
+						Computed:    true,
+						PlanModifiers: []planmodifier.String{
+							stringplanmodifier.UseStateForUnknown(),
+						},
+					},
+					"alert_health_score": schema.Float64Attribute{
+						Description: "Health score threshold for triggering alerts.",
+						Optional:    true,
+						Computed:    true,
+						PlanModifiers: []planmodifier.Float64{
+							float64planmodifier.UseStateForUnknown(),
+						},
+					},
+					"alert_frequency": schema.Int64Attribute{
+						Description: "Alert frequency setting.",
+						Optional:    true,
+						Computed:    true,
+						PlanModifiers: []planmodifier.Int64{
+							int64planmodifier.UseStateForUnknown(),
+						},
+					},
+					"email_dampening_period": schema.Int64Attribute{
+						Description: "Dampening period for health alert emails in milliseconds.",
+						Optional:    true,
+						Computed:    true,
+						PlanModifiers: []planmodifier.Int64{
+							int64planmodifier.UseStateForUnknown(),
+						},
+					},
+					"alerts_email_dampening_period": schema.Int64Attribute{
+						Description: "Dampening period for alert emails in milliseconds.",
+						Optional:    true,
+						Computed:    true,
+						PlanModifiers: []planmodifier.Int64{
+							int64planmodifier.UseStateForUnknown(),
+						},
+					},
+					"prediction_email_dampening_period": schema.Int64Attribute{
+						Description: "Dampening period for prediction emails in milliseconds.",
+						Optional:    true,
+						Computed:    true,
+						PlanModifiers: []planmodifier.Int64{
+							int64planmodifier.UseStateForUnknown(),
+						},
+					},
+					"enable_system_down_email_alert": schema.BoolAttribute{
+						Description: "Enable email alert when the system is down.",
+						Optional:    true,
+						Computed:    true,
+						PlanModifiers: []planmodifier.Bool{
+							boolplanmodifier.UseStateForUnknown(),
+						},
+					},
+					"only_send_with_rca": schema.BoolAttribute{
+						Description: "Only send notifications when root cause analysis is available.",
+						Optional:    true,
+						Computed:    true,
+						PlanModifiers: []planmodifier.Bool{
+							boolplanmodifier.UseStateForUnknown(),
+						},
+					},
+					"enable_incident_prediction_email_alert": schema.BoolAttribute{
+						Description: "Enable email alert for incident predictions.",
+						Optional:    true,
+						Computed:    true,
+						PlanModifiers: []planmodifier.Bool{
+							boolplanmodifier.UseStateForUnknown(),
+						},
+					},
+					"enable_incident_detection_email_alert": schema.BoolAttribute{
+						Description: "Enable email alert for incident detections.",
+						Optional:    true,
+						Computed:    true,
+						PlanModifiers: []planmodifier.Bool{
+							boolplanmodifier.UseStateForUnknown(),
+						},
+					},
+					"enable_alerts_email": schema.BoolAttribute{
+						Description: "Enable alert emails.",
+						Optional:    true,
+						Computed:    true,
+						PlanModifiers: []planmodifier.Bool{
+							boolplanmodifier.UseStateForUnknown(),
+						},
+					},
+					"enable_health_email_alert": schema.BoolAttribute{
+						Description: "Enable health score email alerts.",
+						Optional:    true,
+						Computed:    true,
+						PlanModifiers: []planmodifier.Bool{
+							boolplanmodifier.UseStateForUnknown(),
+						},
+					},
+					"alert_email": schema.StringAttribute{
+						Description: "Email address for alert notifications.",
+						Optional:    true,
+						Computed:    true,
+						PlanModifiers: []planmodifier.String{
+							stringplanmodifier.UseStateForUnknown(),
+						},
+					},
+					"health_alert_email": schema.StringAttribute{
+						Description: "Email address for health alert notifications.",
+						Optional:    true,
+						Computed:    true,
+						PlanModifiers: []planmodifier.String{
+							stringplanmodifier.UseStateForUnknown(),
+						},
+					},
+					"incident_detection_email": schema.StringAttribute{
+						Description: "Email address for incident detection notifications.",
+						Optional:    true,
+						Computed:    true,
+						PlanModifiers: []planmodifier.String{
+							stringplanmodifier.UseStateForUnknown(),
+						},
+					},
+					"enable_root_cause_email_alert": schema.BoolAttribute{
+						Description: "Enable email alert for root cause analysis results.",
+						Optional:    true,
+						Computed:    true,
+						PlanModifiers: []planmodifier.Bool{
+							boolplanmodifier.UseStateForUnknown(),
+						},
+					},
+					"root_cause_email": schema.StringAttribute{
+						Description: "Email address for root cause analysis notifications.",
+						Optional:    true,
+						Computed:    true,
+						PlanModifiers: []planmodifier.String{
+							stringplanmodifier.UseStateForUnknown(),
+						},
+					},
+					"incident_dampening_window": schema.Int64Attribute{
+						Description: "Dampening window for incident notifications in milliseconds.",
+						Optional:    true,
+						Computed:    true,
+						PlanModifiers: []planmodifier.Int64{
+							int64planmodifier.UseStateForUnknown(),
+						},
+					},
+				},
+			},
+		},
+	}
+}
+
+// Configure adds the provider configured client to the resource.
+func (r *systemSettingsResource) Configure(_ context.Context, req resource.ConfigureRequest, resp *resource.ConfigureResponse) {
+	if req.ProviderData == nil {
+		return
+	}
+
+	c, ok := req.ProviderData.(*client.Client)
+	if !ok {
+		resp.Diagnostics.AddError(
+			"Unexpected Resource Configure Type",
+			fmt.Sprintf("Expected *client.Client, got: %T. Please report this issue to the provider developers.", req.ProviderData),
+		)
+		return
+	}
+
+	r.client = c
+}
+
+// resolveSystemID resolves a system name to its ID using the system framework API
+func (r *systemSettingsResource) resolveSystemID(ctx context.Context, systemName string) (string, error) {
+	ids, err := r.client.ResolveSystemNameToIDs([]string{systemName}, r.client.Username)
+	if err != nil {
+		return "", fmt.Errorf("failed to resolve system name '%s' to ID: %w", systemName, err)
+	}
+	if len(ids) == 0 {
+		return "", fmt.Errorf("system '%s' not found", systemName)
+	}
+	return ids[0], nil
+}
+
+// Create creates the resource and sets the initial Terraform state.
+func (r *systemSettingsResource) Create(ctx context.Context, req resource.CreateRequest, resp *resource.CreateResponse) {
+	var plan systemSettingsResourceModel
+	diags := req.Plan.Get(ctx, &plan)
+	resp.Diagnostics.Append(diags...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+
+	systemName := plan.SystemName.ValueString()
+	tflog.Debug(ctx, "Creating system settings", map[string]interface{}{"system_name": systemName})
+
+	systemID, err := r.resolveSystemID(ctx, systemName)
+	if err != nil {
+		resp.Diagnostics.AddError("Error Resolving System ID", err.Error())
+		return
+	}
+
+	if plan.KnowledgebaseSettings != nil {
+		if err := r.applyKnowledgebaseSettings(ctx, systemID, plan.KnowledgebaseSettings); err != nil {
+			resp.Diagnostics.AddError("Error Setting Knowledge Base Settings", err.Error())
+			return
+		}
+	}
+
+	if plan.NotificationsSettings != nil {
+		if err := r.applyNotificationsSettings(ctx, systemID, plan.NotificationsSettings); err != nil {
+			resp.Diagnostics.AddError("Error Setting Notifications Settings", err.Error())
+			return
+		}
+	}
+
+	plan.ID = types.StringValue(systemName)
+
+	// Read back state to populate computed fields
+	if err := r.readIntoModel(ctx, systemID, &plan); err != nil {
+		resp.Diagnostics.AddError("Error Reading System Settings After Create", err.Error())
+		return
+	}
+
+	diags = resp.State.Set(ctx, plan)
+	resp.Diagnostics.Append(diags...)
+}
+
+// Read refreshes the Terraform state with the latest data.
+func (r *systemSettingsResource) Read(ctx context.Context, req resource.ReadRequest, resp *resource.ReadResponse) {
+	var state systemSettingsResourceModel
+	diags := req.State.Get(ctx, &state)
+	resp.Diagnostics.Append(diags...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+
+	systemName := state.SystemName.ValueString()
+	tflog.Debug(ctx, "Reading system settings", map[string]interface{}{"system_name": systemName})
+
+	systemID, err := r.resolveSystemID(ctx, systemName)
+	if err != nil {
+		resp.Diagnostics.AddError("Error Resolving System ID", err.Error())
+		return
+	}
+
+	if err := r.readIntoModel(ctx, systemID, &state); err != nil {
+		resp.Diagnostics.AddError("Error Reading System Settings", err.Error())
+		return
+	}
+
+	diags = resp.State.Set(ctx, state)
+	resp.Diagnostics.Append(diags...)
+}
+
+// Update updates the resource and sets the updated Terraform state on success.
+func (r *systemSettingsResource) Update(ctx context.Context, req resource.UpdateRequest, resp *resource.UpdateResponse) {
+	var plan systemSettingsResourceModel
+	diags := req.Plan.Get(ctx, &plan)
+	resp.Diagnostics.Append(diags...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+
+	systemName := plan.SystemName.ValueString()
+	tflog.Debug(ctx, "Updating system settings", map[string]interface{}{"system_name": systemName})
+
+	systemID, err := r.resolveSystemID(ctx, systemName)
+	if err != nil {
+		resp.Diagnostics.AddError("Error Resolving System ID", err.Error())
+		return
+	}
+
+	if plan.KnowledgebaseSettings != nil {
+		if err := r.applyKnowledgebaseSettings(ctx, systemID, plan.KnowledgebaseSettings); err != nil {
+			resp.Diagnostics.AddError("Error Updating Knowledge Base Settings", err.Error())
+			return
+		}
+	}
+
+	if plan.NotificationsSettings != nil {
+		if err := r.applyNotificationsSettings(ctx, systemID, plan.NotificationsSettings); err != nil {
+			resp.Diagnostics.AddError("Error Updating Notifications Settings", err.Error())
+			return
+		}
+	}
+
+	plan.ID = types.StringValue(systemName)
+
+	// Read back state to populate computed fields
+	if err := r.readIntoModel(ctx, systemID, &plan); err != nil {
+		resp.Diagnostics.AddError("Error Reading System Settings After Update", err.Error())
+		return
+	}
+
+	diags = resp.State.Set(ctx, plan)
+	resp.Diagnostics.Append(diags...)
+}
+
+// Delete removes the resource from Terraform state (settings are left as-is on the server).
+func (r *systemSettingsResource) Delete(ctx context.Context, req resource.DeleteRequest, resp *resource.DeleteResponse) {
+	// System settings cannot be "deleted" from the API; removing from Terraform state only.
+	tflog.Debug(ctx, "Deleting system settings resource (removing from state only)")
+}
+
+// ImportState imports the resource state using system_name as the ID.
+func (r *systemSettingsResource) ImportState(ctx context.Context, req resource.ImportStateRequest, resp *resource.ImportStateResponse) {
+	resource.ImportStatePassthroughID(ctx, path.Root("system_name"), req, resp)
+}
+
+// applyKnowledgebaseSettings writes knowledgebase settings to the API
+func (r *systemSettingsResource) applyKnowledgebaseSettings(_ context.Context, systemID string, m *knowledgebaseSettingsModel) error {
+	globalKB := &client.GlobalKBSetting{
+		EnableGlobalKnowledgeBase:      m.EnableGlobalKnowledgeBase.ValueBool(),
+		CompositeValidThreshold:        m.CompositeValidThreshold.ValueInt64(),
+		TimelineTopK:                   m.TimelineTopK.ValueInt64(),
+		EnableIgnoreInstancePrediction: m.EnableIgnoreInstancePrediction.ValueBool(),
+		PredictionSource:               m.PredictionSource.ValueInt64(),
+		ShareSystemType:                m.ShareSystemType.ValueInt64(),
+		ActionExecutionTime:            m.ActionExecutionTime.ValueInt64(),
+		AutoFixValidationWindow:        m.AutoFixValidationWindow.ValueInt64(),
+		FilterSelfToSelf:               m.FilterSelfToSelf.ValueBool(),
+		RuleSourceType:                 m.RuleSourceType.ValueInt64(),
+	}
+
+	// Parse satellite_system_set JSON string and convert to the SET-format list
+	if v := m.SatelliteSystemSet.ValueString(); v != "" && v != "null" && v != "[]" {
+		var setEntries []client.SatelliteSystemSetEntry
+		if err := json.Unmarshal([]byte(v), &setEntries); err != nil {
+			return fmt.Errorf("satellite_system_set is not valid JSON: %w", err)
+		}
+		globalKB.SatelliteSystemList = client.SatelliteSystemSetToList(setEntries)
+	}
+
+	if err := r.client.SetGlobalKBSetting(systemID, globalKB); err != nil {
+		return fmt.Errorf("failed to set global KB setting: %w", err)
+	}
+
+	incidentPrediction := &client.IncidentPredictionSetting{
+		RuleActiveThreshold:           m.RuleActiveThreshold.ValueFloat64(),
+		RuleInactiveThreshold:         m.RuleInactiveThreshold.ValueFloat64(),
+		RuleActiveCondition:           m.RuleActiveCondition.ValueInt64(),
+		FalsePositiveTolerance:        m.FalsePositiveTolerance.ValueInt64(),
+		KBTrainingLength:              m.KBTrainingLength.ValueInt64(),
+		Tolerance:                     m.Tolerance.ValueFloat64(),
+		EnableInsensitiveRuleMatching: m.EnableInsensitiveRuleMatching.ValueBool(),
+	}
+
+	if err := r.client.SetIncidentPredictionSetting(systemID, incidentPrediction); err != nil {
+		return fmt.Errorf("failed to set incident prediction setting: %w", err)
+	}
+
+	return nil
+}
+
+// applyNotificationsSettings writes notifications settings to the API
+func (r *systemSettingsResource) applyNotificationsSettings(_ context.Context, systemID string, m *notificationsSettingsModel) error {
+	updates := &client.HealthViewSetting{
+		Order:                              m.Order.ValueInt64(),
+		HideFlag:                           m.HideFlag.ValueBool(),
+		AggregationInterval:                m.AggregationInterval.ValueInt64(),
+		EnableSplunkExport:                 m.EnableSplunkExport.ValueBool(),
+		PredictionEmail:                    m.PredictionEmail.ValueString(),
+		AlertHealthScore:                   m.AlertHealthScore.ValueFloat64(),
+		AlertFrequency:                     m.AlertFrequency.ValueInt64(),
+		EmailDampeningPeriod:               m.EmailDampeningPeriod.ValueInt64(),
+		AlertsEmailDampeningPeriod:         m.AlertsEmailDampeningPeriod.ValueInt64(),
+		PredictionEmailDampeningPeriod:     m.PredictionEmailDampeningPeriod.ValueInt64(),
+		EnableSystemDownEmailAlert:         m.EnableSystemDownEmailAlert.ValueBool(),
+		OnlySendWithRCA:                    m.OnlySendWithRCA.ValueBool(),
+		EnableIncidentPredictionEmailAlert: m.EnableIncidentPredictionEmailAlert.ValueBool(),
+		EnableIncidentDetectionEmailAlert:  m.EnableIncidentDetectionEmailAlert.ValueBool(),
+		EnableAlertsEmail:                  m.EnableAlertsEmail.ValueBool(),
+		EnableHealthEmailAlert:             m.EnableHealthEmailAlert.ValueBool(),
+		AlertEmail:                         m.AlertEmail.ValueString(),
+		HealthAlertEmail:                   m.HealthAlertEmail.ValueString(),
+		IncidentDetectionEmail:             m.IncidentDetectionEmail.ValueString(),
+		EnableRootCauseEmailAlert:          m.EnableRootCauseEmailAlert.ValueBool(),
+		RootCauseEmail:                     m.RootCauseEmail.ValueString(),
+		IncidentDampeningWindow:            m.IncidentDampeningWindow.ValueInt64(),
+	}
+
+	if v := m.IncidentCountThreshold.ValueString(); v != "" && v != "null" {
+		var ict map[string]int64
+		if err := json.Unmarshal([]byte(v), &ict); err != nil {
+			return fmt.Errorf("incident_count_threshold is not valid JSON: %w", err)
+		}
+		updates.IncidentCountThreshold = ict
+	}
+
+	if v := m.AssignmentMap.ValueString(); v != "" && v != "null" {
+		var am map[string]any
+		if err := json.Unmarshal([]byte(v), &am); err != nil {
+			return fmt.Errorf("assignment_map is not valid JSON: %w", err)
+		}
+		updates.AssignmentMap = am
+	}
+
+	if err := r.client.SetHealthViewSetting(systemID, updates); err != nil {
+		return fmt.Errorf("failed to set health view setting: %w", err)
+	}
+
+	return nil
+}
+
+// readIntoModel reads the current state from the API and populates the model
+func (r *systemSettingsResource) readIntoModel(_ context.Context, systemID string, m *systemSettingsResourceModel) error {
+	if m.KnowledgebaseSettings != nil {
+		kbSetting, err := r.client.GetGlobalKBSetting(systemID)
+		if err != nil {
+			return fmt.Errorf("failed to read global KB setting: %w", err)
+		}
+		ipSetting, err := r.client.GetIncidentPredictionSetting(systemID)
+		if err != nil {
+			return fmt.Errorf("failed to read incident prediction setting: %w", err)
+		}
+
+		if kbSetting != nil {
+			m.KnowledgebaseSettings.EnableGlobalKnowledgeBase = types.BoolValue(kbSetting.EnableGlobalKnowledgeBase)
+			m.KnowledgebaseSettings.CompositeValidThreshold = types.Int64Value(kbSetting.CompositeValidThreshold)
+			m.KnowledgebaseSettings.TimelineTopK = types.Int64Value(kbSetting.TimelineTopK)
+			m.KnowledgebaseSettings.EnableIgnoreInstancePrediction = types.BoolValue(kbSetting.EnableIgnoreInstancePrediction)
+			m.KnowledgebaseSettings.PredictionSource = types.Int64Value(kbSetting.PredictionSource)
+			m.KnowledgebaseSettings.ShareSystemType = types.Int64Value(kbSetting.ShareSystemType)
+			m.KnowledgebaseSettings.ActionExecutionTime = types.Int64Value(kbSetting.ActionExecutionTime)
+			m.KnowledgebaseSettings.AutoFixValidationWindow = types.Int64Value(kbSetting.AutoFixValidationWindow)
+			m.KnowledgebaseSettings.FilterSelfToSelf = types.BoolValue(kbSetting.FilterSelfToSelf)
+			m.KnowledgebaseSettings.RuleSourceType = types.Int64Value(kbSetting.RuleSourceType)
+
+			// Serialize satellite_system_set, preserving the existing state string when
+			// the data is semantically equal (avoids key-ordering diffs on every plan/apply).
+			var apiSSJSON string
+			if len(kbSetting.SatelliteSystemSet) > 0 {
+				if b, err := json.Marshal(kbSetting.SatelliteSystemSet); err == nil {
+					apiSSJSON = string(b)
+				}
+			} else {
+				apiSSJSON = "[]"
+			}
+			existing := m.KnowledgebaseSettings.SatelliteSystemSet.ValueString()
+			if normalizeJSONString(existing) == normalizeJSONString(apiSSJSON) && existing != "" {
+				// Keep the existing state value (preserves user's key order)
+			} else {
+				m.KnowledgebaseSettings.SatelliteSystemSet = types.StringValue(apiSSJSON)
+			}
+		}
+
+		if ipSetting != nil {
+			m.KnowledgebaseSettings.RuleActiveThreshold = types.Float64Value(ipSetting.RuleActiveThreshold)
+			m.KnowledgebaseSettings.RuleInactiveThreshold = types.Float64Value(ipSetting.RuleInactiveThreshold)
+			m.KnowledgebaseSettings.RuleActiveCondition = types.Int64Value(ipSetting.RuleActiveCondition)
+			m.KnowledgebaseSettings.FalsePositiveTolerance = types.Int64Value(ipSetting.FalsePositiveTolerance)
+			m.KnowledgebaseSettings.KBTrainingLength = types.Int64Value(ipSetting.KBTrainingLength)
+			m.KnowledgebaseSettings.Tolerance = types.Float64Value(ipSetting.Tolerance)
+			m.KnowledgebaseSettings.EnableInsensitiveRuleMatching = types.BoolValue(ipSetting.EnableInsensitiveRuleMatching)
+		}
+	}
+
+	if m.NotificationsSettings != nil {
+		hvSetting, err := r.client.GetHealthViewSetting(systemID)
+		if err != nil {
+			return fmt.Errorf("failed to read health view setting: %w", err)
+		}
+
+		if hvSetting != nil {
+			m.NotificationsSettings.Order = types.Int64Value(hvSetting.Order)
+			m.NotificationsSettings.HideFlag = types.BoolValue(hvSetting.HideFlag)
+			m.NotificationsSettings.AggregationInterval = types.Int64Value(hvSetting.AggregationInterval)
+			m.NotificationsSettings.EnableSplunkExport = types.BoolValue(hvSetting.EnableSplunkExport)
+
+			// For JSON map fields, marshal the API value then preserve the existing state
+			// string when it is semantically equal (avoids key-ordering diffs).
+			var apiICT string
+			if hvSetting.IncidentCountThreshold != nil {
+				if b, err := json.Marshal(hvSetting.IncidentCountThreshold); err == nil {
+					apiICT = string(b)
+				}
+			} else {
+				apiICT = "{}"
+			}
+			existingICT := m.NotificationsSettings.IncidentCountThreshold.ValueString()
+			if normalizeJSONString(existingICT) == normalizeJSONString(apiICT) && existingICT != "" {
+				// Keep existing state value
+			} else {
+				m.NotificationsSettings.IncidentCountThreshold = types.StringValue(apiICT)
+			}
+
+			var apiAM string
+			if hvSetting.AssignmentMap != nil {
+				if b, err := json.Marshal(hvSetting.AssignmentMap); err == nil {
+					apiAM = string(b)
+				}
+			} else {
+				apiAM = "{}"
+			}
+			existingAM := m.NotificationsSettings.AssignmentMap.ValueString()
+			if normalizeJSONString(existingAM) == normalizeJSONString(apiAM) && existingAM != "" {
+				// Keep existing state value
+			} else {
+				m.NotificationsSettings.AssignmentMap = types.StringValue(apiAM)
+			}
+
+			m.NotificationsSettings.PredictionEmail = types.StringValue(hvSetting.PredictionEmail)
+			m.NotificationsSettings.AlertHealthScore = types.Float64Value(hvSetting.AlertHealthScore)
+			m.NotificationsSettings.AlertFrequency = types.Int64Value(hvSetting.AlertFrequency)
+			m.NotificationsSettings.EmailDampeningPeriod = types.Int64Value(hvSetting.EmailDampeningPeriod)
+			m.NotificationsSettings.AlertsEmailDampeningPeriod = types.Int64Value(hvSetting.AlertsEmailDampeningPeriod)
+			m.NotificationsSettings.PredictionEmailDampeningPeriod = types.Int64Value(hvSetting.PredictionEmailDampeningPeriod)
+			m.NotificationsSettings.EnableSystemDownEmailAlert = types.BoolValue(hvSetting.EnableSystemDownEmailAlert)
+			m.NotificationsSettings.OnlySendWithRCA = types.BoolValue(hvSetting.OnlySendWithRCA)
+			m.NotificationsSettings.EnableIncidentPredictionEmailAlert = types.BoolValue(hvSetting.EnableIncidentPredictionEmailAlert)
+			m.NotificationsSettings.EnableIncidentDetectionEmailAlert = types.BoolValue(hvSetting.EnableIncidentDetectionEmailAlert)
+			m.NotificationsSettings.EnableAlertsEmail = types.BoolValue(hvSetting.EnableAlertsEmail)
+			m.NotificationsSettings.EnableHealthEmailAlert = types.BoolValue(hvSetting.EnableHealthEmailAlert)
+			m.NotificationsSettings.AlertEmail = types.StringValue(hvSetting.AlertEmail)
+			m.NotificationsSettings.HealthAlertEmail = types.StringValue(hvSetting.HealthAlertEmail)
+			m.NotificationsSettings.IncidentDetectionEmail = types.StringValue(hvSetting.IncidentDetectionEmail)
+			m.NotificationsSettings.EnableRootCauseEmailAlert = types.BoolValue(hvSetting.EnableRootCauseEmailAlert)
+			m.NotificationsSettings.RootCauseEmail = types.StringValue(hvSetting.RootCauseEmail)
+			m.NotificationsSettings.IncidentDampeningWindow = types.Int64Value(hvSetting.IncidentDampeningWindow)
+		}
+	}
+
+	return nil
+}
+
+// normalizeJSONString parses and re-marshals a JSON string via interface{} so that
+// semantically equivalent JSON with different key orderings produces the same bytes.
+// This is the same approach used by resource_project.go's normalizeJSON helper.
+func normalizeJSONString(s string) string {
+	if s == "" {
+		return s
+	}
+	var v interface{}
+	if err := json.Unmarshal([]byte(s), &v); err != nil {
+		return s
+	}
+	b, err := json.Marshal(v)
+	if err != nil {
+		return s
+	}
+	return string(b)
+}

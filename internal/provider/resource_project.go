@@ -175,10 +175,11 @@ type holidaySettingModel struct {
 }
 
 type jsonKeySettingModel struct {
-	JsonKey          types.String `tfsdk:"json_key"`
-	Type             types.String `tfsdk:"type"`
-	SummarySetting   types.Bool   `tfsdk:"summary_setting"`
-	MetafieldSetting types.Bool   `tfsdk:"metafield_setting"`
+	JsonKey               types.String `tfsdk:"json_key"`
+	Type                  types.String `tfsdk:"type"`
+	SummarySetting        types.Bool   `tfsdk:"summary_setting"`
+	MetafieldSetting      types.Bool   `tfsdk:"metafield_setting"`
+	DampeningfieldSetting types.Bool   `tfsdk:"dampening_field_setting"`
 }
 
 type projectCreationConfigModel struct {
@@ -870,6 +871,10 @@ func (r *projectResource) Schema(_ context.Context, _ resource.SchemaRequest, re
 						},
 						"metafield_setting": schema.BoolAttribute{
 							Description: "Whether to include this key in the metafield settings",
+							Required:    true,
+						},
+						"dampening_field_setting": schema.BoolAttribute{
+							Description: "Whether to include this key in the dampening field settings",
 							Required:    true,
 						},
 					},
@@ -2058,6 +2063,7 @@ func (r *projectResource) Create(ctx context.Context, req resource.CreateRequest
 		var jsonKeysToUpdate []client.JsonKeyType
 		var summaryKeys []string
 		var metafieldKeys []string
+		var dampeningFieldKeys []string
 
 		for _, jsonKeySetting := range configJsonKeys {
 			jsonKeyType := client.JsonKeyType{
@@ -2077,6 +2083,11 @@ func (r *projectResource) Create(ctx context.Context, req resource.CreateRequest
 			if jsonKeySetting.MetafieldSetting.ValueBool() {
 				metafieldKeys = append(metafieldKeys, jsonKeySetting.JsonKey.ValueString())
 			}
+
+			// Track which keys have dampening field settings enabled
+			if jsonKeySetting.DampeningfieldSetting.ValueBool() {
+				dampeningFieldKeys = append(dampeningFieldKeys, jsonKeySetting.JsonKey.ValueString())
+			}
 		}
 
 		// Update JSON key types
@@ -2091,8 +2102,8 @@ func (r *projectResource) Create(ctx context.Context, req resource.CreateRequest
 			}
 		}
 
-		// Update summary and metafield settings
-		err := r.client.UpdateJsonKeySummarySettings(plan.ProjectName.ValueString(), summaryKeys, metafieldKeys)
+		// Update summary, metafield, and dampening field settings
+		err := r.client.UpdateJsonKeySummarySettings(plan.ProjectName.ValueString(), summaryKeys, metafieldKeys, dampeningFieldKeys)
 		if err != nil {
 			resp.Diagnostics.AddError(
 				"Error updating JSON key summary and metafield settings",
@@ -2107,10 +2118,11 @@ func (r *projectResource) Create(ctx context.Context, req resource.CreateRequest
 		// No JSON key settings in config - set to null
 		plan.JsonKeySettings = types.ListNull(types.ObjectType{
 			AttrTypes: map[string]attr.Type{
-				"json_key":          types.StringType,
-				"type":              types.StringType,
-				"summary_setting":   types.BoolType,
-				"metafield_setting": types.BoolType,
+				"json_key":                types.StringType,
+				"type":                    types.StringType,
+				"summary_setting":         types.BoolType,
+				"metafield_setting":       types.BoolType,
+				"dampening_field_setting": types.BoolType,
 			},
 		})
 	}
@@ -2548,7 +2560,7 @@ func (r *projectResource) Read(ctx context.Context, req resource.ReadRequest, re
 		tflog.Warn(ctx, "Could not read JSON key types", map[string]any{"error": err.Error()})
 		// Keep existing state if we can't read from API
 	} else if len(jsonKeyTypes) > 0 {
-		// Get summary and metafield settings
+		// Get summary, metafield, and dampening field settings
 		summarySettingsResp, err := r.client.GetJsonKeySummarySettings(state.ProjectName.ValueString())
 		if err != nil {
 			tflog.Warn(ctx, "Could not read JSON key summary settings", map[string]any{"error": err.Error()})
@@ -2566,6 +2578,11 @@ func (r *projectResource) Read(ctx context.Context, req resource.ReadRequest, re
 			metafieldSet[key] = true
 		}
 
+		dampeningFieldSet := make(map[string]bool)
+		for _, key := range summarySettingsResp.DampeningFieldSetting {
+			dampeningFieldSet[key] = true
+		}
+
 		// Extract existing state for order preservation
 		var existingJsonKeys []jsonKeySettingModel
 		if !state.JsonKeySettings.IsNull() && !state.JsonKeySettings.IsUnknown() {
@@ -2576,10 +2593,11 @@ func (r *projectResource) Read(ctx context.Context, req resource.ReadRequest, re
 		apiJsonKeyMap := make(map[string]jsonKeySettingModel)
 		for _, jsonKey := range jsonKeyTypes {
 			apiJsonKeyMap[jsonKey.JsonKey] = jsonKeySettingModel{
-				JsonKey:          types.StringValue(jsonKey.JsonKey),
-				Type:             types.StringValue(jsonKey.Type),
-				SummarySetting:   types.BoolValue(summarySet[jsonKey.JsonKey]),
-				MetafieldSetting: types.BoolValue(metafieldSet[jsonKey.JsonKey]),
+				JsonKey:               types.StringValue(jsonKey.JsonKey),
+				Type:                  types.StringValue(jsonKey.Type),
+				SummarySetting:        types.BoolValue(summarySet[jsonKey.JsonKey]),
+				MetafieldSetting:      types.BoolValue(metafieldSet[jsonKey.JsonKey]),
+				DampeningfieldSetting: types.BoolValue(dampeningFieldSet[jsonKey.JsonKey]),
 			}
 		}
 
@@ -2613,10 +2631,11 @@ func (r *projectResource) Read(ctx context.Context, req resource.ReadRequest, re
 		if len(jsonKeySettings) > 0 {
 			listValue, diags := types.ListValueFrom(ctx, types.ObjectType{
 				AttrTypes: map[string]attr.Type{
-					"json_key":          types.StringType,
-					"type":              types.StringType,
-					"summary_setting":   types.BoolType,
-					"metafield_setting": types.BoolType,
+					"json_key":                types.StringType,
+					"type":                    types.StringType,
+					"summary_setting":         types.BoolType,
+					"metafield_setting":       types.BoolType,
+					"dampening_field_setting": types.BoolType,
 				},
 			}, jsonKeySettings)
 			resp.Diagnostics.Append(diags...)
@@ -2626,20 +2645,22 @@ func (r *projectResource) Read(ctx context.Context, req resource.ReadRequest, re
 		} else {
 			state.JsonKeySettings = types.ListNull(types.ObjectType{
 				AttrTypes: map[string]attr.Type{
-					"json_key":          types.StringType,
-					"type":              types.StringType,
-					"summary_setting":   types.BoolType,
-					"metafield_setting": types.BoolType,
+					"json_key":                types.StringType,
+					"type":                    types.StringType,
+					"summary_setting":         types.BoolType,
+					"metafield_setting":       types.BoolType,
+					"dampening_field_setting": types.BoolType,
 				},
 			})
 		}
 	} else {
 		state.JsonKeySettings = types.ListNull(types.ObjectType{
 			AttrTypes: map[string]attr.Type{
-				"json_key":          types.StringType,
-				"type":              types.StringType,
-				"summary_setting":   types.BoolType,
-				"metafield_setting": types.BoolType,
+				"json_key":                types.StringType,
+				"type":                    types.StringType,
+				"summary_setting":         types.BoolType,
+				"metafield_setting":       types.BoolType,
+				"dampening_field_setting": types.BoolType,
 			},
 		})
 	}
@@ -2848,12 +2869,30 @@ func (r *projectResource) Update(ctx context.Context, req resource.UpdateRequest
 		plan.NormalEventCausalFlag = getBool("normalEventCausalFlag")
 
 		// Prediction Settings
+		// PredictionRule* fields are managed by the incident prediction API, not the
+		// watch-tower-setting GET API, so it returns stale values. Preserve config values.
 		plan.PredictionCountThreshold = getInt64("predictionCountThreshold")
 		plan.PredictionProbabilityThreshold = getFloat64("predictionProbabilityThreshold")
-		plan.PredictionRuleActiveCondition = getInt64("predictionRuleActiveCondition")
-		plan.PredictionRuleActiveThreshold = getFloat64("predictionRuleActiveThreshold")
-		plan.PredictionRuleFalsePositiveThreshold = getInt64("predictionRuleFalsePositiveThreshold")
-		plan.PredictionRuleInactiveThreshold = getFloat64("predictionRuleInactiveThreshold")
+		if !config.PredictionRuleActiveCondition.IsNull() {
+			plan.PredictionRuleActiveCondition = config.PredictionRuleActiveCondition
+		} else {
+			plan.PredictionRuleActiveCondition = getInt64("predictionRuleActiveCondition")
+		}
+		if !config.PredictionRuleActiveThreshold.IsNull() {
+			plan.PredictionRuleActiveThreshold = config.PredictionRuleActiveThreshold
+		} else {
+			plan.PredictionRuleActiveThreshold = getFloat64("predictionRuleActiveThreshold")
+		}
+		if !config.PredictionRuleFalsePositiveThreshold.IsNull() {
+			plan.PredictionRuleFalsePositiveThreshold = config.PredictionRuleFalsePositiveThreshold
+		} else {
+			plan.PredictionRuleFalsePositiveThreshold = getInt64("predictionRuleFalsePositiveThreshold")
+		}
+		if !config.PredictionRuleInactiveThreshold.IsNull() {
+			plan.PredictionRuleInactiveThreshold = config.PredictionRuleInactiveThreshold
+		} else {
+			plan.PredictionRuleInactiveThreshold = getFloat64("predictionRuleInactiveThreshold")
+		}
 		plan.ProjectModelFlag = getBool("projectModelFlag")
 		plan.Proxy = getString("proxy")
 
@@ -3264,6 +3303,7 @@ func (r *projectResource) Update(ctx context.Context, req resource.UpdateRequest
 		var jsonKeysToUpdate []client.JsonKeyType
 		var summaryKeys []string
 		var metafieldKeys []string
+		var dampeningFieldKeys []string
 
 		for _, jsonKeySetting := range configJsonKeys {
 			jsonKeyType := client.JsonKeyType{
@@ -3283,6 +3323,11 @@ func (r *projectResource) Update(ctx context.Context, req resource.UpdateRequest
 			if jsonKeySetting.MetafieldSetting.ValueBool() {
 				metafieldKeys = append(metafieldKeys, jsonKeySetting.JsonKey.ValueString())
 			}
+
+			// Track which keys have dampening field settings enabled
+			if jsonKeySetting.DampeningfieldSetting.ValueBool() {
+				dampeningFieldKeys = append(dampeningFieldKeys, jsonKeySetting.JsonKey.ValueString())
+			}
 		}
 
 		// Update JSON key types
@@ -3297,8 +3342,8 @@ func (r *projectResource) Update(ctx context.Context, req resource.UpdateRequest
 			}
 		}
 
-		// Update summary and metafield settings
-		err := r.client.UpdateJsonKeySummarySettings(plan.ProjectName.ValueString(), summaryKeys, metafieldKeys)
+		// Update summary, metafield, and dampening field settings
+		err := r.client.UpdateJsonKeySummarySettings(plan.ProjectName.ValueString(), summaryKeys, metafieldKeys, dampeningFieldKeys)
 		if err != nil {
 			resp.Diagnostics.AddError(
 				"Error updating JSON key summary and metafield settings",
@@ -3313,10 +3358,11 @@ func (r *projectResource) Update(ctx context.Context, req resource.UpdateRequest
 		// No JSON key settings in config - set to null
 		plan.JsonKeySettings = types.ListNull(types.ObjectType{
 			AttrTypes: map[string]attr.Type{
-				"json_key":          types.StringType,
-				"type":              types.StringType,
-				"summary_setting":   types.BoolType,
-				"metafield_setting": types.BoolType,
+				"json_key":                types.StringType,
+				"type":                    types.StringType,
+				"summary_setting":         types.BoolType,
+				"metafield_setting":       types.BoolType,
+				"dampening_field_setting": types.BoolType,
 			},
 		})
 	}
