@@ -308,39 +308,15 @@ func (c *Client) CreateProject(project *ProjectConfig) error {
 
 // UpdateProject updates an existing project's configuration
 func (c *Client) UpdateProject(project *ProjectConfig) error {
-	// Build the settings JSON
 	settings := project.Settings
 	if settings == nil {
 		settings = make(map[string]interface{})
 	}
 
-	// Convert settings map to ProjectSettings struct to ensure type safety
-	// and only send fields that are present in the map
-	settingsJSON, err := json.Marshal(settings)
-	if err != nil {
-		return fmt.Errorf("failed to marshal settings: %w", err)
-	}
-
-	var projectSettings ProjectSettings
-	if err := json.Unmarshal(settingsJSON, &projectSettings); err != nil {
-		return fmt.Errorf("failed to unmarshal to ProjectSettings: %w", err)
-	}
-
-	// Marshal back to map[string]interface{} with omitempty fields excluded
-	finalSettingsJSON, err := json.Marshal(projectSettings)
-	if err != nil {
-		return fmt.Errorf("failed to marshal ProjectSettings: %w", err)
-	}
-
-	var finalSettings map[string]interface{}
-	if err := json.Unmarshal(finalSettingsJSON, &finalSettings); err != nil {
-		return fmt.Errorf("failed to unmarshal final settings: %w", err)
-	}
-
 	path := fmt.Sprintf("/api/external/v1/watch-tower-setting?projectName=%s&customerName=%s",
 		url.QueryEscape(project.ProjectName), url.QueryEscape(c.Username))
 
-	body, statusCode, err := c.DoRequest("POST", path, finalSettings)
+	body, statusCode, err := c.DoRequest("POST", path, settings)
 	if err != nil {
 		return err
 	}

@@ -2,7 +2,7 @@ terraform {
   required_providers {
     insightfinder = {
       source  = "insightfinder/insightfinder"
-      version = "~> 1.7"
+      version = "~> 1.8"
     }
   }
 }

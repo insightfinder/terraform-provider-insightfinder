@@ -904,7 +904,6 @@ func (r *projectResource) Configure(_ context.Context, req resource.ConfigureReq
 
 // populateSettings converts the Terraform plan/state into a settings map for API calls
 func populateSettings(plan *projectResourceModel) map[string]interface{} {
-	// Helper function to parse JSON fields
 	parseJSONField := func(jsonStr string) interface{} {
 		if jsonStr == "" {
 			return nil
@@ -916,362 +915,338 @@ func populateSettings(plan *projectResourceModel) map[string]interface{} {
 		return result
 	}
 
-	// Build ProjectSettings struct from the plan
-	projectSettings := client.ProjectSettings{}
+	// Build the map directly to preserve false/zero values that omitempty would strip.
+	s := make(map[string]interface{})
 
-	// Populate only non-null fields to match the struct
 	if !plan.ProjectName.IsNull() {
-		projectSettings.ProjectName = plan.ProjectName.ValueString()
+		s["projectName"] = plan.ProjectName.ValueString()
 	}
 	if !plan.ProjectDisplayName.IsNull() {
-		projectSettings.ProjectDisplayName = plan.ProjectDisplayName.ValueString()
+		s["projectDisplayName"] = plan.ProjectDisplayName.ValueString()
 	}
 	if !plan.CValue.IsNull() {
-		projectSettings.CValue = int(plan.CValue.ValueInt64())
+		s["cValue"] = int(plan.CValue.ValueInt64())
 	}
 	if !plan.PValue.IsNull() {
-		projectSettings.PValue = plan.PValue.ValueFloat64()
+		s["pValue"] = plan.PValue.ValueFloat64()
 	}
 	if !plan.ProjectTimeZone.IsNull() {
-		projectSettings.ProjectTimeZone = plan.ProjectTimeZone.ValueString()
+		s["projectTimeZone"] = plan.ProjectTimeZone.ValueString()
 	}
 	if !plan.SamplingInterval.IsNull() {
-		projectSettings.SamplingInterval = int(plan.SamplingInterval.ValueInt64())
+		s["samplingInterval"] = int(plan.SamplingInterval.ValueInt64())
 	}
 	if !plan.MinValidModelSpan.IsNull() {
-		projectSettings.MinValidModelSpan = int(plan.MinValidModelSpan.ValueInt64())
+		s["minValidModelSpan"] = int(plan.MinValidModelSpan.ValueInt64())
 	}
 	if !plan.MaxWebHookRequestSize.IsNull() {
-		projectSettings.MaxWebHookRequestSize = int(plan.MaxWebHookRequestSize.ValueInt64())
+		s["maxWebHookRequestSize"] = int(plan.MaxWebHookRequestSize.ValueInt64())
 	}
 	if !plan.WebhookUrl.IsNull() {
-		projectSettings.WebhookURL = plan.WebhookUrl.ValueString()
+		s["webhookUrl"] = plan.WebhookUrl.ValueString()
 	}
 	if !plan.WebhookTypeSetStr.IsNull() {
-		projectSettings.WebhookTypeSetStr = plan.WebhookTypeSetStr.ValueString()
+		s["webhookTypeSetStr"] = plan.WebhookTypeSetStr.ValueString()
 	}
 	if !plan.WebhookBlackListSetStr.IsNull() {
-		projectSettings.WebhookBlackListSetStr = plan.WebhookBlackListSetStr.ValueString()
+		s["webhookBlackListSetStr"] = plan.WebhookBlackListSetStr.ValueString()
 	}
 	if !plan.WebhookCriticalKeywordSetStr.IsNull() {
-		projectSettings.WebhookCriticalKeywordSetStr = plan.WebhookCriticalKeywordSetStr.ValueString()
+		s["webhookCriticalKeywordSetStr"] = plan.WebhookCriticalKeywordSetStr.ValueString()
 	}
 	if !plan.WebhookAlertDampening.IsNull() {
-		projectSettings.WebhookAlertDampening = int(plan.WebhookAlertDampening.ValueInt64())
+		s["webhookAlertDampening"] = int(plan.WebhookAlertDampening.ValueInt64())
 	}
 	if !plan.Proxy.IsNull() {
-		projectSettings.Proxy = plan.Proxy.ValueString()
+		s["proxy"] = plan.Proxy.ValueString()
 	}
 	if !plan.RetentionTime.IsNull() {
-		projectSettings.RetentionTime = int(plan.RetentionTime.ValueInt64())
+		s["retentionTime"] = int(plan.RetentionTime.ValueInt64())
 	}
 	if !plan.UBLRetentionTime.IsNull() {
-		projectSettings.UBLRetentionTime = int(plan.UBLRetentionTime.ValueInt64())
+		s["UBLRetentionTime"] = int(plan.UBLRetentionTime.ValueInt64())
 	}
 	if !plan.TrainingFilter.IsNull() {
-		projectSettings.TrainingFilter = plan.TrainingFilter.ValueBool()
+		s["trainingFilter"] = plan.TrainingFilter.ValueBool()
 	}
 	if !plan.MultiHopSearchLimit.IsNull() {
-		projectSettings.MultiHopSearchLimit = plan.MultiHopSearchLimit.ValueString()
+		s["multiHopSearchLimit"] = plan.MultiHopSearchLimit.ValueString()
 	}
 	if !plan.EnableNewAlertEmail.IsNull() {
-		projectSettings.EnableNewAlertEmail = plan.EnableNewAlertEmail.ValueBool()
+		s["enableNewAlertEmail"] = plan.EnableNewAlertEmail.ValueBool()
 	}
 	if !plan.LargeProject.IsNull() {
-		projectSettings.LargeProject = plan.LargeProject.ValueBool()
+		s["largeProject"] = plan.LargeProject.ValueBool()
 	}
 	if !plan.NewPatternRange.IsNull() {
-		projectSettings.NewPatternRange = int(plan.NewPatternRange.ValueInt64())
+		s["newPatternRange"] = int(plan.NewPatternRange.ValueInt64())
 	}
 	if !plan.EnableAnomalyScoreEscalation.IsNull() {
-		projectSettings.EnableAnomalyScoreEscalation = plan.EnableAnomalyScoreEscalation.ValueBool()
+		s["enableAnomalyScoreEscalation"] = plan.EnableAnomalyScoreEscalation.ValueBool()
 	}
 	if !plan.EscalationAnomalyScoreThreshold.IsNull() {
-		projectSettings.EscalationAnomalyScoreThreshold = plan.EscalationAnomalyScoreThreshold.ValueString()
+		s["escalationAnomalyScoreThreshold"] = plan.EscalationAnomalyScoreThreshold.ValueString()
 	}
 	if !plan.IgnoreAnomalyScoreThreshold.IsNull() {
-		projectSettings.IgnoreAnomalyScoreThreshold = plan.IgnoreAnomalyScoreThreshold.ValueString()
+		s["ignoreAnomalyScoreThreshold"] = plan.IgnoreAnomalyScoreThreshold.ValueString()
 	}
 	if !plan.EnableStreamDetection.IsNull() {
-		projectSettings.EnableStreamDetection = plan.EnableStreamDetection.ValueBool()
+		s["enableStreamDetection"] = plan.EnableStreamDetection.ValueBool()
 	}
 
 	// Log-specific fields
 	if !plan.DailyModelSpan.IsNull() {
-		projectSettings.DailyModelSpan = int(plan.DailyModelSpan.ValueInt64())
+		s["dailyModelSpan"] = int(plan.DailyModelSpan.ValueInt64())
 	}
 	if !plan.KeywordFeatureNumber.IsNull() {
-		projectSettings.KeywordFeatureNumber = int(plan.KeywordFeatureNumber.ValueInt64())
+		s["keywordFeatureNumber"] = int(plan.KeywordFeatureNumber.ValueInt64())
 	}
 	if !plan.MaxLogModelSize.IsNull() {
-		projectSettings.MaxLogModelSize = int(plan.MaxLogModelSize.ValueInt64())
+		s["maxLogModelSize"] = int(plan.MaxLogModelSize.ValueInt64())
 	}
 	if !plan.ModelKeywordSetting.IsNull() {
-		projectSettings.ModelKeywordSetting = int(plan.ModelKeywordSetting.ValueInt64())
+		s["modelKeywordSetting"] = int(plan.ModelKeywordSetting.ValueInt64())
 	}
 	if !plan.NlpFlag.IsNull() {
-		projectSettings.NlpFlag = plan.NlpFlag.ValueBool()
+		s["nlpFlag"] = plan.NlpFlag.ValueBool()
 	}
 	if !plan.ProjectModelFlag.IsNull() {
-		projectSettings.ProjectModelFlag = plan.ProjectModelFlag.ValueBool()
+		s["projectModelFlag"] = plan.ProjectModelFlag.ValueBool()
 	}
 	if !plan.MaximumThreads.IsNull() {
-		projectSettings.MaximumThreads = int(plan.MaximumThreads.ValueInt64())
+		s["maximumThreads"] = int(plan.MaximumThreads.ValueInt64())
 	}
 	if !plan.LogDetectionMinCount.IsNull() {
-		projectSettings.LogDetectionMinCount = int(plan.LogDetectionMinCount.ValueInt64())
+		s["logDetectionMinCount"] = int(plan.LogDetectionMinCount.ValueInt64())
 	}
 	if !plan.LogDetectionSize.IsNull() {
-		projectSettings.LogDetectionSize = int(plan.LogDetectionSize.ValueInt64())
+		s["logDetectionSize"] = int(plan.LogDetectionSize.ValueInt64())
 	}
 	if !plan.MaximumDetectionWaitTime.IsNull() {
-		projectSettings.MaximumDetectionWaitTime = int(plan.MaximumDetectionWaitTime.ValueInt64())
+		s["maximumDetectionWaitTime"] = int(plan.MaximumDetectionWaitTime.ValueInt64())
 	}
 	if !plan.KeywordSetting.IsNull() {
-		projectSettings.KeywordSetting = int(plan.KeywordSetting.ValueInt64())
+		s["keywordSetting"] = int(plan.KeywordSetting.ValueInt64())
 	}
 	if !plan.LogPatternLimitLevel.IsNull() {
-		projectSettings.LogPatternLimitLevel = int(plan.LogPatternLimitLevel.ValueInt64())
+		s["logPatternLimitLevel"] = int(plan.LogPatternLimitLevel.ValueInt64())
 	}
 	if !plan.NormalEventCausalFlag.IsNull() {
-		projectSettings.NormalEventCausalFlag = plan.NormalEventCausalFlag.ValueBool()
+		s["normalEventCausalFlag"] = plan.NormalEventCausalFlag.ValueBool()
 	}
 	if !plan.SimilaritySensitivity.IsNull() {
-		projectSettings.SimilaritySensitivity = plan.SimilaritySensitivity.ValueString()
+		s["similaritySensitivity"] = plan.SimilaritySensitivity.ValueString()
 	}
 	if !plan.CollectAllRareEventsFlag.IsNull() {
-		projectSettings.CollectAllRareEventsFlag = plan.CollectAllRareEventsFlag.ValueBool()
+		s["collectAllRareEventsFlag"] = plan.CollectAllRareEventsFlag.ValueBool()
 	}
 	if !plan.RareEventAlertThresholds.IsNull() {
-		projectSettings.RareEventAlertThresholds = int(plan.RareEventAlertThresholds.ValueInt64())
+		s["rareEventAlertThresholds"] = int(plan.RareEventAlertThresholds.ValueInt64())
 	}
 	if !plan.LogAnomalyEventBaseScore.IsNull() {
-		projectSettings.LogAnomalyEventBaseScore = plan.LogAnomalyEventBaseScore.ValueString()
+		s["logAnomalyEventBaseScore"] = plan.LogAnomalyEventBaseScore.ValueString()
 	}
 	if !plan.RareNumberLimit.IsNull() {
-		projectSettings.RareNumberLimit = int(plan.RareNumberLimit.ValueInt64())
+		s["rareNumberLimit"] = int(plan.RareNumberLimit.ValueInt64())
 	}
 	if !plan.WhitelistNumberLimit.IsNull() {
-		projectSettings.WhitelistNumberLimit = int(plan.WhitelistNumberLimit.ValueInt64())
+		s["whitelistNumberLimit"] = int(plan.WhitelistNumberLimit.ValueInt64())
 	}
 	if !plan.NewPatternNumberLimit.IsNull() {
-		projectSettings.NewPatternNumberLimit = int(plan.NewPatternNumberLimit.ValueInt64())
+		s["newPatternNumberLimit"] = int(plan.NewPatternNumberLimit.ValueInt64())
 	}
 	if !plan.HotNumberLimit.IsNull() {
-		projectSettings.HotNumberLimit = int(plan.HotNumberLimit.ValueInt64())
+		s["hotNumberLimit"] = int(plan.HotNumberLimit.ValueInt64())
 	}
 	if !plan.ColdNumberLimit.IsNull() {
-		projectSettings.ColdNumberLimit = int(plan.ColdNumberLimit.ValueInt64())
+		s["coldNumberLimit"] = int(plan.ColdNumberLimit.ValueInt64())
 	}
 	if !plan.RareAnomalyType.IsNull() {
-		projectSettings.RareAnomalyType = int(plan.RareAnomalyType.ValueInt64())
+		s["rareAnomalyType"] = int(plan.RareAnomalyType.ValueInt64())
 	}
 	if !plan.HotEventThreshold.IsNull() {
-		projectSettings.HotEventThreshold = int(plan.HotEventThreshold.ValueInt64())
+		s["hotEventThreshold"] = int(plan.HotEventThreshold.ValueInt64())
 	}
 	if !plan.ColdEventThreshold.IsNull() {
-		projectSettings.ColdEventThreshold = int(plan.ColdEventThreshold.ValueInt64())
+		s["coldEventThreshold"] = int(plan.ColdEventThreshold.ValueInt64())
 	}
 	if !plan.DisableLogCompressEvent.IsNull() {
-		projectSettings.DisableLogCompressEvent = plan.DisableLogCompressEvent.ValueBool()
+		s["disableLogCompressEvent"] = plan.DisableLogCompressEvent.ValueBool()
 	}
 	if !plan.EnableHotEvent.IsNull() {
-		projectSettings.EnableHotEvent = plan.EnableHotEvent.ValueBool()
+		s["enableHotEvent"] = plan.EnableHotEvent.ValueBool()
 	}
 	if !plan.HotEventCalmDownPeriod.IsNull() {
-		projectSettings.HotEventCalmDownPeriod = int(plan.HotEventCalmDownPeriod.ValueInt64())
+		s["hotEventCalmDownPeriod"] = int(plan.HotEventCalmDownPeriod.ValueInt64())
 	}
 	if !plan.InstanceDownEnable.IsNull() {
-		projectSettings.InstanceDownEnable = plan.InstanceDownEnable.ValueBool()
+		s["instanceDownEnable"] = plan.InstanceDownEnable.ValueBool()
 	}
 	if !plan.AnomalySamplingInterval.IsNull() {
-		projectSettings.AnomalySamplingInterval = int(plan.AnomalySamplingInterval.ValueInt64())
+		s["anomalySamplingInterval"] = int(plan.AnomalySamplingInterval.ValueInt64())
 	}
 	if !plan.HotEventDetectionMode.IsNull() {
-		projectSettings.HotEventDetectionMode = int(plan.HotEventDetectionMode.ValueInt64())
+		s["hotEventDetectionMode"] = int(plan.HotEventDetectionMode.ValueInt64())
 	}
 	if !plan.AnomalyDetectionMode.IsNull() {
-		projectSettings.AnomalyDetectionMode = int(plan.AnomalyDetectionMode.ValueInt64())
+		s["anomalyDetectionMode"] = int(plan.AnomalyDetectionMode.ValueInt64())
 	}
 	if !plan.PrettyJsonConvertorFlag.IsNull() {
-		projectSettings.PrettyJSONConvertorFlag = plan.PrettyJsonConvertorFlag.ValueBool()
+		s["prettyJsonConvertorFlag"] = plan.PrettyJsonConvertorFlag.ValueBool()
 	}
 	if !plan.ZoneNameKey.IsNull() {
-		projectSettings.ZoneNameKey = plan.ZoneNameKey.ValueString()
+		s["zoneNameKey"] = plan.ZoneNameKey.ValueString()
 	}
 	if !plan.MultiLineFlag.IsNull() {
-		projectSettings.MultiLineFlag = plan.MultiLineFlag.ValueBool()
+		s["multiLineFlag"] = plan.MultiLineFlag.ValueBool()
 	}
 	if !plan.FeatureOutlierSensitivity.IsNull() {
-		projectSettings.FeatureOutlierSensitivity = plan.FeatureOutlierSensitivity.ValueString()
+		s["featureOutlierSensitivity"] = plan.FeatureOutlierSensitivity.ValueString()
 	}
 	if !plan.DisableModelKeywordStatsCollection.IsNull() {
-		projectSettings.DisableModelKeywordStatsCollection = plan.DisableModelKeywordStatsCollection.ValueBool()
+		s["disableModelKeywordStatsCollection"] = plan.DisableModelKeywordStatsCollection.ValueBool()
 	}
 	if !plan.InstanceConvertFlag.IsNull() {
-		projectSettings.InstanceConvertFlag = plan.InstanceConvertFlag.ValueBool()
+		s["instanceConvertFlag"] = plan.InstanceConvertFlag.ValueBool()
 	}
 	if !plan.NewAlertFlag.IsNull() {
-		projectSettings.NewAlertFlag = plan.NewAlertFlag.ValueBool()
+		s["newAlertFlag"] = plan.NewAlertFlag.ValueBool()
 	}
 	if !plan.IsGroupingByInstance.IsNull() {
-		projectSettings.IsGroupingByInstance = plan.IsGroupingByInstance.ValueBool()
+		s["isGroupingByInstance"] = plan.IsGroupingByInstance.ValueBool()
 	}
 	if !plan.FeatureOutlierThreshold.IsNull() {
-		projectSettings.FeatureOutlierThreshold = plan.FeatureOutlierThreshold.ValueFloat64()
+		s["featureOutlierThreshold"] = plan.FeatureOutlierThreshold.ValueFloat64()
 	}
 	if !plan.IsTracePrompt.IsNull() {
-		projectSettings.IsTracePrompt = plan.IsTracePrompt.ValueBool()
+		s["isTracePrompt"] = plan.IsTracePrompt.ValueBool()
 	}
 	if !plan.IsEdgeBrain.IsNull() {
-		projectSettings.IsEdgeBrain = plan.IsEdgeBrain.ValueBool()
+		s["isEdgeBrain"] = plan.IsEdgeBrain.ValueBool()
 	}
 
 	// Incident prediction and RCA fields
 	if !plan.IncidentPredictionWindow.IsNull() {
-		projectSettings.IncidentPredictionWindow = int(plan.IncidentPredictionWindow.ValueInt64())
+		s["incidentPredictionWindow"] = int(plan.IncidentPredictionWindow.ValueInt64())
 	}
 	if !plan.MinIncidentPredictionWindow.IsNull() {
-		projectSettings.MinIncidentPredictionWindow = int(plan.MinIncidentPredictionWindow.ValueInt64())
+		s["minIncidentPredictionWindow"] = int(plan.MinIncidentPredictionWindow.ValueInt64())
 	}
 	if !plan.IncidentRelationSearchWindow.IsNull() {
-		projectSettings.IncidentRelationSearchWindow = int(plan.IncidentRelationSearchWindow.ValueInt64())
+		s["incidentRelationSearchWindow"] = int(plan.IncidentRelationSearchWindow.ValueInt64())
 	}
 	if !plan.IncidentPredictionEventLimit.IsNull() {
-		projectSettings.IncidentPredictionEventLimit = int(plan.IncidentPredictionEventLimit.ValueInt64())
+		s["incidentPredictionEventLimit"] = int(plan.IncidentPredictionEventLimit.ValueInt64())
 	}
 	if !plan.RootCauseCountThreshold.IsNull() {
-		projectSettings.RootCauseCountThreshold = int(plan.RootCauseCountThreshold.ValueInt64())
+		s["rootCauseCountThreshold"] = int(plan.RootCauseCountThreshold.ValueInt64())
 	}
 	if !plan.RootCauseProbabilityThreshold.IsNull() {
-		projectSettings.RootCauseProbabilityThreshold = plan.RootCauseProbabilityThreshold.ValueFloat64()
+		s["rootCauseProbabilityThreshold"] = plan.RootCauseProbabilityThreshold.ValueFloat64()
 	}
 	if !plan.RootCauseLogMessageSearchRange.IsNull() {
-		projectSettings.RootCauseLogMessageSearchRange = int(plan.RootCauseLogMessageSearchRange.ValueInt64())
+		s["rootCauseLogMessageSearchRange"] = int(plan.RootCauseLogMessageSearchRange.ValueInt64())
 	}
 	if !plan.CausalPredictionSetting.IsNull() {
-		projectSettings.CausalPredictionSetting = int(plan.CausalPredictionSetting.ValueInt64())
+		s["causalPredictionSetting"] = int(plan.CausalPredictionSetting.ValueInt64())
 	}
 	if !plan.CausalMinDelay.IsNull() {
-		projectSettings.CausalMinDelay = plan.CausalMinDelay.ValueString()
+		s["causalMinDelay"] = plan.CausalMinDelay.ValueString()
 	}
 	if !plan.RootCauseRankSetting.IsNull() {
-		projectSettings.RootCauseRankSetting = int(plan.RootCauseRankSetting.ValueInt64())
+		s["rootCauseRankSetting"] = int(plan.RootCauseRankSetting.ValueInt64())
 	}
 	if !plan.MaximumRootCauseResultSize.IsNull() {
-		projectSettings.MaximumRootCauseResultSize = int(plan.MaximumRootCauseResultSize.ValueInt64())
+		s["maximumRootCauseResultSize"] = int(plan.MaximumRootCauseResultSize.ValueInt64())
 	}
 	if !plan.MultiHopSearchLevel.IsNull() {
-		projectSettings.MultiHopSearchLevel = int(plan.MultiHopSearchLevel.ValueInt64())
+		s["multiHopSearchLevel"] = int(plan.MultiHopSearchLevel.ValueInt64())
 	}
 	if !plan.AvgPerIncidentDowntimeCost.IsNull() {
-		projectSettings.AvgPerIncidentDowntimeCost = plan.AvgPerIncidentDowntimeCost.ValueFloat64()
+		s["avgPerIncidentDowntimeCost"] = plan.AvgPerIncidentDowntimeCost.ValueFloat64()
 	}
 	if !plan.PredictionRuleActiveCondition.IsNull() {
-		projectSettings.PredictionRuleActiveCondition = int(plan.PredictionRuleActiveCondition.ValueInt64())
+		s["predictionRuleActiveCondition"] = int(plan.PredictionRuleActiveCondition.ValueInt64())
 	}
 	if !plan.PredictionRuleFalsePositiveThreshold.IsNull() {
-		projectSettings.PredictionRuleFalsePositiveThreshold = int(plan.PredictionRuleFalsePositiveThreshold.ValueInt64())
+		s["predictionRuleFalsePositiveThreshold"] = int(plan.PredictionRuleFalsePositiveThreshold.ValueInt64())
 	}
 	if !plan.PredictionRuleActiveThreshold.IsNull() {
-		projectSettings.PredictionRuleActiveThreshold = plan.PredictionRuleActiveThreshold.ValueFloat64()
+		s["predictionRuleActiveThreshold"] = plan.PredictionRuleActiveThreshold.ValueFloat64()
 	}
 	if !plan.PredictionRuleInactiveThreshold.IsNull() {
-		projectSettings.PredictionRuleInactiveThreshold = plan.PredictionRuleInactiveThreshold.ValueFloat64()
+		s["predictionRuleInactiveThreshold"] = plan.PredictionRuleInactiveThreshold.ValueFloat64()
 	}
 	if !plan.PredictionProbabilityThreshold.IsNull() {
-		projectSettings.PredictionProbabilityThreshold = plan.PredictionProbabilityThreshold.ValueFloat64()
+		s["predictionProbabilityThreshold"] = plan.PredictionProbabilityThreshold.ValueFloat64()
 	}
 	if !plan.AlertHourlyCost.IsNull() {
-		projectSettings.AlertHourlyCost = plan.AlertHourlyCost.ValueFloat64()
+		s["alertHourlyCost"] = plan.AlertHourlyCost.ValueFloat64()
 	}
 	if !plan.AlertAverageTime.IsNull() {
-		projectSettings.AlertAverageTime = int(plan.AlertAverageTime.ValueInt64())
+		s["alertAverageTime"] = int(plan.AlertAverageTime.ValueInt64())
 	}
 	if !plan.IgnoreInstanceForKB.IsNull() {
-		projectSettings.IgnoreInstanceForKB = plan.IgnoreInstanceForKB.ValueBool()
+		s["ignoreInstanceForKB"] = plan.IgnoreInstanceForKB.ValueBool()
 	}
 	if !plan.ShowInstanceDown.IsNull() {
-		projectSettings.ShowInstanceDown = plan.ShowInstanceDown.ValueBool()
+		s["showInstanceDown"] = plan.ShowInstanceDown.ValueBool()
 	}
 	if !plan.PredictionCountThreshold.IsNull() {
-		projectSettings.PredictionCountThreshold = int(plan.PredictionCountThreshold.ValueInt64())
+		s["predictionCountThreshold"] = int(plan.PredictionCountThreshold.ValueInt64())
 	}
 
-	// Complex JSON fields - parse and assign to struct
+	// Complex JSON fields
 	if !plan.BaseValueSetting.IsNull() {
 		if parsed := parseJSONField(plan.BaseValueSetting.ValueString()); parsed != nil {
-			// Marshal to JSON and unmarshal to the struct field
-			if jsonBytes, err := json.Marshal(parsed); err == nil {
-				_ = json.Unmarshal(jsonBytes, &projectSettings.BaseValueSetting)
-			}
+			s["baseValueSetting"] = parsed
 		}
 	}
 	if !plan.CdfSetting.IsNull() {
 		if parsed := parseJSONField(plan.CdfSetting.ValueString()); parsed != nil {
-			if cdfSetting, ok := parsed.([]interface{}); ok {
-				projectSettings.CdfSetting = cdfSetting
+			if list, ok := parsed.([]interface{}); ok {
+				s["cdfSetting"] = list
 			}
 		}
 	}
 	if !plan.EmailSetting.IsNull() {
 		if parsed := parseJSONField(plan.EmailSetting.ValueString()); parsed != nil {
-			if jsonBytes, err := json.Marshal(parsed); err == nil {
-				_ = json.Unmarshal(jsonBytes, &projectSettings.EmailSetting)
-			}
+			s["emailSetting"] = parsed
 		}
 	}
 	if !plan.InstanceGroupingUpdate.IsNull() {
 		if parsed := parseJSONField(plan.InstanceGroupingUpdate.ValueString()); parsed != nil {
-			if jsonBytes, err := json.Marshal(parsed); err == nil {
-				_ = json.Unmarshal(jsonBytes, &projectSettings.InstanceGroupingUpdate)
-			}
+			s["instanceGroupingUpdate"] = parsed
 		}
 	}
 	if !plan.LlmEvaluationSetting.IsNull() {
 		if parsed := parseJSONField(plan.LlmEvaluationSetting.ValueString()); parsed != nil {
-			if jsonBytes, err := json.Marshal(parsed); err == nil {
-				_ = json.Unmarshal(jsonBytes, &projectSettings.LlmEvaluationSetting)
-			}
+			s["llmEvaluationSetting"] = parsed
 		}
 	}
 	if !plan.LogToLogSettingList.IsNull() {
 		if parsed := parseJSONField(plan.LogToLogSettingList.ValueString()); parsed != nil {
-			if logToLogSettingList, ok := parsed.([]interface{}); ok {
-				projectSettings.LogToLogSettingList = logToLogSettingList
+			if list, ok := parsed.([]interface{}); ok {
+				s["logToLogSettingList"] = list
 			}
 		}
 	}
 	if !plan.WebhookHeaderList.IsNull() {
 		if parsed := parseJSONField(plan.WebhookHeaderList.ValueString()); parsed != nil {
-			if webhookHeaderList, ok := parsed.([]interface{}); ok {
-				projectSettings.WebhookHeaderList = webhookHeaderList
+			if list, ok := parsed.([]interface{}); ok {
+				s["webhookHeaderList"] = list
 			}
 		}
 	}
 	if !plan.SharedUsernames.IsNull() {
 		if parsed := parseJSONField(plan.SharedUsernames.ValueString()); parsed != nil {
-			if sharedUsernames, ok := parsed.([]interface{}); ok {
-				projectSettings.SharedUsernames = sharedUsernames
+			if list, ok := parsed.([]interface{}); ok {
+				s["sharedUsernames"] = list
 			}
 		}
 	}
 
-	// Convert struct to map[string]interface{} using JSON marshal/unmarshal
-	// This automatically excludes omitempty fields that are zero values
-	jsonBytes, err := json.Marshal(projectSettings)
-	if err != nil {
-		// Fallback to empty map if marshaling fails
-		return make(map[string]interface{})
-	}
-
-	var settings map[string]interface{}
-	if err := json.Unmarshal(jsonBytes, &settings); err != nil {
-		// Fallback to empty map if unmarshaling fails
-		return make(map[string]interface{})
-	}
-
-	return settings
+	return s
 }
 
 // Create creates the resource and sets the initial Terraform state.
