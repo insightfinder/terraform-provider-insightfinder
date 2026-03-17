@@ -216,6 +216,7 @@ func (p *insightfinderProvider) DataSources(_ context.Context) []func() datasour
 func (p *insightfinderProvider) Resources(_ context.Context) []func() resource.Resource {
 	return []func() resource.Resource{
 		NewProjectResource,
+		NewMetricProjectResource,
 		NewLogLabelsResource,
 		NewJWTConfigResource,
 		NewServiceNowResource,

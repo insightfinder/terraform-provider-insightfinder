@@ -5,6 +5,57 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.8.0] - 2026-03-16
+
+### Added
+- **insightfinder_metric_project**: New resource for managing InsightFinder metric projects
+  - Full CRUD support for metric projects via `/api/external/v1/watch-tower-setting`
+  - Project creation via `/api/v1/check-and-add-custom-project` with `data_type`, `instance_type`, `project_cloud_type`, and `insight_agent_type`
+  - All metric-specific detection tuning fields: `c_value`, `p_value`, `high_ratio_c_value`, `maximum_hint`, `dynamic_baseline_detection_flag`, `baseline_duration`, `positive_baseline_violation_factor`, `negative_baseline_violation_factor`, `enable_period_anomaly_filter`, `enable_ubl_detect`, `enable_cumulative_detect`, `enable_baseline_detection_double_verify`, `filter_by_anomaly_in_baseline_generation`, `anomaly_dampening`, `anomaly_gap_tolerance_count`
+  - Gap filling and prediction fields: `enable_fill_gap`, `enable_store_filled_gap`, `gap_filling_training_data_length`, `enable_metric_data_prediction`, `prediction_training_data_length`, `prediction_correlation_sensitivity`, `enable_kpi_prediction`
+  - Incident prediction and RCA fields: `incident_prediction_window`, `min_incident_prediction_window`, `incident_relation_search_window`, `incident_prediction_event_limit`, `root_cause_count_threshold`, `root_cause_probability_threshold`, `causal_prediction_setting`, `root_cause_rank_setting`, `maximum_root_cause_result_size`, `multi_hop_search_level`, `multi_hop_search_limit`
+  - Instance down detection: `instance_down_threshold`, `instance_down_report_number`, `instance_down_enable`, `instance_down_ratio_threshold`, `show_instance_down`
+  - Holiday settings management (create/update/delete via `/api/external/v1/holiday`)
+  - Complex JSON fields: `linked_log_projects`, `component_metric_setting_overall_model_list`, `email_setting`, `instance_grouping_update`, `shared_usernames`, `webhook_header_list`
+  - Full webhook configuration support
+  - Import support via project name
+  - **`metric_configurations`** block: Per-metric alert threshold and component operation settings
+    - Each entry targets a named metric (`metric_name`) and supports:
+    - `escalate_incident_components` (List of String): component names that escalate incidents for this metric
+    - `ignored_components` (List of String): component names excluded from detection for this metric
+    - `metric_alert_settings` (List of Objects): per-component (or global) alert threshold rows with full threshold bands (`threshold_alert_lower_bound`, `threshold_alert_upper_bound`, `incident_alert_lower_bound`, `incident_alert_upper_bound`, and their negative variants), detection flags (`is_kpi`, `is_flapping_result_only`, `fill_zero`, `compute_difference`, `enable_baseline_near_constance`), and display fields (`detection_type`, `pattern_name_higher`, `pattern_name_lower`, `metric_type`, `rouge_value`, `incident_duration_threshold`, `anomaly_gap_tolerance_duration`)
+    - API endpoints: GET/POST `/api/external/v1/componentmetricupdate` for alert settings; GET/POST `/api/external/v1/metriccomponent` for escalate/ignore component operations
+
+- **insightfinder_system_settings**: Extended `notifications_settings` with dedicated notification sub-blocks
+  - **`system_down_notification`** block: Configures system-down email alerts via `/api/external/v2/systemdownsetting`
+    - `enable_system_down_email_alert` (Boolean): Enable email when the system goes down
+    - `email_dampening_period` (Number, ms): Minimum interval between repeated system-down emails
+    - `email_set` (List of String): Recipient addresses for system-down notifications
+  - **`daily_report_notification`** block: Configures daily insights report emails via `/api/external/v1/insightsreportsetting`
+    - `enable_insights_report` (Boolean): Enable the daily summary email
+    - `email_set` (List of String): Recipient addresses for the daily report
+  - **`weekly_report_notification`** block: Configures weekly insights report emails (same API, `isDaily=false`)
+    - `enable_insights_report` (Boolean): Enable the weekly summary email
+    - `email_set` (List of String): Recipient addresses for the weekly report
+  - **`instance_down_notification`** block (List): Per-project instance-down alert settings via `/api/external/v1/projects/update`
+    - `project_name` (String, Required): The project to configure
+    - `instance_down_enable` (Boolean): Enable instance-down detection for this project
+    - `instance_down_dampening` (Number, ms): Dampening window between repeated instance-down alerts
+    - `instance_down_threshold` (Number, ms): Duration before an instance is considered down
+    - `instance_down_report_number` (Number): Number of down instances before an alert is sent
+    - `instance_down_emails` (List of String): Recipient addresses for instance-down notifications
+
+### Fixed
+- **insightfinder_metric_project**: Fixed `false` boolean and `0` integer values being silently dropped from API requests
+  - `populateMetricSettings` now builds `map[string]interface{}` directly instead of marshaling through a struct with `omitempty` tags
+  - `UpdateMetricProject` now sends the settings map directly without double-marshaling through `MetricProjectSettings`
+  - Affected fields included `enable_kpi_prediction`, `filter_by_anomaly_in_baseline_generation`, `show_instance_down`, `gap_filling_training_data_length`, `prediction_training_data_length`, and all other boolean/integer fields set to their zero values
+
+- **insightfinder_project**: Fixed same `omitempty` bug where `false` booleans and `0` integers were dropped from API update requests
+  - `populateSettings` now builds `map[string]interface{}` directly
+  - `UpdateProject` now sends the settings map directly without the unnecessary double-marshal through `ProjectSettings`
+  - Resolves issues where settings like `training_filter = false`, `enable_hot_event = false`, or any integer field set to `0` would not be applied
+
 ## [1.7.1] - 2026-03-12
 
 ### Changed
@@ -280,9 +331,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## Version History
 
+- **1.8.0** - Added `insightfinder_metric_project` resource; fixed `omitempty` zero-value bug in both metric and log project updates
 - **1.7.0** - Added `dampening_field_setting` to `json_key_settings`; fixed system settings and email_setting generation in CLI tool
 - **1.0.0** - Initial release with core functionality
 
+[1.8.0]: https://github.com/insightfinder/terraform-provider-insightfinder/releases/tag/v1.8.0
 [1.7.0]: https://github.com/insightfinder/terraform-provider-insightfinder/releases/tag/v1.7.0
 [1.0.0]: https://github.com/insightfinder/terraform-provider-insightfinder/releases/tag/v1.0.0
-[Unreleased]: https://github.com/insightfinder/terraform-provider-insightfinder/compare/v1.7.0...HEAD
+[Unreleased]: https://github.com/insightfinder/terraform-provider-insightfinder/compare/v1.8.0...HEAD

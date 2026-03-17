@@ -155,6 +155,7 @@ func TestProviderResources(t *testing.T) {
 
 	expectedResources := map[string]bool{
 		"insightfinder_project":         false,
+		"insightfinder_metric_project":  false,
 		"insightfinder_servicenow":      false,
 		"insightfinder_jwt_config":      false,
 		"insightfinder_log_labels":      false,
