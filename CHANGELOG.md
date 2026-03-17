@@ -19,6 +19,31 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Complex JSON fields: `linked_log_projects`, `component_metric_setting_overall_model_list`, `email_setting`, `instance_grouping_update`, `shared_usernames`, `webhook_header_list`
   - Full webhook configuration support
   - Import support via project name
+  - **`metric_configurations`** block: Per-metric alert threshold and component operation settings
+    - Each entry targets a named metric (`metric_name`) and supports:
+    - `escalate_incident_components` (List of String): component names that escalate incidents for this metric
+    - `ignored_components` (List of String): component names excluded from detection for this metric
+    - `metric_alert_settings` (List of Objects): per-component (or global) alert threshold rows with full threshold bands (`threshold_alert_lower_bound`, `threshold_alert_upper_bound`, `incident_alert_lower_bound`, `incident_alert_upper_bound`, and their negative variants), detection flags (`is_kpi`, `is_flapping_result_only`, `fill_zero`, `compute_difference`, `enable_baseline_near_constance`), and display fields (`detection_type`, `pattern_name_higher`, `pattern_name_lower`, `metric_type`, `rouge_value`, `incident_duration_threshold`, `anomaly_gap_tolerance_duration`)
+    - API endpoints: GET/POST `/api/external/v1/componentmetricupdate` for alert settings; GET/POST `/api/external/v1/metriccomponent` for escalate/ignore component operations
+
+- **insightfinder_system_settings**: Extended `notifications_settings` with dedicated notification sub-blocks
+  - **`system_down_notification`** block: Configures system-down email alerts via `/api/external/v2/systemdownsetting`
+    - `enable_system_down_email_alert` (Boolean): Enable email when the system goes down
+    - `email_dampening_period` (Number, ms): Minimum interval between repeated system-down emails
+    - `email_set` (List of String): Recipient addresses for system-down notifications
+  - **`daily_report_notification`** block: Configures daily insights report emails via `/api/external/v1/insightsreportsetting`
+    - `enable_insights_report` (Boolean): Enable the daily summary email
+    - `email_set` (List of String): Recipient addresses for the daily report
+  - **`weekly_report_notification`** block: Configures weekly insights report emails (same API, `isDaily=false`)
+    - `enable_insights_report` (Boolean): Enable the weekly summary email
+    - `email_set` (List of String): Recipient addresses for the weekly report
+  - **`instance_down_notification`** block (List): Per-project instance-down alert settings via `/api/external/v1/projects/update`
+    - `project_name` (String, Required): The project to configure
+    - `instance_down_enable` (Boolean): Enable instance-down detection for this project
+    - `instance_down_dampening` (Number, ms): Dampening window between repeated instance-down alerts
+    - `instance_down_threshold` (Number, ms): Duration before an instance is considered down
+    - `instance_down_report_number` (Number): Number of down instances before an alert is sent
+    - `instance_down_emails` (List of String): Recipient addresses for instance-down notifications
 
 ### Fixed
 - **insightfinder_metric_project**: Fixed `false` boolean and `0` integer values being silently dropped from API requests

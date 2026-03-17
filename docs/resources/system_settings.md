@@ -71,6 +71,99 @@ resource "insightfinder_system_settings" "example" {
 
     incident_count_threshold = jsonencode({})
     assignment_map           = jsonencode({})
+
+    system_down_notification = {
+      enable_system_down_email_alert = true
+      email_dampening_period         = 3600000
+      email_set                      = ["ops@example.com"]
+    }
+
+    daily_report_notification = {
+      enable_insights_report = true
+      email_set              = ["reports@example.com"]
+    }
+
+    weekly_report_notification = {
+      enable_insights_report = true
+      email_set              = ["reports@example.com"]
+    }
+
+    instance_down_notification = [
+      {
+        project_name              = "my-metric-project"
+        instance_down_enable      = true
+        instance_down_dampening   = 3600000
+        instance_down_threshold   = 3600000
+        instance_down_report_number = 1
+        instance_down_emails      = ["ops@example.com"]
+      }
+    ]
+  }
+}
+```
+
+### Notifications with System Down, Reports, and Instance Down
+
+```terraform
+resource "insightfinder_system_settings" "notifications_extended" {
+  system_name = "my-production-system"
+
+  notifications_settings = {
+    prediction_email                       = "alerts@example.com"
+    enable_incident_prediction_email_alert = true
+    enable_incident_detection_email_alert  = true
+    alert_health_score                     = 0.5
+    aggregation_interval                   = 10
+    email_dampening_period                 = 3600000
+    alerts_email_dampening_period          = 3600000
+    prediction_email_dampening_period      = 3600000
+    incident_dampening_window              = 3600000
+    order                                  = 0
+    hide_flag                              = false
+    enable_splunk_export                   = false
+    only_send_with_rca                     = false
+    enable_system_down_email_alert         = false
+    enable_alerts_email                    = false
+    enable_health_email_alert              = false
+    enable_root_cause_email_alert          = false
+    alert_frequency                        = 0
+    incident_count_threshold               = jsonencode({})
+    assignment_map                         = jsonencode({})
+
+    system_down_notification = {
+      enable_system_down_email_alert = true
+      email_dampening_period         = 3600000
+      email_set                      = ["oncall@example.com", "ops@example.com"]
+    }
+
+    daily_report_notification = {
+      enable_insights_report = true
+      email_set              = ["manager@example.com"]
+    }
+
+    weekly_report_notification = {
+      enable_insights_report = true
+      email_set              = ["executive@example.com", "manager@example.com"]
+    }
+
+    instance_down_notification = [
+      {
+        project_name                = "production-metrics"
+        instance_down_enable        = true
+        instance_down_dampening     = 1800000
+        instance_down_threshold     = 300000
+        instance_down_report_number = 2
+        instance_down_emails        = ["oncall@example.com"]
+      },
+      {
+        project_name                = "staging-metrics"
+        instance_down_enable        = false
+        instance_down_dampening     = 3600000
+        instance_down_threshold     = 600000
+        instance_down_report_number = 5
+        instance_down_emails        = []
+      }
+    ]
   }
 }
 ```
@@ -253,6 +346,47 @@ All attributes are Optional and Computed (server defaults are used when omitted)
 |-----------|------|-------------|
 | `incident_count_threshold` | String | JSON-encoded map of `"ProjectName@username"` keys to integer thresholds. An incident alert is suppressed until the count exceeds the threshold for that project. Example: `jsonencode({"MyProject@admin": 5})`. Use `jsonencode({})` for no thresholds. |
 | `assignment_map` | String | JSON-encoded map of zone/component keys to assignee lists. Each value is an object with `jiraAssignees`, `emailAssignees`, and `serviceNowAssignees` arrays. Use `jsonencode({})` for no assignments. |
+
+#### System Down Notification
+
+Configures system-down alerts via a dedicated API (`/api/external/v2/systemdownsetting`). All attributes are Optional and Computed.
+
+| Attribute | Type | Description |
+|-----------|------|-------------|
+| `enable_system_down_email_alert` | Boolean | Enable email alert when the system is detected as down. |
+| `email_dampening_period` | Number | Minimum interval in milliseconds between repeated system-down email alerts. |
+| `email_set` | List of String | Email addresses to notify when the system goes down. |
+
+#### Daily Report Notification
+
+Configures daily insights report emails via `/api/external/v1/insightsreportsetting`. All attributes are Optional and Computed.
+
+| Attribute | Type | Description |
+|-----------|------|-------------|
+| `enable_insights_report` | Boolean | Enable the daily insights summary email for this system. |
+| `email_set` | List of String | Email addresses to receive the daily report. |
+
+#### Weekly Report Notification
+
+Configures weekly insights report emails (same API as daily, `isDaily=false`). All attributes are Optional and Computed.
+
+| Attribute | Type | Description |
+|-----------|------|-------------|
+| `enable_insights_report` | Boolean | Enable the weekly insights summary email for this system. |
+| `email_set` | List of String | Email addresses to receive the weekly report. |
+
+#### Instance Down Notification
+
+A list of per-project instance-down alert configurations via `/api/external/v1/projects/update`. Each entry configures one project.
+
+| Attribute | Type | Description |
+|-----------|------|-------------|
+| `project_name` | String (Required) | The project to configure instance-down alerts for. |
+| `instance_down_enable` | Boolean | Enable instance-down detection for this project. |
+| `instance_down_dampening` | Number | Dampening window in milliseconds between repeated instance-down alerts. |
+| `instance_down_threshold` | Number | Duration in milliseconds before an instance is considered down. |
+| `instance_down_report_number` | Number | Number of instances that must be down before an alert is sent. |
+| `instance_down_emails` | List of String | Email addresses to notify when instances go down. |
 
 ---
 

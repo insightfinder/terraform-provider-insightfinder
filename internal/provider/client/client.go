@@ -8,6 +8,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"mime/multipart"
 	"net/http"
 	"net/url"
 	"time"
@@ -144,6 +145,51 @@ func (c *Client) DoFormRequest(method, path string, formData url.Values) ([]byte
 		return nil, resp.StatusCode, fmt.Errorf("failed to read response body: %w", err)
 	}
 
+	return respBody, resp.StatusCode, nil
+}
+
+// DoMultipartFormRequest performs an HTTP request with multipart/form-data.
+// fields contains plain-text form fields; fileParts contains file-like parts sent as file uploads.
+func (c *Client) DoMultipartFormRequest(method, path string, fields map[string]string, fileParts map[string][]byte) ([]byte, int, error) {
+	var buf bytes.Buffer
+	w := multipart.NewWriter(&buf)
+
+	// Add authentication fields
+	w.WriteField("userName", c.Username)
+	w.WriteField("licenseKey", c.LicenseKey)
+
+	for k, v := range fields {
+		w.WriteField(k, v)
+	}
+	for fieldName, data := range fileParts {
+		part, err := w.CreateFormFile(fieldName, fieldName+".json")
+		if err != nil {
+			return nil, 0, fmt.Errorf("failed to create form file part: %w", err)
+		}
+		part.Write(data)
+	}
+	w.Close()
+
+	fullURL := fmt.Sprintf("%s%s", c.BaseURL, path)
+	req, err := http.NewRequest(method, fullURL, &buf)
+	if err != nil {
+		return nil, 0, fmt.Errorf("failed to create request: %w", err)
+	}
+
+	req.Header.Set("X-User-Name", c.Username)
+	req.Header.Set("X-API-Key", c.LicenseKey)
+	req.Header.Set("Content-Type", w.FormDataContentType())
+
+	resp, err := c.HTTPClient.Do(req)
+	if err != nil {
+		return nil, 0, fmt.Errorf("failed to execute request: %w", err)
+	}
+	defer resp.Body.Close()
+
+	respBody, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, resp.StatusCode, fmt.Errorf("failed to read response body: %w", err)
+	}
 	return respBody, resp.StatusCode, nil
 }
 

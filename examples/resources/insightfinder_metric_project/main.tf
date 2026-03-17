@@ -155,6 +155,69 @@ resource "insightfinder_metric_project" "metrics_with_holidays" {
   ]
 }
 
+# Metric project with per-metric alert threshold and component configurations
+resource "insightfinder_metric_project" "with_metric_config" {
+  project_name = "configured-metrics"
+  system_name  = "Production"
+
+  project_creation_config = {
+    data_type          = "Metric"
+    instance_type      = "PrivateCloud"
+    project_cloud_type = "PrivateCloud"
+    insight_agent_type = "Custom"
+  }
+
+  sampling_interval = 60
+  retention_time    = 90
+
+  metric_configurations = [
+    {
+      metric_name                  = "cpu_usage"
+      escalate_incident_components = ["web-server-01", "web-server-02"]
+      ignored_components           = ["test-instance"]
+      metric_alert_settings = [
+        {
+          component_name                          = ""
+          threshold_alert_lower_bound             = ""
+          threshold_alert_upper_bound             = "95"
+          threshold_alert_lower_bound_negative    = ""
+          threshold_alert_upper_bound_negative    = ""
+          threshold_no_alert_lower_bound          = ""
+          threshold_no_alert_upper_bound          = "80"
+          threshold_no_alert_lower_bound_negative = ""
+          threshold_no_alert_upper_bound_negative = ""
+          incident_alert_lower_bound              = ""
+          incident_alert_upper_bound              = "99"
+          incident_alert_lower_bound_negative     = ""
+          incident_alert_upper_bound_negative     = ""
+          incident_no_alert_lower_bound           = ""
+          incident_no_alert_upper_bound           = "90"
+          incident_no_alert_lower_bound_negative  = ""
+          incident_no_alert_upper_bound_negative  = ""
+          is_kpi                                  = true
+          is_flapping_result_only                 = false
+          incident_duration_threshold             = 300000
+          detection_type                          = "Threshold"
+          pattern_name_higher                     = "High CPU"
+          pattern_name_lower                      = ""
+          metric_type                             = "Gauge"
+          fill_zero                               = false
+          rouge_value                             = ""
+          enable_baseline_near_constance          = false
+          compute_difference                      = false
+          anomaly_gap_tolerance_duration          = 0
+        }
+      ]
+    },
+    {
+      metric_name                  = "memory_usage"
+      escalate_incident_components = []
+      ignored_components           = []
+      metric_alert_settings        = []
+    }
+  ]
+}
+
 variable "username" {
   description = "InsightFinder username"
   type        = string

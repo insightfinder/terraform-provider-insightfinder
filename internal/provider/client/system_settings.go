@@ -116,6 +116,322 @@ type HealthViewSetting struct {
 	ID                                    string                 `json:"id,omitempty"`
 }
 
+// SystemDownSetting represents system down notification settings for a system
+type SystemDownSetting struct {
+	EnableSystemDownEmailAlert bool     `json:"enableSystemDownEmailAlert"`
+	EmailDampeningPeriod       int64    `json:"emailDampeningPeriod"`
+	EmailSet                   []string `json:"emailSet,omitempty"`
+}
+
+// systemDownSettingModel is the POST body model for system down settings
+type systemDownSettingModel struct {
+	EnableSystemDownEmailAlert bool     `json:"enableSystemDownEmailAlert"`
+	EmailDampeningPeriod       int64    `json:"emailDampeningPeriod"`
+	SystemID                   string   `json:"systemId"`
+	EmailSet                   []string `json:"emailSet,omitempty"`
+}
+
+// InsightsReportSetting represents insights report notification settings (daily + weekly)
+type InsightsReportSetting struct {
+	EnableDailyInsightsReport  bool     `json:"enableDailyInsightsReport"`
+	EmailSet                   []string `json:"emailSet"`
+	WeeklyEmailSet             []string `json:"weeklyEmailSet"`
+	EnableWeeklyInsightsReport bool     `json:"enableWeeklyInsightsReport"`
+}
+
+// insightsReportSettingModel is the POST body model for insights report settings
+type insightsReportSettingModel struct {
+	SystemID             string   `json:"systemId"`
+	EmailSet             []string `json:"emailSet,omitempty"`
+	EnableInsightsReport bool     `json:"enableInsightsReport"`
+}
+
+// InstanceDownSetting represents instance down notification settings for a project
+type InstanceDownSetting struct {
+	ProjectName              string   `json:"projectName"`
+	InstanceDownEnable       bool     `json:"instanceDownEnable"`
+	InstanceDownDampening    int64    `json:"instanceDownDampening"`
+	InstanceDownThreshold    int64    `json:"instanceDownThreshold"`
+	InstanceDownReportNumber int64    `json:"instanceDownReportNumber"`
+	InstanceDownEmails       []string `json:"instanceDownEmails"`
+}
+
+// GetSystemDownSetting retrieves system down notification settings for a system
+func (c *Client) GetSystemDownSetting(systemID string) (*SystemDownSetting, error) {
+	systemIDsJSON, err := json.Marshal([]string{systemID})
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal systemIds: %w", err)
+	}
+
+	params := url.Values{}
+	params.Add("customerName", c.Username)
+	params.Add("systemIds", string(systemIDsJSON))
+
+	path := fmt.Sprintf("/api/external/v2/systemdownsetting?%s", params.Encode())
+	body, statusCode, err := c.DoRequest("GET", path, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	if statusCode == 404 || statusCode == 204 {
+		return nil, nil
+	}
+
+	if statusCode != 200 {
+		return nil, fmt.Errorf("failed to get system down setting: HTTP %d - %s", statusCode, string(body))
+	}
+
+	var settings []SystemDownSetting
+	if err := json.Unmarshal(body, &settings); err != nil {
+		return nil, fmt.Errorf("failed to parse system down setting: %w", err)
+	}
+
+	if len(settings) == 0 {
+		return nil, nil
+	}
+
+	return &settings[0], nil
+}
+
+// SetSystemDownSetting updates system down notification settings for a system
+func (c *Client) SetSystemDownSetting(systemID string, setting *SystemDownSetting) error {
+	models := []systemDownSettingModel{{
+		EnableSystemDownEmailAlert: setting.EnableSystemDownEmailAlert,
+		EmailDampeningPeriod:       setting.EmailDampeningPeriod,
+		SystemID:                   systemID,
+		EmailSet:                   setting.EmailSet,
+	}}
+
+	modelsJSON, err := json.Marshal(models)
+	if err != nil {
+		return fmt.Errorf("failed to marshal settingModels: %w", err)
+	}
+
+	formData := url.Values{}
+	formData.Set("customerName", c.Username)
+	formData.Set("settingModels", string(modelsJSON))
+
+	body, statusCode, err := c.DoFormRequest("POST", "/api/external/v2/systemdownsetting", formData)
+	if err != nil {
+		return err
+	}
+
+	if statusCode != 200 {
+		return fmt.Errorf("failed to set system down setting: HTTP %d - %s", statusCode, string(body))
+	}
+
+	var response map[string]any
+	if err := json.Unmarshal(body, &response); err != nil {
+		return nil
+	}
+
+	if success, ok := response["success"].(bool); ok && !success {
+		if msg, ok := response["message"].(string); ok {
+			return fmt.Errorf("failed to set system down setting: %s", msg)
+		}
+		return fmt.Errorf("failed to set system down setting")
+	}
+
+	return nil
+}
+
+// GetInsightsReportSetting retrieves insights report notification settings for a system
+func (c *Client) GetInsightsReportSetting(systemID string) (*InsightsReportSetting, error) {
+	systemIDsJSON, err := json.Marshal([]string{systemID})
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal systemIds: %w", err)
+	}
+
+	params := url.Values{}
+	params.Add("customerName", c.Username)
+	params.Add("systemIds", string(systemIDsJSON))
+
+	path := fmt.Sprintf("/api/external/v1/insightsreportsetting?%s", params.Encode())
+	body, statusCode, err := c.DoRequest("GET", path, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	if statusCode == 404 || statusCode == 204 {
+		return nil, nil
+	}
+
+	if statusCode != 200 {
+		return nil, fmt.Errorf("failed to get insights report setting: HTTP %d - %s", statusCode, string(body))
+	}
+
+	var settings []InsightsReportSetting
+	if err := json.Unmarshal(body, &settings); err != nil {
+		return nil, fmt.Errorf("failed to parse insights report setting: %w", err)
+	}
+
+	if len(settings) == 0 {
+		return nil, nil
+	}
+
+	return &settings[0], nil
+}
+
+// SetInsightsReportSetting updates insights report settings (daily or weekly) for a system
+func (c *Client) SetInsightsReportSetting(systemID string, emailSet []string, enableInsightsReport bool, isDaily bool) error {
+	models := []insightsReportSettingModel{{
+		SystemID:             systemID,
+		EmailSet:             emailSet,
+		EnableInsightsReport: enableInsightsReport,
+	}}
+
+	modelsJSON, err := json.Marshal(models)
+	if err != nil {
+		return fmt.Errorf("failed to marshal settingModels: %w", err)
+	}
+
+	isDailyStr := "false"
+	if isDaily {
+		isDailyStr = "true"
+	}
+
+	formData := url.Values{}
+	formData.Set("customerName", c.Username)
+	formData.Set("isDaily", isDailyStr)
+	formData.Set("settingModels", string(modelsJSON))
+	formData.Set("systemId", systemID)
+
+	body, statusCode, err := c.DoFormRequest("POST", "/api/external/v1/insightsreportsetting", formData)
+	if err != nil {
+		return err
+	}
+
+	if statusCode != 200 {
+		return fmt.Errorf("failed to set insights report setting: HTTP %d - %s", statusCode, string(body))
+	}
+
+	var response map[string]any
+	if err := json.Unmarshal(body, &response); err != nil {
+		return nil
+	}
+
+	if success, ok := response["success"].(bool); ok && !success {
+		if msg, ok := response["message"].(string); ok {
+			return fmt.Errorf("failed to set insights report setting: %s", msg)
+		}
+		return fmt.Errorf("failed to set insights report setting")
+	}
+
+	return nil
+}
+
+// GetInstanceDownSetting retrieves instance down notification settings for a specific project
+func (c *Client) GetInstanceDownSetting(projectName string) (*InstanceDownSetting, error) {
+	params := url.Values{}
+	params.Add("operation", "display")
+	params.Add("projectName", projectName)
+	params.Add("customerName", c.Username)
+
+	path := fmt.Sprintf("/api/external/v1/projects/update?%s", params.Encode())
+	body, statusCode, err := c.DoRequest("GET", path, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	if statusCode == 404 || statusCode == 204 {
+		return nil, nil
+	}
+
+	if statusCode != 200 {
+		return nil, fmt.Errorf("failed to get instance down setting for project %s: HTTP %d - %s", projectName, statusCode, string(body))
+	}
+
+	var response struct {
+		Data struct {
+			ProjectModelAllJSON struct {
+				ProjectName              string   `json:"projectName"`
+				InstanceDownThreshold    int64    `json:"instanceDownThreshold"`
+				InstanceDownEnable       bool     `json:"instanceDownEnable"`
+				InstanceDownEmails       []string `json:"instanceDownEmails"`
+				InstanceDownDampening    int64    `json:"instanceDownDampening"`
+				InstanceDownReportNumber int64    `json:"instanceDownReportNumber"`
+			} `json:"projectModelAllJSON"`
+		} `json:"data"`
+		Success bool `json:"success"`
+	}
+
+	if err := json.Unmarshal(body, &response); err != nil {
+		return nil, fmt.Errorf("failed to parse instance down setting: %w", err)
+	}
+
+	if !response.Success {
+		return nil, fmt.Errorf("failed to get instance down setting for project %s", projectName)
+	}
+
+	proj := response.Data.ProjectModelAllJSON
+	emails := proj.InstanceDownEmails
+	if emails == nil {
+		emails = []string{}
+	}
+
+	return &InstanceDownSetting{
+		ProjectName:              proj.ProjectName,
+		InstanceDownEnable:       proj.InstanceDownEnable,
+		InstanceDownDampening:    proj.InstanceDownDampening,
+		InstanceDownThreshold:    proj.InstanceDownThreshold,
+		InstanceDownReportNumber: proj.InstanceDownReportNumber,
+		InstanceDownEmails:       emails,
+	}, nil
+}
+
+// SetInstanceDownSetting updates instance down notification settings for a specific project
+func (c *Client) SetInstanceDownSetting(setting *InstanceDownSetting) error {
+	emails := setting.InstanceDownEmails
+	if emails == nil {
+		emails = []string{}
+	}
+
+	emailsJSON, err := json.Marshal(emails)
+	if err != nil {
+		return fmt.Errorf("failed to marshal instanceDownEmails: %w", err)
+	}
+
+	instanceDownEnableStr := "false"
+	if setting.InstanceDownEnable {
+		instanceDownEnableStr = "true"
+	}
+
+	formData := url.Values{}
+	formData.Set("operation", "updateprojsettings")
+	formData.Set("projectName", setting.ProjectName)
+	formData.Set("instanceDownEnable", instanceDownEnableStr)
+	formData.Set("instanceDownDampening", fmt.Sprintf("%d", setting.InstanceDownDampening))
+	formData.Set("instanceDownThreshold", fmt.Sprintf("%d", setting.InstanceDownThreshold))
+	formData.Set("instanceDownReportNumber", fmt.Sprintf("%d", setting.InstanceDownReportNumber))
+	formData.Set("instanceDownEmails", string(emailsJSON))
+
+	body, statusCode, err := c.DoFormRequest("POST", "/api/external/v1/projects/update", formData)
+	if err != nil {
+		return err
+	}
+
+	if statusCode != 200 {
+		return fmt.Errorf("failed to set instance down setting for project %s: HTTP %d - %s", setting.ProjectName, statusCode, string(body))
+	}
+
+	var response map[string]any
+	if err := json.Unmarshal(body, &response); err != nil {
+		return nil
+	}
+
+	// Response has shape: {"alertSetting": {"success": true}, "instanceDownThreshold": {"success": true}}
+	// Check that no sub-key has success=false
+	for key, val := range response {
+		if subMap, ok := val.(map[string]any); ok {
+			if success, ok := subMap["success"].(bool); ok && !success {
+				return fmt.Errorf("failed to set instance down setting for project %s (key: %s)", setting.ProjectName, key)
+			}
+		}
+	}
+
+	return nil
+}
+
 // GetGlobalKBSetting retrieves the global knowledge base setting for a system
 func (c *Client) GetGlobalKBSetting(systemID string) (*GlobalKBSetting, error) {
 	systemIDsJSON, err := json.Marshal([]string{systemID})

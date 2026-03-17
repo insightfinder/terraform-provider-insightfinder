@@ -8,6 +8,7 @@ import (
 	"encoding/json"
 	"fmt"
 
+	"github.com/hashicorp/terraform-plugin-framework/attr"
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
@@ -97,6 +98,34 @@ type notificationsSettingsModel struct {
 	EnableRootCauseEmailAlert          types.Bool    `tfsdk:"enable_root_cause_email_alert"`
 	RootCauseEmail                     types.String  `tfsdk:"root_cause_email"`
 	IncidentDampeningWindow            types.Int64   `tfsdk:"incident_dampening_window"`
+	// New notification settings
+	SystemDownNotification   *systemDownNotificationModel     `tfsdk:"system_down_notification"`
+	DailyReportNotification  *insightsReportNotificationModel `tfsdk:"daily_report_notification"`
+	WeeklyReportNotification *insightsReportNotificationModel `tfsdk:"weekly_report_notification"`
+	InstanceDownNotification []instanceDownNotificationModel  `tfsdk:"instance_down_notification"`
+}
+
+// systemDownNotificationModel holds system down notification settings
+type systemDownNotificationModel struct {
+	EnableSystemDownEmailAlert types.Bool  `tfsdk:"enable_system_down_email_alert"`
+	EmailDampeningPeriod       types.Int64 `tfsdk:"email_dampening_period"`
+	EmailSet                   types.List  `tfsdk:"email_set"`
+}
+
+// insightsReportNotificationModel holds daily or weekly insights report notification settings
+type insightsReportNotificationModel struct {
+	EnableInsightsReport types.Bool `tfsdk:"enable_insights_report"`
+	EmailSet             types.List `tfsdk:"email_set"`
+}
+
+// instanceDownNotificationModel holds instance down notification settings for one project
+type instanceDownNotificationModel struct {
+	ProjectName              types.String `tfsdk:"project_name"`
+	InstanceDownEnable       types.Bool   `tfsdk:"instance_down_enable"`
+	InstanceDownDampening    types.Int64  `tfsdk:"instance_down_dampening"`
+	InstanceDownThreshold    types.Int64  `tfsdk:"instance_down_threshold"`
+	InstanceDownReportNumber types.Int64  `tfsdk:"instance_down_report_number"`
+	InstanceDownEmails       types.List   `tfsdk:"instance_down_emails"`
 }
 
 // Metadata returns the resource type name.
@@ -473,6 +502,124 @@ func (r *systemSettingsResource) Schema(_ context.Context, _ resource.SchemaRequ
 							int64planmodifier.UseStateForUnknown(),
 						},
 					},
+					"system_down_notification": schema.SingleNestedAttribute{
+						Description: "System down notification settings (dedicated API at /api/external/v2/systemdownsetting).",
+						Optional:    true,
+						Attributes: map[string]schema.Attribute{
+							"enable_system_down_email_alert": schema.BoolAttribute{
+								Description: "Enable email alert when the system is down.",
+								Optional:    true,
+								Computed:    true,
+								PlanModifiers: []planmodifier.Bool{
+									boolplanmodifier.UseStateForUnknown(),
+								},
+							},
+							"email_dampening_period": schema.Int64Attribute{
+								Description: "Dampening period for system down email alerts in milliseconds.",
+								Optional:    true,
+								Computed:    true,
+								PlanModifiers: []planmodifier.Int64{
+									int64planmodifier.UseStateForUnknown(),
+								},
+							},
+							"email_set": schema.ListAttribute{
+								Description: "List of email addresses to notify when the system is down.",
+								ElementType: types.StringType,
+								Optional:    true,
+								Computed:    true,
+							},
+						},
+					},
+					"daily_report_notification": schema.SingleNestedAttribute{
+						Description: "Daily insights report notification settings.",
+						Optional:    true,
+						Attributes: map[string]schema.Attribute{
+							"enable_insights_report": schema.BoolAttribute{
+								Description: "Enable daily insights report email.",
+								Optional:    true,
+								Computed:    true,
+								PlanModifiers: []planmodifier.Bool{
+									boolplanmodifier.UseStateForUnknown(),
+								},
+							},
+							"email_set": schema.ListAttribute{
+								Description: "List of email addresses to receive the daily insights report.",
+								ElementType: types.StringType,
+								Optional:    true,
+								Computed:    true,
+							},
+						},
+					},
+					"weekly_report_notification": schema.SingleNestedAttribute{
+						Description: "Weekly insights report notification settings.",
+						Optional:    true,
+						Attributes: map[string]schema.Attribute{
+							"enable_insights_report": schema.BoolAttribute{
+								Description: "Enable weekly insights report email.",
+								Optional:    true,
+								Computed:    true,
+								PlanModifiers: []planmodifier.Bool{
+									boolplanmodifier.UseStateForUnknown(),
+								},
+							},
+							"email_set": schema.ListAttribute{
+								Description: "List of email addresses to receive the weekly insights report.",
+								ElementType: types.StringType,
+								Optional:    true,
+								Computed:    true,
+							},
+						},
+					},
+					"instance_down_notification": schema.ListNestedAttribute{
+						Description: "Instance down notification settings per project.",
+						Optional:    true,
+						NestedObject: schema.NestedAttributeObject{
+							Attributes: map[string]schema.Attribute{
+								"project_name": schema.StringAttribute{
+									Description: "The name of the project to configure instance down notifications for.",
+									Required:    true,
+								},
+								"instance_down_enable": schema.BoolAttribute{
+									Description: "Enable instance down email alerts for this project.",
+									Optional:    true,
+									Computed:    true,
+									PlanModifiers: []planmodifier.Bool{
+										boolplanmodifier.UseStateForUnknown(),
+									},
+								},
+								"instance_down_dampening": schema.Int64Attribute{
+									Description: "Dampening period for instance down alerts in milliseconds.",
+									Optional:    true,
+									Computed:    true,
+									PlanModifiers: []planmodifier.Int64{
+										int64planmodifier.UseStateForUnknown(),
+									},
+								},
+								"instance_down_threshold": schema.Int64Attribute{
+									Description: "Threshold (in milliseconds) before an instance is considered down.",
+									Optional:    true,
+									Computed:    true,
+									PlanModifiers: []planmodifier.Int64{
+										int64planmodifier.UseStateForUnknown(),
+									},
+								},
+								"instance_down_report_number": schema.Int64Attribute{
+									Description: "Number of instance down events to include in the report.",
+									Optional:    true,
+									Computed:    true,
+									PlanModifiers: []planmodifier.Int64{
+										int64planmodifier.UseStateForUnknown(),
+									},
+								},
+								"instance_down_emails": schema.ListAttribute{
+									Description: "List of email addresses to notify when instances are down.",
+									ElementType: types.StringType,
+									Optional:    true,
+									Computed:    true,
+								},
+							},
+						},
+					},
 				},
 			},
 		},
@@ -727,6 +874,57 @@ func (r *systemSettingsResource) applyNotificationsSettings(_ context.Context, s
 		return fmt.Errorf("failed to set health view setting: %w", err)
 	}
 
+	// System down notification (dedicated API)
+	if m.SystemDownNotification != nil {
+		sdSetting := &client.SystemDownSetting{
+			EnableSystemDownEmailAlert: m.SystemDownNotification.EnableSystemDownEmailAlert.ValueBool(),
+			EmailDampeningPeriod:       m.SystemDownNotification.EmailDampeningPeriod.ValueInt64(),
+			EmailSet:                   typesListToStrings(m.SystemDownNotification.EmailSet),
+		}
+		if err := r.client.SetSystemDownSetting(systemID, sdSetting); err != nil {
+			return fmt.Errorf("failed to set system down setting: %w", err)
+		}
+	}
+
+	// Daily report notification
+	if m.DailyReportNotification != nil {
+		if err := r.client.SetInsightsReportSetting(
+			systemID,
+			typesListToStrings(m.DailyReportNotification.EmailSet),
+			m.DailyReportNotification.EnableInsightsReport.ValueBool(),
+			true,
+		); err != nil {
+			return fmt.Errorf("failed to set daily insights report setting: %w", err)
+		}
+	}
+
+	// Weekly report notification
+	if m.WeeklyReportNotification != nil {
+		if err := r.client.SetInsightsReportSetting(
+			systemID,
+			typesListToStrings(m.WeeklyReportNotification.EmailSet),
+			m.WeeklyReportNotification.EnableInsightsReport.ValueBool(),
+			false,
+		); err != nil {
+			return fmt.Errorf("failed to set weekly insights report setting: %w", err)
+		}
+	}
+
+	// Instance down notifications (one API call per project)
+	for _, item := range m.InstanceDownNotification {
+		setting := &client.InstanceDownSetting{
+			ProjectName:              item.ProjectName.ValueString(),
+			InstanceDownEnable:       item.InstanceDownEnable.ValueBool(),
+			InstanceDownDampening:    item.InstanceDownDampening.ValueInt64(),
+			InstanceDownThreshold:    item.InstanceDownThreshold.ValueInt64(),
+			InstanceDownReportNumber: item.InstanceDownReportNumber.ValueInt64(),
+			InstanceDownEmails:       typesListToStrings(item.InstanceDownEmails),
+		}
+		if err := r.client.SetInstanceDownSetting(setting); err != nil {
+			return fmt.Errorf("failed to set instance down setting for project %s: %w", setting.ProjectName, err)
+		}
+	}
+
 	return nil
 }
 
@@ -846,9 +1044,91 @@ func (r *systemSettingsResource) readIntoModel(_ context.Context, systemID strin
 			m.NotificationsSettings.RootCauseEmail = types.StringValue(hvSetting.RootCauseEmail)
 			m.NotificationsSettings.IncidentDampeningWindow = types.Int64Value(hvSetting.IncidentDampeningWindow)
 		}
+
+		// System down notification
+		if m.NotificationsSettings.SystemDownNotification != nil {
+			sdSetting, err := r.client.GetSystemDownSetting(systemID)
+			if err != nil {
+				return fmt.Errorf("failed to read system down setting: %w", err)
+			}
+			if sdSetting != nil {
+				m.NotificationsSettings.SystemDownNotification.EnableSystemDownEmailAlert = types.BoolValue(sdSetting.EnableSystemDownEmailAlert)
+				m.NotificationsSettings.SystemDownNotification.EmailDampeningPeriod = types.Int64Value(sdSetting.EmailDampeningPeriod)
+				m.NotificationsSettings.SystemDownNotification.EmailSet = stringsToTypesList(sdSetting.EmailSet)
+			}
+		}
+
+		// Daily and weekly report notifications (single GET returns both)
+		if m.NotificationsSettings.DailyReportNotification != nil || m.NotificationsSettings.WeeklyReportNotification != nil {
+			irSetting, err := r.client.GetInsightsReportSetting(systemID)
+			if err != nil {
+				return fmt.Errorf("failed to read insights report setting: %w", err)
+			}
+			if irSetting != nil {
+				if m.NotificationsSettings.DailyReportNotification != nil {
+					m.NotificationsSettings.DailyReportNotification.EnableInsightsReport = types.BoolValue(irSetting.EnableDailyInsightsReport)
+					m.NotificationsSettings.DailyReportNotification.EmailSet = stringsToTypesList(irSetting.EmailSet)
+				}
+				if m.NotificationsSettings.WeeklyReportNotification != nil {
+					m.NotificationsSettings.WeeklyReportNotification.EnableInsightsReport = types.BoolValue(irSetting.EnableWeeklyInsightsReport)
+					m.NotificationsSettings.WeeklyReportNotification.EmailSet = stringsToTypesList(irSetting.WeeklyEmailSet)
+				}
+			}
+		}
+
+		// Instance down notifications (one GET per project)
+		if len(m.NotificationsSettings.InstanceDownNotification) > 0 {
+			newList := make([]instanceDownNotificationModel, 0, len(m.NotificationsSettings.InstanceDownNotification))
+			for _, item := range m.NotificationsSettings.InstanceDownNotification {
+				projectName := item.ProjectName.ValueString()
+				idSetting, err := r.client.GetInstanceDownSetting(projectName)
+				if err != nil {
+					return fmt.Errorf("failed to read instance down setting for project %s: %w", projectName, err)
+				}
+				if idSetting != nil {
+					newList = append(newList, instanceDownNotificationModel{
+						ProjectName:              types.StringValue(idSetting.ProjectName),
+						InstanceDownEnable:       types.BoolValue(idSetting.InstanceDownEnable),
+						InstanceDownDampening:    types.Int64Value(idSetting.InstanceDownDampening),
+						InstanceDownThreshold:    types.Int64Value(idSetting.InstanceDownThreshold),
+						InstanceDownReportNumber: types.Int64Value(idSetting.InstanceDownReportNumber),
+						InstanceDownEmails:       stringsToTypesList(idSetting.InstanceDownEmails),
+					})
+				} else {
+					newList = append(newList, item)
+				}
+			}
+			m.NotificationsSettings.InstanceDownNotification = newList
+		}
 	}
 
 	return nil
+}
+
+// stringsToTypesList converts a Go []string to a types.List of string elements.
+func stringsToTypesList(strs []string) types.List {
+	if len(strs) == 0 {
+		return types.ListValueMust(types.StringType, []attr.Value{})
+	}
+	vals := make([]attr.Value, len(strs))
+	for i, s := range strs {
+		vals[i] = types.StringValue(s)
+	}
+	return types.ListValueMust(types.StringType, vals)
+}
+
+// typesListToStrings converts a types.List of string elements to a Go []string.
+func typesListToStrings(l types.List) []string {
+	if l.IsNull() || l.IsUnknown() {
+		return []string{}
+	}
+	result := make([]string, 0, len(l.Elements()))
+	for _, el := range l.Elements() {
+		if s, ok := el.(types.String); ok {
+			result = append(result, s.ValueString())
+		}
+	}
+	return result
 }
 
 // normalizeJSONString parses and re-marshals a JSON string via interface{} so that

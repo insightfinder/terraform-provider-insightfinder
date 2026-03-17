@@ -132,6 +132,72 @@ resource "insightfinder_metric_project" "metrics_with_holidays" {
 }
 ```
 
+### Metric Project with Metric Configurations
+
+```terraform
+resource "insightfinder_metric_project" "with_metric_config" {
+  project_name = "configured-metrics"
+  system_name  = "Production"
+
+  project_creation_config = {
+    data_type          = "Metric"
+    instance_type      = "PrivateCloud"
+    project_cloud_type = "PrivateCloud"
+    insight_agent_type = "Custom"
+  }
+
+  sampling_interval = 60
+  retention_time    = 90
+
+  metric_configurations = [
+    {
+      metric_name                  = "cpu_usage"
+      escalate_incident_components = ["web-server-01", "web-server-02"]
+      ignored_components           = ["test-instance"]
+      metric_alert_settings = [
+        {
+          component_name                       = ""
+          threshold_alert_lower_bound          = ""
+          threshold_alert_upper_bound          = "95"
+          threshold_alert_lower_bound_negative = ""
+          threshold_alert_upper_bound_negative = ""
+          threshold_no_alert_lower_bound       = ""
+          threshold_no_alert_upper_bound       = "80"
+          threshold_no_alert_lower_bound_negative = ""
+          threshold_no_alert_upper_bound_negative = ""
+          incident_alert_lower_bound           = ""
+          incident_alert_upper_bound           = "99"
+          incident_alert_lower_bound_negative  = ""
+          incident_alert_upper_bound_negative  = ""
+          incident_no_alert_lower_bound        = ""
+          incident_no_alert_upper_bound        = "90"
+          incident_no_alert_lower_bound_negative = ""
+          incident_no_alert_upper_bound_negative = ""
+          is_kpi                               = true
+          is_flapping_result_only              = false
+          incident_duration_threshold          = 300000
+          detection_type                       = "Threshold"
+          pattern_name_higher                  = "High CPU"
+          pattern_name_lower                   = ""
+          metric_type                          = "Gauge"
+          fill_zero                            = false
+          rouge_value                          = ""
+          enable_baseline_near_constance       = false
+          compute_difference                   = false
+          anomaly_gap_tolerance_duration       = 0
+        }
+      ]
+    },
+    {
+      metric_name                  = "memory_usage"
+      escalate_incident_components = []
+      ignored_components           = []
+      metric_alert_settings        = []
+    }
+  ]
+}
+```
+
 ### Metric Project with Email and Webhook Alerts
 
 ```terraform
@@ -300,6 +366,43 @@ resource "insightfinder_metric_project" "alerted_metrics" {
   - `name` (String, Required) Unique holiday name within the project.
   - `start_date` (String, Required) Start date in `MM-DD` format (e.g., `12-25`).
   - `end_date` (String, Required) End date in `MM-DD` format (e.g., `12-26`).
+
+### Optional — Metric Configurations
+
+- `metric_configurations` (List of Objects, Computed) Per-metric alert threshold settings and component operation rules. Each entry manages one named metric:
+  - `metric_name` (String, Required) The exact metric name to configure.
+  - `escalate_incident_components` (List of String, Optional) Component names that escalate incidents for this metric.
+  - `ignored_components` (List of String, Optional) Component names excluded from anomaly detection for this metric.
+  - `metric_alert_settings` (List of Objects, Optional) Per-component (or global) alert threshold rows. Each row has:
+    - `component_name` (String) Component name, or empty string for the global (project-level) setting.
+    - `threshold_alert_lower_bound` (String) Lower threshold for anomaly alert.
+    - `threshold_alert_upper_bound` (String) Upper threshold for anomaly alert.
+    - `threshold_alert_lower_bound_negative` (String) Negative direction lower alert threshold.
+    - `threshold_alert_upper_bound_negative` (String) Negative direction upper alert threshold.
+    - `threshold_no_alert_lower_bound` (String) Lower threshold below which no alert is raised.
+    - `threshold_no_alert_upper_bound` (String) Upper threshold above which no alert is raised.
+    - `threshold_no_alert_lower_bound_negative` (String) Negative direction lower no-alert threshold.
+    - `threshold_no_alert_upper_bound_negative` (String) Negative direction upper no-alert threshold.
+    - `incident_alert_lower_bound` (String) Lower threshold for incident alert.
+    - `incident_alert_upper_bound` (String) Upper threshold for incident alert.
+    - `incident_alert_lower_bound_negative` (String) Negative direction lower incident alert threshold.
+    - `incident_alert_upper_bound_negative` (String) Negative direction upper incident alert threshold.
+    - `incident_no_alert_lower_bound` (String) Lower threshold below which no incident alert is raised.
+    - `incident_no_alert_upper_bound` (String) Upper threshold above which no incident alert is raised.
+    - `incident_no_alert_lower_bound_negative` (String) Negative direction lower no-incident-alert threshold.
+    - `incident_no_alert_upper_bound_negative` (String) Negative direction upper no-incident-alert threshold.
+    - `is_kpi` (Boolean) Mark this metric as a KPI metric.
+    - `is_flapping_result_only` (Boolean) Only report flapping anomalies.
+    - `incident_duration_threshold` (Number) Minimum incident duration in milliseconds before alerting.
+    - `detection_type` (String) Detection algorithm type (e.g., `Threshold`, `Baseline`).
+    - `pattern_name_higher` (String) Pattern name for values above threshold.
+    - `pattern_name_lower` (String) Pattern name for values below threshold.
+    - `metric_type` (String) Metric data type (e.g., `Gauge`, `Counter`).
+    - `fill_zero` (Boolean) Fill missing data points with zero.
+    - `rouge_value` (String) Raw rouge value string from the API (e.g., `{"l":NaN,"s":NaN}`). Set to empty string to clear.
+    - `enable_baseline_near_constance` (Boolean) Enable near-constance baseline detection.
+    - `compute_difference` (Boolean) Compute derivative (difference) of this metric before detection.
+    - `anomaly_gap_tolerance_duration` (Number) Duration in milliseconds to tolerate gaps in anomaly detection.
 
 ### Read-Only
 

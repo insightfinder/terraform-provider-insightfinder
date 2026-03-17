@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/url"
+	"strings"
 )
 
 // MetricProjectSettings represents the settings specific to a metric project
@@ -122,6 +123,356 @@ type MetricProjectSettings struct {
 		PredictionEmailDampeningPeriod     int    `json:"predictionEmailDampeningPeriod"`
 		AwSeverityLevel                    string `json:"awSeverityLevel,omitempty"`
 	} `json:"emailSetting,omitempty"`
+}
+
+// ─── Metric Configuration Types ───────────────────────────────────────────────
+
+// MetricAlertSetting is one row in the globalSetting or componentLevelSettingList
+// returned by GET /api/external/v1/componentmetricupdate.
+// RougeValue is *string because the API returns it as a JSON string or null.
+type MetricAlertSetting struct {
+	SMetric                            string  `json:"smetric"`
+	ComponentName                      string  `json:"componentName"`
+	ThresholdAlertLowerBound           string  `json:"thresholdAlertLowerBound"`
+	ThresholdAlertUpperBound           string  `json:"thresholdAlertUpperBound"`
+	ThresholdAlertLowerBoundNegative   string  `json:"thresholdAlertLowerBoundNegative"`
+	ThresholdAlertUpperBoundNegative   string  `json:"thresholdAlertUpperBoundNegative"`
+	ThresholdNoAlertLowerBound         string  `json:"thresholdNoAlertLowerBound"`
+	ThresholdNoAlertUpperBound         string  `json:"thresholdNoAlertUpperBound"`
+	ThresholdNoAlertLowerBoundNegative string  `json:"thresholdNoAlertLowerBoundNegative"`
+	ThresholdNoAlertUpperBoundNegative string  `json:"thresholdNoAlertUpperBoundNegative"`
+	IncidentAlertLowerBound            string  `json:"incidentAlertLowerBound"`
+	IncidentAlertUpperBound            string  `json:"incidentAlertUpperBound"`
+	IncidentAlertLowerBoundNegative    string  `json:"incidentAlertLowerBoundNegative"`
+	IncidentAlertUpperBoundNegative    string  `json:"incidentAlertUpperBoundNegative"`
+	IncidentNoAlertLowerBound          string  `json:"incidentNoAlertLowerBound"`
+	IncidentNoAlertUpperBound          string  `json:"incidentNoAlertUpperBound"`
+	IncidentNoAlertLowerBoundNegative  string  `json:"incidentNoAlertLowerBoundNegative"`
+	IncidentNoAlertUpperBoundNegative  string  `json:"incidentNoAlertUpperBoundNegative"`
+	IsKPI                              bool    `json:"isKPI"`
+	IsFlappingResultOnly               bool    `json:"isFlappingResultOnly"`
+	IncidentDurationThreshold          int64   `json:"incidentDurationThreshold"`
+	DetectionType                      string  `json:"detectionType"`
+	PatternNameHigher                  string  `json:"patternNameHigher"`
+	PatternNameLower                   string  `json:"patternNameLower"`
+	MetricType                         string  `json:"metricType"`
+	FillZero                           bool    `json:"fillZero"`
+	RougeValue                         *string `json:"rougeValue"` // null or JSON string e.g. `{"l":NaN,"s":NaN}`
+	EnableBaselineNearConstance        bool    `json:"enableBaselineNearConstance"`
+	ComputeDifference                  bool    `json:"computeDifference"`
+	AnomalyGapToleranceDuration        int64   `json:"anomalyGapToleranceDuration"`
+}
+
+// MetricAlertSettingPost is used when writing to POST /api/external/v1/componentmetricupdate.
+// RougeValue uses json.RawMessage so we can inject the non-standard `{l: "NaN",s: "NaN"}` bytes verbatim.
+type MetricAlertSettingPost struct {
+	SMetric                            string          `json:"smetric"`
+	ComponentName                      string          `json:"componentName"`
+	ThresholdAlertLowerBound           string          `json:"thresholdAlertLowerBound"`
+	ThresholdAlertUpperBound           string          `json:"thresholdAlertUpperBound"`
+	ThresholdAlertLowerBoundNegative   string          `json:"thresholdAlertLowerBoundNegative"`
+	ThresholdAlertUpperBoundNegative   string          `json:"thresholdAlertUpperBoundNegative"`
+	ThresholdNoAlertLowerBound         string          `json:"thresholdNoAlertLowerBound"`
+	ThresholdNoAlertUpperBound         string          `json:"thresholdNoAlertUpperBound"`
+	ThresholdNoAlertLowerBoundNegative string          `json:"thresholdNoAlertLowerBoundNegative"`
+	ThresholdNoAlertUpperBoundNegative string          `json:"thresholdNoAlertUpperBoundNegative"`
+	IncidentAlertLowerBound            string          `json:"incidentAlertLowerBound"`
+	IncidentAlertUpperBound            string          `json:"incidentAlertUpperBound"`
+	IncidentAlertLowerBoundNegative    string          `json:"incidentAlertLowerBoundNegative"`
+	IncidentAlertUpperBoundNegative    string          `json:"incidentAlertUpperBoundNegative"`
+	IncidentNoAlertLowerBound          string          `json:"incidentNoAlertLowerBound"`
+	IncidentNoAlertUpperBound          string          `json:"incidentNoAlertUpperBound"`
+	IncidentNoAlertLowerBoundNegative  string          `json:"incidentNoAlertLowerBoundNegative"`
+	IncidentNoAlertUpperBoundNegative  string          `json:"incidentNoAlertUpperBoundNegative"`
+	IsKPI                              bool            `json:"isKPI"`
+	IsFlappingResultOnly               bool            `json:"isFlappingResultOnly"`
+	IncidentDurationThreshold          int64           `json:"incidentDurationThreshold"`
+	DetectionType                      string          `json:"detectionType"`
+	PatternNameHigher                  string          `json:"patternNameHigher"`
+	PatternNameLower                   string          `json:"patternNameLower"`
+	MetricType                         string          `json:"metricType"`
+	FillZero                           bool            `json:"fillZero"`
+	RougeValue                         json.RawMessage `json:"rougeValue"` // injected verbatim: null or {l: "NaN",s: "NaN"}
+	EnableBaselineNearConstance        bool            `json:"enableBaselineNearConstance"`
+	ComputeDifference                  bool            `json:"computeDifference"`
+	AnomalyGapToleranceDuration        int64           `json:"anomalyGapToleranceDuration"`
+}
+
+// MetricSettingEntry is the per-metric object inside the metricSetting array from the GET response.
+type MetricSettingEntry struct {
+	GlobalSetting             MetricAlertSetting   `json:"globalSetting"`
+	ComponentLevelSettingList []MetricAlertSetting `json:"componentLevelSettingList"`
+}
+
+// GetMetricSettingsResponse is the top-level GET /api/external/v1/componentmetricupdate response.
+type GetMetricSettingsResponse struct {
+	MetricSettingArrCount   int                  `json:"metricSettingArrCount"`
+	ReachEnd                bool                 `json:"reachEnd"`
+	MetricSetting           []MetricSettingEntry `json:"metricSetting"`
+	PatternIdGenerationRule int                  `json:"patternIdGenerationRule"`
+}
+
+// MetricComponentEntry is one element decoded from the componentIgnored / componentEscalateIncident JSON string.
+type MetricComponentEntry struct {
+	MetricLevelPrimaryKey struct {
+		ProjectLevelPartitionKey struct {
+			ProjectName string `json:"projectName"`
+			UserName    string `json:"userName"`
+		} `json:"projectLevelPartitionKey"`
+		MetricName string `json:"metricName"`
+	} `json:"metricLevelPrimaryKey"`
+	ComponentNameSet []string `json:"componentNameSet"`
+}
+
+// MetricComponentOperationResponse is the outer wrapper from GET /api/external/v1/metriccomponent.
+type MetricComponentOperationResponse struct {
+	ComponentEscalateIncident string `json:"componentEscalateIncident,omitempty"`
+	ComponentIgnored          string `json:"componentIgnored,omitempty"`
+}
+
+// ─── Metric Configuration API Functions ───────────────────────────────────────
+
+// GetMetricSettings fetches alert settings for a single metric in a project.
+// projectName should NOT include the @username suffix here; it is appended internally.
+// metricFilter is a fuzzy search, so we paginate until reachEnd=true and return
+// only the entry whose GlobalSetting.SMetric exactly matches metricName.
+func (c *Client) GetMetricSettings(projectName, metricName string) (*MetricSettingEntry, error) {
+	start := 0
+	limit := 500
+
+	for {
+		params := url.Values{}
+		params.Set("onlyIsKpi", "false")
+		params.Set("onlyComputeDifference", "false")
+		params.Set("projectName", projectName+"@"+c.Username)
+		params.Set("start", fmt.Sprintf("%d", start))
+		params.Set("limit", fmt.Sprintf("%d", limit))
+		params.Set("metricFilter", metricName)
+		params.Set("customerName", c.Username)
+		params.Set("tzOffset", "-14400000")
+
+		apiPath := "/api/external/v1/componentmetricupdate?" + params.Encode()
+		body, statusCode, err := c.DoRequest("GET", apiPath, nil)
+		if err != nil {
+			return nil, err
+		}
+		if statusCode == 404 || statusCode == 204 {
+			return nil, nil
+		}
+		if statusCode != 200 {
+			return nil, fmt.Errorf("failed to get metric settings: HTTP %d - %s", statusCode, string(body))
+		}
+
+		var resp GetMetricSettingsResponse
+		if err := json.Unmarshal(body, &resp); err != nil {
+			return nil, fmt.Errorf("failed to parse metric settings response: %w", err)
+		}
+
+		for i, entry := range resp.MetricSetting {
+			if entry.GlobalSetting.SMetric == metricName {
+				return &resp.MetricSetting[i], nil
+			}
+		}
+
+		if resp.ReachEnd {
+			break
+		}
+		start += limit
+	}
+
+	return nil, nil
+}
+
+// SetMetricSettings sends a pre-serialized JSON array of MetricAlertSettingPost entries for a project.
+// data is the raw JSON bytes (built by the resource layer to handle rougeValue properly).
+func (c *Client) SetMetricSettings(projectName string, patternIdGenerationRule int, data []byte) error {
+	fields := map[string]string{
+		"projectName":             projectName + "@" + c.Username,
+		"patternIdGenerationRule": fmt.Sprintf("%d", patternIdGenerationRule),
+		"customerName":            c.Username,
+	}
+	fileParts := map[string][]byte{
+		"data": data,
+	}
+
+	body, statusCode, err := c.DoMultipartFormRequest("POST", "/api/external/v1/componentmetricupdate", fields, fileParts)
+	if err != nil {
+		return err
+	}
+	if statusCode != 200 {
+		return fmt.Errorf("failed to set metric settings: HTTP %d - %s", statusCode, string(body))
+	}
+
+	var response ProjectResponse
+	if err := json.Unmarshal(body, &response); err != nil {
+		return nil // treat parse error as success when status was 200
+	}
+	if !response.Success {
+		return fmt.Errorf("failed to set metric settings: %s", response.Message)
+	}
+	return nil
+}
+
+// GetMetricComponents returns a map[metricName][]componentName for the given operation
+// (operation = "escalateIncident" or "ignored").
+func (c *Client) GetMetricComponents(projectName, operation string) (map[string][]string, error) {
+	params := url.Values{}
+	params.Set("projectName", projectName)
+	params.Set("customerName", c.Username)
+	params.Set("operation", operation)
+	params.Set("tzOffset", "-14400000")
+
+	apiPath := "/api/external/v1/metriccomponent?" + params.Encode()
+	body, statusCode, err := c.DoRequest("GET", apiPath, nil)
+	if err != nil {
+		return nil, err
+	}
+	if statusCode == 404 || statusCode == 204 {
+		return make(map[string][]string), nil
+	}
+	if statusCode != 200 {
+		return nil, fmt.Errorf("failed to get metric components (%s): HTTP %d - %s", operation, statusCode, string(body))
+	}
+
+	var outer MetricComponentOperationResponse
+	if err := json.Unmarshal(body, &outer); err != nil {
+		return nil, fmt.Errorf("failed to parse metric component response: %w", err)
+	}
+
+	var encodedStr string
+	if operation == "escalateIncident" {
+		encodedStr = outer.ComponentEscalateIncident
+	} else {
+		encodedStr = outer.ComponentIgnored
+	}
+
+	if encodedStr == "" {
+		return make(map[string][]string), nil
+	}
+
+	var entries []MetricComponentEntry
+	if err := json.Unmarshal([]byte(encodedStr), &entries); err != nil {
+		return nil, fmt.Errorf("failed to parse %s entries: %w", operation, err)
+	}
+
+	result := make(map[string][]string)
+	for _, e := range entries {
+		result[e.MetricLevelPrimaryKey.MetricName] = e.ComponentNameSet
+	}
+	return result, nil
+}
+
+// SetMetricComponents sets the component list for a metric+operation pair.
+// If desiredComponents contains a "Global_*" prefix component, selectAll=true is used.
+// Otherwise: reset with selectAll=true, then add desired and remove the Global_* entry.
+func (c *Client) SetMetricComponents(projectName, metricName, operation string, desiredComponents []string) error {
+	hasGlobal := false
+	for _, comp := range desiredComponents {
+		if strings.HasPrefix(comp, "Global_") {
+			hasGlobal = true
+			break
+		}
+	}
+
+	// Step 1: always reset via selectAll=true
+	if err := c.postMetricComponent(projectName, metricName, operation, true, nil, nil); err != nil {
+		return err
+	}
+
+	// If desired is "all" (has Global_*), we're done
+	if hasGlobal {
+		return nil
+	}
+
+	// If desired is empty, remove the Global_* that selectAll just added
+	if len(desiredComponents) == 0 {
+		// GET current to find the actual Global_* component name
+		current, err := c.GetMetricComponents(projectName, operation)
+		if err != nil {
+			return fmt.Errorf("failed to get current components after selectAll: %w", err)
+		}
+		var globalComps []string
+		for _, comp := range current[metricName] {
+			if strings.HasPrefix(comp, "Global_") {
+				globalComps = append(globalComps, comp)
+			}
+		}
+		return c.postMetricComponent(projectName, metricName, operation, false, nil, globalComps)
+	}
+
+	// Step 2: add desired components, remove the Global_* entry
+	current, err := c.GetMetricComponents(projectName, operation)
+	if err != nil {
+		return fmt.Errorf("failed to get current components after selectAll: %w", err)
+	}
+	var globalComps []string
+	for _, comp := range current[metricName] {
+		if strings.HasPrefix(comp, "Global_") {
+			globalComps = append(globalComps, comp)
+		}
+	}
+	return c.postMetricComponent(projectName, metricName, operation, false, desiredComponents, globalComps)
+}
+
+// postMetricComponent is the low-level POST to /api/external/v1/metriccomponent.
+func (c *Client) postMetricComponent(projectName, metricName, operation string, selectAll bool, addSet, removeSet []string) error {
+	formData := url.Values{}
+	formData.Set("projectName", projectName)
+	formData.Set("customerName", c.Username)
+	formData.Set("metricName", metricName)
+	formData.Set("operation", operation)
+	if selectAll {
+		formData.Set("selectAll", "true")
+	} else {
+		formData.Set("selectAll", "false")
+		if len(addSet) > 0 {
+			addJSON, _ := json.Marshal(addSet)
+			formData.Set("addComponentSet", string(addJSON))
+		}
+		if len(removeSet) > 0 {
+			removeJSON, _ := json.Marshal(removeSet)
+			formData.Set("removeComponentSet", string(removeJSON))
+		}
+	}
+
+	body, statusCode, err := c.DoFormRequest("POST", "/api/external/v1/metriccomponent", formData)
+	if err != nil {
+		return err
+	}
+	if statusCode != 200 {
+		return fmt.Errorf("failed to set metric component (%s/%s): HTTP %d - %s", metricName, operation, statusCode, string(body))
+	}
+
+	var response ProjectResponse
+	if err := json.Unmarshal(body, &response); err != nil {
+		return nil
+	}
+	if !response.Success {
+		return fmt.Errorf("failed to set metric component (%s/%s): %s", metricName, operation, response.Message)
+	}
+	return nil
+}
+
+// ConvertRougeValueForPost converts a Terraform-stored rougeValue string to the raw bytes
+// for the POST API, or null.
+// GET response delivers rougeValue as a JSON string like `{"l":NaN,"s":NaN}` (unquoted NaN).
+// This function normalizes that into valid JSON `{"l":"NaN","s":"NaN"}` for the POST body.
+func ConvertRougeValueForPost(storedVal string) json.RawMessage {
+	if storedVal == "" || storedVal == "null" {
+		return json.RawMessage("null")
+	}
+	// Normalize: replace unquoted NaN → "NaN" to make it valid JSON for parsing
+	normalized := strings.ReplaceAll(storedVal, ":NaN", `:"NaN"`)
+	normalized = strings.ReplaceAll(normalized, ": NaN", `:"NaN"`)
+	var rv map[string]string
+	if err := json.Unmarshal([]byte(normalized), &rv); err == nil {
+		l := rv["l"]
+		s := rv["s"]
+		// Produce valid JSON with quoted keys so json.Marshal accepts the RawMessage.
+		out, _ := json.Marshal(map[string]string{"l": l, "s": s})
+		return json.RawMessage(out)
+	}
+	return json.RawMessage("null")
 }
 
 // UpdateMetricProject updates an existing metric project's configuration.

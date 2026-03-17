@@ -10,6 +10,7 @@ import (
 	"sort"
 
 	"github.com/hashicorp/terraform-plugin-framework/attr"
+	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
@@ -48,21 +49,21 @@ type metricProjectResourceModel struct {
 	ProjectTimeZone  types.String  `tfsdk:"project_time_zone"`
 	SamplingInterval types.Int64   `tfsdk:"sampling_interval"`
 
-	RetentionTime       types.Int64 `tfsdk:"retention_time"`
-	UBLRetentionTime    types.Int64 `tfsdk:"ubl_retention_time"`
-	TrainingFilter      types.Bool  `tfsdk:"training_filter"`
-	EnableNewAlertEmail types.Bool  `tfsdk:"enable_new_alert_email"`
-	LargeProject        types.Bool  `tfsdk:"large_project"`
-	NewPatternRange     types.Int64 `tfsdk:"new_pattern_range"`
+	RetentionTime       types.Int64  `tfsdk:"retention_time"`
+	UBLRetentionTime    types.Int64  `tfsdk:"ubl_retention_time"`
+	TrainingFilter      types.Bool   `tfsdk:"training_filter"`
+	EnableNewAlertEmail types.Bool   `tfsdk:"enable_new_alert_email"`
+	LargeProject        types.Bool   `tfsdk:"large_project"`
+	NewPatternRange     types.Int64  `tfsdk:"new_pattern_range"`
 	Proxy               types.String `tfsdk:"proxy"`
 
-	EnableAnomalyScoreEscalation    types.Bool   `tfsdk:"enable_anomaly_score_escalation"`
-	EscalationAnomalyScoreThreshold types.String `tfsdk:"escalation_anomaly_score_threshold"`
-	IgnoreAnomalyScoreThreshold     types.String `tfsdk:"ignore_anomaly_score_threshold"`
-	EnableStreamDetection           types.Bool   `tfsdk:"enable_stream_detection"`
-	IgnoreInstanceForKB             types.Bool   `tfsdk:"ignore_instance_for_kb"`
-	ShowInstanceDown                types.Bool   `tfsdk:"show_instance_down"`
-	InstanceDownEnable              types.Bool   `tfsdk:"instance_down_enable"`
+	EnableAnomalyScoreEscalation    types.Bool    `tfsdk:"enable_anomaly_score_escalation"`
+	EscalationAnomalyScoreThreshold types.String  `tfsdk:"escalation_anomaly_score_threshold"`
+	IgnoreAnomalyScoreThreshold     types.String  `tfsdk:"ignore_anomaly_score_threshold"`
+	EnableStreamDetection           types.Bool    `tfsdk:"enable_stream_detection"`
+	IgnoreInstanceForKB             types.Bool    `tfsdk:"ignore_instance_for_kb"`
+	ShowInstanceDown                types.Bool    `tfsdk:"show_instance_down"`
+	InstanceDownEnable              types.Bool    `tfsdk:"instance_down_enable"`
 	AlertHourlyCost                 types.Float64 `tfsdk:"alert_hourly_cost"`
 	AlertAverageTime                types.Int64   `tfsdk:"alert_average_time"`
 	AvgPerIncidentDowntimeCost      types.Float64 `tfsdk:"avg_per_incident_downtime_cost"`
@@ -135,6 +136,50 @@ type metricProjectResourceModel struct {
 
 	// Holiday settings
 	HolidaySettings types.List `tfsdk:"holiday_settings"`
+
+	// Metric configurations (per-metric alert thresholds + component operations)
+	MetricConfigurations types.List `tfsdk:"metric_configurations"`
+}
+
+// metricAlertSettingModel maps one entry in metric_alert_settings.
+type metricAlertSettingModel struct {
+	ComponentName                      types.String `tfsdk:"component_name"`
+	ThresholdAlertLowerBound           types.String `tfsdk:"threshold_alert_lower_bound"`
+	ThresholdAlertUpperBound           types.String `tfsdk:"threshold_alert_upper_bound"`
+	ThresholdAlertLowerBoundNegative   types.String `tfsdk:"threshold_alert_lower_bound_negative"`
+	ThresholdAlertUpperBoundNegative   types.String `tfsdk:"threshold_alert_upper_bound_negative"`
+	ThresholdNoAlertLowerBound         types.String `tfsdk:"threshold_no_alert_lower_bound"`
+	ThresholdNoAlertUpperBound         types.String `tfsdk:"threshold_no_alert_upper_bound"`
+	ThresholdNoAlertLowerBoundNegative types.String `tfsdk:"threshold_no_alert_lower_bound_negative"`
+	ThresholdNoAlertUpperBoundNegative types.String `tfsdk:"threshold_no_alert_upper_bound_negative"`
+	IncidentAlertLowerBound            types.String `tfsdk:"incident_alert_lower_bound"`
+	IncidentAlertUpperBound            types.String `tfsdk:"incident_alert_upper_bound"`
+	IncidentAlertLowerBoundNegative    types.String `tfsdk:"incident_alert_lower_bound_negative"`
+	IncidentAlertUpperBoundNegative    types.String `tfsdk:"incident_alert_upper_bound_negative"`
+	IncidentNoAlertLowerBound          types.String `tfsdk:"incident_no_alert_lower_bound"`
+	IncidentNoAlertUpperBound          types.String `tfsdk:"incident_no_alert_upper_bound"`
+	IncidentNoAlertLowerBoundNegative  types.String `tfsdk:"incident_no_alert_lower_bound_negative"`
+	IncidentNoAlertUpperBoundNegative  types.String `tfsdk:"incident_no_alert_upper_bound_negative"`
+	IsKPI                              types.Bool   `tfsdk:"is_kpi"`
+	IsFlappingResultOnly               types.Bool   `tfsdk:"is_flapping_result_only"`
+	IncidentDurationThreshold          types.Int64  `tfsdk:"incident_duration_threshold"`
+	DetectionType                      types.String `tfsdk:"detection_type"`
+	PatternNameHigher                  types.String `tfsdk:"pattern_name_higher"`
+	PatternNameLower                   types.String `tfsdk:"pattern_name_lower"`
+	MetricType                         types.String `tfsdk:"metric_type"`
+	FillZero                           types.Bool   `tfsdk:"fill_zero"`
+	RougeValue                         types.String `tfsdk:"rouge_value"` // null or raw string from API e.g. `{"l":NaN,"s":NaN}`
+	EnableBaselineNearConstance        types.Bool   `tfsdk:"enable_baseline_near_constance"`
+	ComputeDifference                  types.Bool   `tfsdk:"compute_difference"`
+	AnomalyGapToleranceDuration        types.Int64  `tfsdk:"anomaly_gap_tolerance_duration"`
+}
+
+// metricConfigurationModel maps one entry in metric_configurations.
+type metricConfigurationModel struct {
+	MetricName                 types.String `tfsdk:"metric_name"`
+	EscalateIncidentComponents types.List   `tfsdk:"escalate_incident_components"` // list of strings
+	IgnoredComponents          types.List   `tfsdk:"ignored_components"`           // list of strings
+	MetricAlertSettings        types.List   `tfsdk:"metric_alert_settings"`        // list of metricAlertSettingModel
 }
 
 type metricProjectCreationConfigModel struct {
@@ -142,6 +187,51 @@ type metricProjectCreationConfigModel struct {
 	InstanceType     types.String `tfsdk:"instance_type"`
 	ProjectCloudType types.String `tfsdk:"project_cloud_type"`
 	InsightAgentType types.String `tfsdk:"insight_agent_type"`
+}
+
+// metricAlertSettingAttrTypes returns the attr.Type map for a metricAlertSettingModel object.
+func metricAlertSettingAttrTypes() map[string]attr.Type {
+	return map[string]attr.Type{
+		"component_name":                          types.StringType,
+		"threshold_alert_lower_bound":             types.StringType,
+		"threshold_alert_upper_bound":             types.StringType,
+		"threshold_alert_lower_bound_negative":    types.StringType,
+		"threshold_alert_upper_bound_negative":    types.StringType,
+		"threshold_no_alert_lower_bound":          types.StringType,
+		"threshold_no_alert_upper_bound":          types.StringType,
+		"threshold_no_alert_lower_bound_negative": types.StringType,
+		"threshold_no_alert_upper_bound_negative": types.StringType,
+		"incident_alert_lower_bound":              types.StringType,
+		"incident_alert_upper_bound":              types.StringType,
+		"incident_alert_lower_bound_negative":     types.StringType,
+		"incident_alert_upper_bound_negative":     types.StringType,
+		"incident_no_alert_lower_bound":           types.StringType,
+		"incident_no_alert_upper_bound":           types.StringType,
+		"incident_no_alert_lower_bound_negative":  types.StringType,
+		"incident_no_alert_upper_bound_negative":  types.StringType,
+		"is_kpi":                                  types.BoolType,
+		"is_flapping_result_only":                 types.BoolType,
+		"incident_duration_threshold":             types.Int64Type,
+		"detection_type":                          types.StringType,
+		"pattern_name_higher":                     types.StringType,
+		"pattern_name_lower":                      types.StringType,
+		"metric_type":                             types.StringType,
+		"fill_zero":                               types.BoolType,
+		"rouge_value":                             types.StringType,
+		"enable_baseline_near_constance":          types.BoolType,
+		"compute_difference":                      types.BoolType,
+		"anomaly_gap_tolerance_duration":          types.Int64Type,
+	}
+}
+
+// metricConfigurationAttrTypes returns the attr.Type map for a metricConfigurationModel object.
+func metricConfigurationAttrTypes() map[string]attr.Type {
+	return map[string]attr.Type{
+		"metric_name":                  types.StringType,
+		"escalate_incident_components": types.ListType{ElemType: types.StringType},
+		"ignored_components":           types.ListType{ElemType: types.StringType},
+		"metric_alert_settings":        types.ListType{ElemType: types.ObjectType{AttrTypes: metricAlertSettingAttrTypes()}},
+	}
 }
 
 func (r *metricProjectResource) Metadata(_ context.Context, req resource.MetadataRequest, resp *resource.MetadataResponse) {
@@ -612,6 +702,69 @@ func (r *metricProjectResource) Schema(_ context.Context, _ resource.SchemaReque
 						"end_date": schema.StringAttribute{
 							Description: "End date of the holiday in MM-DD format (e.g., '12-26').",
 							Required:    true,
+						},
+					},
+				},
+			},
+			"metric_configurations": schema.ListNestedAttribute{
+				Description: "Per-metric alert threshold settings and component escalation/ignored configurations.",
+				Optional:    true,
+				Computed:    true,
+				NestedObject: schema.NestedAttributeObject{
+					Attributes: map[string]schema.Attribute{
+						"metric_name": schema.StringAttribute{
+							Description: "The metric name (e.g., 'txMcs').",
+							Required:    true,
+						},
+						"escalate_incident_components": schema.ListAttribute{
+							Description: "Components for which incidents are escalated. Use ['Global_<hash>'] to select all.",
+							ElementType: types.StringType,
+							Optional:    true,
+							Computed:    true,
+						},
+						"ignored_components": schema.ListAttribute{
+							Description: "Components that are ignored for this metric. Use ['Global_<hash>'] to select all.",
+							ElementType: types.StringType,
+							Optional:    true,
+							Computed:    true,
+						},
+						"metric_alert_settings": schema.ListNestedAttribute{
+							Description: "Alert threshold settings per component for this metric.",
+							Optional:    true,
+							Computed:    true,
+							NestedObject: schema.NestedAttributeObject{
+								Attributes: map[string]schema.Attribute{
+									"component_name":                          schema.StringAttribute{Description: "Component name (use Global_<hash> for the global setting).", Required: true},
+									"threshold_alert_lower_bound":             schema.StringAttribute{Description: "Alert lower bound threshold.", Optional: true, Computed: true},
+									"threshold_alert_upper_bound":             schema.StringAttribute{Description: "Alert upper bound threshold.", Optional: true, Computed: true},
+									"threshold_alert_lower_bound_negative":    schema.StringAttribute{Description: "Alert lower bound negative threshold.", Optional: true, Computed: true},
+									"threshold_alert_upper_bound_negative":    schema.StringAttribute{Description: "Alert upper bound negative threshold.", Optional: true, Computed: true},
+									"threshold_no_alert_lower_bound":          schema.StringAttribute{Description: "No-alert lower bound threshold.", Optional: true, Computed: true},
+									"threshold_no_alert_upper_bound":          schema.StringAttribute{Description: "No-alert upper bound threshold.", Optional: true, Computed: true},
+									"threshold_no_alert_lower_bound_negative": schema.StringAttribute{Description: "No-alert lower bound negative threshold.", Optional: true, Computed: true},
+									"threshold_no_alert_upper_bound_negative": schema.StringAttribute{Description: "No-alert upper bound negative threshold.", Optional: true, Computed: true},
+									"incident_alert_lower_bound":              schema.StringAttribute{Description: "Incident alert lower bound.", Optional: true, Computed: true},
+									"incident_alert_upper_bound":              schema.StringAttribute{Description: "Incident alert upper bound.", Optional: true, Computed: true},
+									"incident_alert_lower_bound_negative":     schema.StringAttribute{Description: "Incident alert lower bound negative.", Optional: true, Computed: true},
+									"incident_alert_upper_bound_negative":     schema.StringAttribute{Description: "Incident alert upper bound negative.", Optional: true, Computed: true},
+									"incident_no_alert_lower_bound":           schema.StringAttribute{Description: "Incident no-alert lower bound.", Optional: true, Computed: true},
+									"incident_no_alert_upper_bound":           schema.StringAttribute{Description: "Incident no-alert upper bound.", Optional: true, Computed: true},
+									"incident_no_alert_lower_bound_negative":  schema.StringAttribute{Description: "Incident no-alert lower bound negative.", Optional: true, Computed: true},
+									"incident_no_alert_upper_bound_negative":  schema.StringAttribute{Description: "Incident no-alert upper bound negative.", Optional: true, Computed: true},
+									"is_kpi":                                  schema.BoolAttribute{Description: "Whether this metric is a KPI.", Optional: true, Computed: true},
+									"is_flapping_result_only":                 schema.BoolAttribute{Description: "Whether to report flapping results only.", Optional: true, Computed: true},
+									"incident_duration_threshold":             schema.Int64Attribute{Description: "Minimum incident duration (ms) to trigger.", Optional: true, Computed: true},
+									"detection_type":                          schema.StringAttribute{Description: "Detection direction: 'positive', 'negative', or 'both'.", Optional: true, Computed: true},
+									"pattern_name_higher":                     schema.StringAttribute{Description: "Pattern name for higher anomalies.", Optional: true, Computed: true},
+									"pattern_name_lower":                      schema.StringAttribute{Description: "Pattern name for lower anomalies.", Optional: true, Computed: true},
+									"metric_type":                             schema.StringAttribute{Description: "Metric type classification (e.g., 'Unknown', 'CPU Utilization').", Optional: true, Computed: true},
+									"fill_zero":                               schema.BoolAttribute{Description: "Fill missing data with zero.", Optional: true, Computed: true},
+									"rouge_value":                             schema.StringAttribute{Description: "Rouge value as raw JSON string from API (e.g., '{\"l\":NaN,\"s\":NaN}'). Null to disable.", Optional: true, Computed: true},
+									"enable_baseline_near_constance":          schema.BoolAttribute{Description: "Enable baseline near constance detection.", Optional: true, Computed: true},
+									"compute_difference":                      schema.BoolAttribute{Description: "Compute difference for this metric.", Optional: true, Computed: true},
+									"anomaly_gap_tolerance_duration":          schema.Int64Attribute{Description: "Anomaly gap tolerance duration in milliseconds.", Optional: true, Computed: true},
+								},
+							},
 						},
 					},
 				},
@@ -1187,6 +1340,9 @@ func preserveMetricConfigValues(plan *metricProjectResourceModel, config *metric
 	preserve(&plan.InstanceGroupingUpdate, &config.InstanceGroupingUpdate)
 	preserve(&plan.SharedUsernames, &config.SharedUsernames)
 	preserve(&plan.WebhookHeaderList, &config.WebhookHeaderList)
+	if !config.MetricConfigurations.IsNull() {
+		plan.MetricConfigurations = config.MetricConfigurations
+	}
 }
 
 func (r *metricProjectResource) Create(ctx context.Context, req resource.CreateRequest, resp *resource.CreateResponse) {
@@ -1292,6 +1448,37 @@ func (r *metricProjectResource) Create(ctx context.Context, req resource.CreateR
 				"end_date":   types.StringType,
 			},
 		})
+	}
+
+	// Process metric_configurations
+	if !config.MetricConfigurations.IsNull() && !config.MetricConfigurations.IsUnknown() {
+		var metricConfigs []metricConfigurationModel
+		diags = config.MetricConfigurations.ElementsAs(ctx, &metricConfigs, false)
+		resp.Diagnostics.Append(diags...)
+		if resp.Diagnostics.HasError() {
+			return
+		}
+		patternIdRule := int(plan.PatternIdGenerationRule.ValueInt64())
+		applyDiags := applyMetricConfigurations(ctx, r.client, plan.ProjectName.ValueString(), metricConfigs, patternIdRule)
+		resp.Diagnostics.Append(applyDiags...)
+		if resp.Diagnostics.HasError() {
+			return
+		}
+		// Normalize null component lists → [] so state is consistent with what Read returns,
+		// preventing a perpetual plan diff.
+		normalizedConfigs, normDiags := normalizeMetricConfigsForState(ctx, metricConfigs)
+		resp.Diagnostics.Append(normDiags...)
+		if resp.Diagnostics.HasError() {
+			return
+		}
+		listVal, d := types.ListValueFrom(ctx, types.ObjectType{AttrTypes: metricConfigurationAttrTypes()}, normalizedConfigs)
+		resp.Diagnostics.Append(d...)
+		if resp.Diagnostics.HasError() {
+			return
+		}
+		plan.MetricConfigurations = listVal
+	} else {
+		plan.MetricConfigurations = types.ListNull(types.ObjectType{AttrTypes: metricConfigurationAttrTypes()})
 	}
 
 	plan.SystemName = config.SystemName
@@ -1401,6 +1588,24 @@ func (r *metricProjectResource) Read(ctx context.Context, req resource.ReadReque
 					"end_date":   types.StringType,
 				},
 			})
+		}
+	}
+
+	// Read metric_configurations from API (only for metrics already tracked in state)
+	if !state.MetricConfigurations.IsNull() && !state.MetricConfigurations.IsUnknown() {
+		var existingConfigs []metricConfigurationModel
+		diags = state.MetricConfigurations.ElementsAs(ctx, &existingConfigs, false)
+		resp.Diagnostics.Append(diags...)
+		if !resp.Diagnostics.HasError() {
+			updatedConfigs, readDiags := readMetricConfigurationsFromAPI(ctx, r.client, state.ProjectName.ValueString(), existingConfigs)
+			resp.Diagnostics.Append(readDiags...)
+			if !resp.Diagnostics.HasError() && len(updatedConfigs) > 0 {
+				listVal, d := types.ListValueFrom(ctx, types.ObjectType{AttrTypes: metricConfigurationAttrTypes()}, updatedConfigs)
+				resp.Diagnostics.Append(d...)
+				if !resp.Diagnostics.HasError() {
+					state.MetricConfigurations = listVal
+				}
+			}
 		}
 	}
 
@@ -1547,6 +1752,37 @@ func (r *metricProjectResource) Update(ctx context.Context, req resource.UpdateR
 		})
 	}
 
+	// Process metric_configurations
+	if !config.MetricConfigurations.IsNull() && !config.MetricConfigurations.IsUnknown() {
+		var metricConfigs []metricConfigurationModel
+		diags = config.MetricConfigurations.ElementsAs(ctx, &metricConfigs, false)
+		resp.Diagnostics.Append(diags...)
+		if resp.Diagnostics.HasError() {
+			return
+		}
+		patternIdRule := int(plan.PatternIdGenerationRule.ValueInt64())
+		applyDiags := applyMetricConfigurations(ctx, r.client, plan.ProjectName.ValueString(), metricConfigs, patternIdRule)
+		resp.Diagnostics.Append(applyDiags...)
+		if resp.Diagnostics.HasError() {
+			return
+		}
+		// Normalize null component lists → [] so state is consistent with what Read returns,
+		// preventing a perpetual plan diff.
+		normalizedConfigs, normDiags := normalizeMetricConfigsForState(ctx, metricConfigs)
+		resp.Diagnostics.Append(normDiags...)
+		if resp.Diagnostics.HasError() {
+			return
+		}
+		listVal, d := types.ListValueFrom(ctx, types.ObjectType{AttrTypes: metricConfigurationAttrTypes()}, normalizedConfigs)
+		resp.Diagnostics.Append(d...)
+		if resp.Diagnostics.HasError() {
+			return
+		}
+		plan.MetricConfigurations = listVal
+	} else {
+		plan.MetricConfigurations = types.ListNull(types.ObjectType{AttrTypes: metricConfigurationAttrTypes()})
+	}
+
 	plan.SystemName = config.SystemName
 	plan.ProjectCreationConfig = config.ProjectCreationConfig
 
@@ -1577,6 +1813,223 @@ func (r *metricProjectResource) Delete(ctx context.Context, req resource.DeleteR
 
 func (r *metricProjectResource) ImportState(ctx context.Context, req resource.ImportStateRequest, resp *resource.ImportStateResponse) {
 	resource.ImportStatePassthroughID(ctx, path.Root("id"), req, resp)
+}
+
+// buildMetricAlertSettingFromAPI converts a client.MetricAlertSetting to a metricAlertSettingModel.
+func buildMetricAlertSettingFromAPI(s client.MetricAlertSetting) metricAlertSettingModel {
+	m := metricAlertSettingModel{
+		ComponentName:                      types.StringValue(s.ComponentName),
+		ThresholdAlertLowerBound:           types.StringValue(s.ThresholdAlertLowerBound),
+		ThresholdAlertUpperBound:           types.StringValue(s.ThresholdAlertUpperBound),
+		ThresholdAlertLowerBoundNegative:   types.StringValue(s.ThresholdAlertLowerBoundNegative),
+		ThresholdAlertUpperBoundNegative:   types.StringValue(s.ThresholdAlertUpperBoundNegative),
+		ThresholdNoAlertLowerBound:         types.StringValue(s.ThresholdNoAlertLowerBound),
+		ThresholdNoAlertUpperBound:         types.StringValue(s.ThresholdNoAlertUpperBound),
+		ThresholdNoAlertLowerBoundNegative: types.StringValue(s.ThresholdNoAlertLowerBoundNegative),
+		ThresholdNoAlertUpperBoundNegative: types.StringValue(s.ThresholdNoAlertUpperBoundNegative),
+		IncidentAlertLowerBound:            types.StringValue(s.IncidentAlertLowerBound),
+		IncidentAlertUpperBound:            types.StringValue(s.IncidentAlertUpperBound),
+		IncidentAlertLowerBoundNegative:    types.StringValue(s.IncidentAlertLowerBoundNegative),
+		IncidentAlertUpperBoundNegative:    types.StringValue(s.IncidentAlertUpperBoundNegative),
+		IncidentNoAlertLowerBound:          types.StringValue(s.IncidentNoAlertLowerBound),
+		IncidentNoAlertUpperBound:          types.StringValue(s.IncidentNoAlertUpperBound),
+		IncidentNoAlertLowerBoundNegative:  types.StringValue(s.IncidentNoAlertLowerBoundNegative),
+		IncidentNoAlertUpperBoundNegative:  types.StringValue(s.IncidentNoAlertUpperBoundNegative),
+		IsKPI:                              types.BoolValue(s.IsKPI),
+		IsFlappingResultOnly:               types.BoolValue(s.IsFlappingResultOnly),
+		IncidentDurationThreshold:          types.Int64Value(s.IncidentDurationThreshold),
+		DetectionType:                      types.StringValue(s.DetectionType),
+		PatternNameHigher:                  types.StringValue(s.PatternNameHigher),
+		PatternNameLower:                   types.StringValue(s.PatternNameLower),
+		MetricType:                         types.StringValue(s.MetricType),
+		FillZero:                           types.BoolValue(s.FillZero),
+		EnableBaselineNearConstance:        types.BoolValue(s.EnableBaselineNearConstance),
+		ComputeDifference:                  types.BoolValue(s.ComputeDifference),
+		AnomalyGapToleranceDuration:        types.Int64Value(s.AnomalyGapToleranceDuration),
+	}
+	// Treat both nil pointer and the literal string "null" (returned by the API) as Terraform null.
+	if s.RougeValue == nil || *s.RougeValue == "null" {
+		m.RougeValue = types.StringNull()
+	} else {
+		m.RougeValue = types.StringValue(*s.RougeValue)
+	}
+	return m
+}
+
+// buildSingleMetricAlertSettingPost converts a metricAlertSettingModel to a client.MetricAlertSettingPost.
+// metricName is used for the SMetric field (not stored in the model itself).
+func buildSingleMetricAlertSettingPost(metricName string, s metricAlertSettingModel) client.MetricAlertSettingPost {
+	return client.MetricAlertSettingPost{
+		SMetric:                            metricName,
+		ComponentName:                      s.ComponentName.ValueString(),
+		ThresholdAlertLowerBound:           s.ThresholdAlertLowerBound.ValueString(),
+		ThresholdAlertUpperBound:           s.ThresholdAlertUpperBound.ValueString(),
+		ThresholdAlertLowerBoundNegative:   s.ThresholdAlertLowerBoundNegative.ValueString(),
+		ThresholdAlertUpperBoundNegative:   s.ThresholdAlertUpperBoundNegative.ValueString(),
+		ThresholdNoAlertLowerBound:         s.ThresholdNoAlertLowerBound.ValueString(),
+		ThresholdNoAlertUpperBound:         s.ThresholdNoAlertUpperBound.ValueString(),
+		ThresholdNoAlertLowerBoundNegative: s.ThresholdNoAlertLowerBoundNegative.ValueString(),
+		ThresholdNoAlertUpperBoundNegative: s.ThresholdNoAlertUpperBoundNegative.ValueString(),
+		IncidentAlertLowerBound:            s.IncidentAlertLowerBound.ValueString(),
+		IncidentAlertUpperBound:            s.IncidentAlertUpperBound.ValueString(),
+		IncidentAlertLowerBoundNegative:    s.IncidentAlertLowerBoundNegative.ValueString(),
+		IncidentAlertUpperBoundNegative:    s.IncidentAlertUpperBoundNegative.ValueString(),
+		IncidentNoAlertLowerBound:          s.IncidentNoAlertLowerBound.ValueString(),
+		IncidentNoAlertUpperBound:          s.IncidentNoAlertUpperBound.ValueString(),
+		IncidentNoAlertLowerBoundNegative:  s.IncidentNoAlertLowerBoundNegative.ValueString(),
+		IncidentNoAlertUpperBoundNegative:  s.IncidentNoAlertUpperBoundNegative.ValueString(),
+		IsKPI:                              s.IsKPI.ValueBool(),
+		IsFlappingResultOnly:               s.IsFlappingResultOnly.ValueBool(),
+		IncidentDurationThreshold:          s.IncidentDurationThreshold.ValueInt64(),
+		DetectionType:                      s.DetectionType.ValueString(),
+		PatternNameHigher:                  s.PatternNameHigher.ValueString(),
+		PatternNameLower:                   s.PatternNameLower.ValueString(),
+		MetricType:                         s.MetricType.ValueString(),
+		FillZero:                           s.FillZero.ValueBool(),
+		RougeValue:                         client.ConvertRougeValueForPost(s.RougeValue.ValueString()),
+		EnableBaselineNearConstance:        s.EnableBaselineNearConstance.ValueBool(),
+		ComputeDifference:                  s.ComputeDifference.ValueBool(),
+		AnomalyGapToleranceDuration:        s.AnomalyGapToleranceDuration.ValueInt64(),
+	}
+}
+
+// readMetricConfigurationsFromAPI reads current metric configuration state from the API
+// for all metrics listed in existingConfigs.
+func readMetricConfigurationsFromAPI(ctx context.Context, c *client.Client, projectName string, existingConfigs []metricConfigurationModel) ([]metricConfigurationModel, diag.Diagnostics) {
+	var diags diag.Diagnostics
+	if len(existingConfigs) == 0 {
+		return nil, diags
+	}
+
+	escalateMap, err := c.GetMetricComponents(projectName, "escalateIncident")
+	if err != nil {
+		diags.AddWarning("Could not read escalateIncident components", err.Error())
+		escalateMap = make(map[string][]string)
+	}
+	ignoredMap, err := c.GetMetricComponents(projectName, "ignored")
+	if err != nil {
+		diags.AddWarning("Could not read ignored components", err.Error())
+		ignoredMap = make(map[string][]string)
+	}
+
+	var result []metricConfigurationModel
+	for _, existingCfg := range existingConfigs {
+		metricName := existingCfg.MetricName.ValueString()
+
+		// Use an explicit empty slice when the metric has no entries so the framework
+		// stores [] (empty list) in state rather than null. This prevents a perpetual
+		// diff where Terraform plans [] for a null Computed list attribute.
+		escalateComps := escalateMap[metricName]
+		if escalateComps == nil {
+			escalateComps = []string{}
+		}
+		escalateListVal, d := types.ListValueFrom(ctx, types.StringType, escalateComps)
+		diags.Append(d...)
+
+		ignoredComps := ignoredMap[metricName]
+		if ignoredComps == nil {
+			ignoredComps = []string{}
+		}
+		ignoredListVal, d := types.ListValueFrom(ctx, types.StringType, ignoredComps)
+		diags.Append(d...)
+
+		settingEntry, err := c.GetMetricSettings(projectName, metricName)
+		var alertSettingModels []metricAlertSettingModel
+		if err != nil {
+			diags.AddWarning(fmt.Sprintf("Could not read metric settings for %s", metricName), err.Error())
+		} else if settingEntry != nil {
+			alertSettingModels = append(alertSettingModels, buildMetricAlertSettingFromAPI(settingEntry.GlobalSetting))
+			for _, compSetting := range settingEntry.ComponentLevelSettingList {
+				alertSettingModels = append(alertSettingModels, buildMetricAlertSettingFromAPI(compSetting))
+			}
+		}
+
+		alertSettingsListVal, d := types.ListValueFrom(ctx, types.ObjectType{AttrTypes: metricAlertSettingAttrTypes()}, alertSettingModels)
+		diags.Append(d...)
+
+		result = append(result, metricConfigurationModel{
+			MetricName:                 types.StringValue(metricName),
+			EscalateIncidentComponents: escalateListVal,
+			IgnoredComponents:          ignoredListVal,
+			MetricAlertSettings:        alertSettingsListVal,
+		})
+	}
+	return result, diags
+}
+
+// applyMetricConfigurations pushes metric_configurations to the API for all metrics in planConfigs.
+func applyMetricConfigurations(ctx context.Context, c *client.Client, projectName string, planConfigs []metricConfigurationModel, patternIdRule int) diag.Diagnostics {
+	var diags diag.Diagnostics
+
+	for _, cfg := range planConfigs {
+		metricName := cfg.MetricName.ValueString()
+
+		if !cfg.EscalateIncidentComponents.IsNull() && !cfg.EscalateIncidentComponents.IsUnknown() {
+			var escalateComps []string
+			d := cfg.EscalateIncidentComponents.ElementsAs(ctx, &escalateComps, false)
+			diags.Append(d...)
+			if !diags.HasError() {
+				if err := c.SetMetricComponents(projectName, metricName, "escalateIncident", escalateComps); err != nil {
+					diags.AddError(fmt.Sprintf("Error setting escalateIncident components for %s", metricName), err.Error())
+				}
+			}
+		}
+
+		if !cfg.IgnoredComponents.IsNull() && !cfg.IgnoredComponents.IsUnknown() {
+			var ignoredComps []string
+			d := cfg.IgnoredComponents.ElementsAs(ctx, &ignoredComps, false)
+			diags.Append(d...)
+			if !diags.HasError() {
+				if err := c.SetMetricComponents(projectName, metricName, "ignored", ignoredComps); err != nil {
+					diags.AddError(fmt.Sprintf("Error setting ignored components for %s", metricName), err.Error())
+				}
+			}
+		}
+
+		if !cfg.MetricAlertSettings.IsNull() && !cfg.MetricAlertSettings.IsUnknown() {
+			var alertSettings []metricAlertSettingModel
+			d := cfg.MetricAlertSettings.ElementsAs(ctx, &alertSettings, false)
+			diags.Append(d...)
+			if !diags.HasError() && len(alertSettings) > 0 {
+				var postData []client.MetricAlertSettingPost
+				for _, s := range alertSettings {
+					postData = append(postData, buildSingleMetricAlertSettingPost(metricName, s))
+				}
+				jsonBytes, err := json.Marshal(postData)
+				if err != nil {
+					diags.AddError(fmt.Sprintf("Error marshaling metric alert settings for %s", metricName), err.Error())
+					continue
+				}
+				if err := c.SetMetricSettings(projectName, patternIdRule, jsonBytes); err != nil {
+					diags.AddError(fmt.Sprintf("Error setting metric alert settings for %s", metricName), err.Error())
+				}
+			}
+		}
+	}
+	return diags
+}
+
+// normalizeMetricConfigsForState converts null component lists to empty lists so that
+// Terraform's state always holds [] (not null) for escalate_incident_components and
+// ignored_components. Without this, Optional+Computed null attributes cause a perpetual
+// plan diff: Terraform plans [] for null Computed list attributes, apply stores null
+// from config, and the cycle repeats.
+func normalizeMetricConfigsForState(ctx context.Context, configs []metricConfigurationModel) ([]metricConfigurationModel, diag.Diagnostics) {
+	var diags diag.Diagnostics
+	emptyList, d := types.ListValueFrom(ctx, types.StringType, []string{})
+	diags.Append(d...)
+	if diags.HasError() {
+		return configs, diags
+	}
+	for i, mc := range configs {
+		if mc.EscalateIncidentComponents.IsNull() {
+			configs[i].EscalateIncidentComponents = emptyList
+		}
+		if mc.IgnoredComponents.IsNull() {
+			configs[i].IgnoredComponents = emptyList
+		}
+	}
+	return configs, diags
 }
 
 // splitByComma splits a string by comma. Extracted to avoid repetition in date parsing.

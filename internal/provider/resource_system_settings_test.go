@@ -338,3 +338,228 @@ resource "insightfinder_system_settings" "test" {
 }
 `
 }
+
+func TestAccSystemSettingsResource_SystemDownNotification(t *testing.T) {
+	resource.Test(t, resource.TestCase{
+		PreCheck:                 func() { testAccPreCheck(t) },
+		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
+		Steps: []resource.TestStep{
+			{
+				Config: testAccSystemSettingsResourceConfigSystemDown("test-system-sysdown"),
+				Check: resource.ComposeAggregateTestCheckFunc(
+					resource.TestCheckResourceAttr("insightfinder_system_settings.test", "system_name", "test-system-sysdown"),
+					resource.TestCheckResourceAttr("insightfinder_system_settings.test", "notifications_settings.system_down_notification.enable_system_down_email_alert", "true"),
+					resource.TestCheckResourceAttr("insightfinder_system_settings.test", "notifications_settings.system_down_notification.email_dampening_period", "3600000"),
+					resource.TestCheckResourceAttr("insightfinder_system_settings.test", "notifications_settings.system_down_notification.email_set.0", "ops@example.com"),
+					resource.TestCheckResourceAttrSet("insightfinder_system_settings.test", "id"),
+				),
+			},
+			{
+				ResourceName:      "insightfinder_system_settings.test",
+				ImportState:       true,
+				ImportStateVerify: true,
+			},
+		},
+	})
+}
+
+func TestAccSystemSettingsResource_DailyWeeklyReport(t *testing.T) {
+	resource.Test(t, resource.TestCase{
+		PreCheck:                 func() { testAccPreCheck(t) },
+		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
+		Steps: []resource.TestStep{
+			{
+				Config: testAccSystemSettingsResourceConfigReports("test-system-reports"),
+				Check: resource.ComposeAggregateTestCheckFunc(
+					resource.TestCheckResourceAttr("insightfinder_system_settings.test", "system_name", "test-system-reports"),
+					resource.TestCheckResourceAttr("insightfinder_system_settings.test", "notifications_settings.daily_report_notification.enable_insights_report", "true"),
+					resource.TestCheckResourceAttr("insightfinder_system_settings.test", "notifications_settings.daily_report_notification.email_set.0", "reports@example.com"),
+					resource.TestCheckResourceAttr("insightfinder_system_settings.test", "notifications_settings.weekly_report_notification.enable_insights_report", "true"),
+					resource.TestCheckResourceAttr("insightfinder_system_settings.test", "notifications_settings.weekly_report_notification.email_set.0", "exec@example.com"),
+					resource.TestCheckResourceAttrSet("insightfinder_system_settings.test", "id"),
+				),
+			},
+		},
+	})
+}
+
+func TestAccSystemSettingsResource_InstanceDownNotification(t *testing.T) {
+	resource.Test(t, resource.TestCase{
+		PreCheck:                 func() { testAccPreCheck(t) },
+		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
+		Steps: []resource.TestStep{
+			{
+				Config: testAccSystemSettingsResourceConfigInstanceDown("test-system-instdown"),
+				Check: resource.ComposeAggregateTestCheckFunc(
+					resource.TestCheckResourceAttr("insightfinder_system_settings.test", "system_name", "test-system-instdown"),
+					resource.TestCheckResourceAttr("insightfinder_system_settings.test", "notifications_settings.instance_down_notification.0.project_name", "my-project"),
+					resource.TestCheckResourceAttr("insightfinder_system_settings.test", "notifications_settings.instance_down_notification.0.instance_down_enable", "true"),
+					resource.TestCheckResourceAttr("insightfinder_system_settings.test", "notifications_settings.instance_down_notification.0.instance_down_threshold", "300000"),
+					resource.TestCheckResourceAttr("insightfinder_system_settings.test", "notifications_settings.instance_down_notification.0.instance_down_emails.0", "oncall@example.com"),
+					resource.TestCheckResourceAttrSet("insightfinder_system_settings.test", "id"),
+				),
+			},
+			{
+				Config: testAccSystemSettingsResourceConfigInstanceDownUpdated("test-system-instdown"),
+				Check: resource.ComposeAggregateTestCheckFunc(
+					resource.TestCheckResourceAttr("insightfinder_system_settings.test", "notifications_settings.instance_down_notification.0.instance_down_enable", "false"),
+					resource.TestCheckResourceAttr("insightfinder_system_settings.test", "notifications_settings.instance_down_notification.0.instance_down_threshold", "600000"),
+				),
+			},
+		},
+	})
+}
+
+func testAccSystemSettingsResourceConfigSystemDown(systemName string) string {
+	return `
+resource "insightfinder_system_settings" "test" {
+  system_name = "` + systemName + `"
+
+  notifications_settings = {
+    prediction_email                       = ""
+    enable_system_down_email_alert         = false
+    alert_health_score                     = 0.5
+    aggregation_interval                   = 5
+    alert_frequency                        = 0
+    email_dampening_period                 = 3600000
+    alerts_email_dampening_period          = 3600000
+    prediction_email_dampening_period      = 3600000
+    incident_dampening_window              = 3600000
+    hide_flag                              = false
+    enable_splunk_export                   = false
+    only_send_with_rca                     = false
+    enable_incident_prediction_email_alert = false
+    enable_incident_detection_email_alert  = false
+    enable_alerts_email                    = false
+    enable_health_email_alert              = false
+    enable_root_cause_email_alert          = false
+    order                                  = 0
+
+    system_down_notification = {
+      enable_system_down_email_alert = true
+      email_dampening_period         = 3600000
+      email_set                      = ["ops@example.com"]
+    }
+  }
+}
+`
+}
+
+func testAccSystemSettingsResourceConfigReports(systemName string) string {
+	return `
+resource "insightfinder_system_settings" "test" {
+  system_name = "` + systemName + `"
+
+  notifications_settings = {
+    prediction_email                       = ""
+    enable_system_down_email_alert         = false
+    alert_health_score                     = 0.5
+    aggregation_interval                   = 5
+    alert_frequency                        = 0
+    email_dampening_period                 = 3600000
+    alerts_email_dampening_period          = 3600000
+    prediction_email_dampening_period      = 3600000
+    incident_dampening_window              = 3600000
+    hide_flag                              = false
+    enable_splunk_export                   = false
+    only_send_with_rca                     = false
+    enable_incident_prediction_email_alert = false
+    enable_incident_detection_email_alert  = false
+    enable_alerts_email                    = false
+    enable_health_email_alert              = false
+    enable_root_cause_email_alert          = false
+    order                                  = 0
+
+    daily_report_notification = {
+      enable_insights_report = true
+      email_set              = ["reports@example.com"]
+    }
+
+    weekly_report_notification = {
+      enable_insights_report = true
+      email_set              = ["exec@example.com"]
+    }
+  }
+}
+`
+}
+
+func testAccSystemSettingsResourceConfigInstanceDown(systemName string) string {
+	return `
+resource "insightfinder_system_settings" "test" {
+  system_name = "` + systemName + `"
+
+  notifications_settings = {
+    prediction_email                       = ""
+    enable_system_down_email_alert         = false
+    alert_health_score                     = 0.5
+    aggregation_interval                   = 5
+    alert_frequency                        = 0
+    email_dampening_period                 = 3600000
+    alerts_email_dampening_period          = 3600000
+    prediction_email_dampening_period      = 3600000
+    incident_dampening_window              = 3600000
+    hide_flag                              = false
+    enable_splunk_export                   = false
+    only_send_with_rca                     = false
+    enable_incident_prediction_email_alert = false
+    enable_incident_detection_email_alert  = false
+    enable_alerts_email                    = false
+    enable_health_email_alert              = false
+    enable_root_cause_email_alert          = false
+    order                                  = 0
+
+    instance_down_notification = [
+      {
+        project_name                = "my-project"
+        instance_down_enable        = true
+        instance_down_dampening     = 1800000
+        instance_down_threshold     = 300000
+        instance_down_report_number = 2
+        instance_down_emails        = ["oncall@example.com"]
+      }
+    ]
+  }
+}
+`
+}
+
+func testAccSystemSettingsResourceConfigInstanceDownUpdated(systemName string) string {
+	return `
+resource "insightfinder_system_settings" "test" {
+  system_name = "` + systemName + `"
+
+  notifications_settings = {
+    prediction_email                       = ""
+    enable_system_down_email_alert         = false
+    alert_health_score                     = 0.5
+    aggregation_interval                   = 5
+    alert_frequency                        = 0
+    email_dampening_period                 = 3600000
+    alerts_email_dampening_period          = 3600000
+    prediction_email_dampening_period      = 3600000
+    incident_dampening_window              = 3600000
+    hide_flag                              = false
+    enable_splunk_export                   = false
+    only_send_with_rca                     = false
+    enable_incident_prediction_email_alert = false
+    enable_incident_detection_email_alert  = false
+    enable_alerts_email                    = false
+    enable_health_email_alert              = false
+    enable_root_cause_email_alert          = false
+    order                                  = 0
+
+    instance_down_notification = [
+      {
+        project_name                = "my-project"
+        instance_down_enable        = false
+        instance_down_dampening     = 3600000
+        instance_down_threshold     = 600000
+        instance_down_report_number = 5
+        instance_down_emails        = []
+      }
+    ]
+  }
+}
+`
+}
