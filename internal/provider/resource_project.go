@@ -8,7 +8,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"sort"
 
 	"github.com/hashicorp/terraform-plugin-framework/attr"
 	"github.com/hashicorp/terraform-plugin-framework/path"
@@ -163,9 +162,9 @@ type projectResourceModel struct {
 	WebhookHeaderList         types.String `tfsdk:"webhook_header_list"`
 	SharedUsernames           types.String `tfsdk:"shared_usernames"`
 	LogLabelSettings          types.List   `tfsdk:"log_label_settings"`
-	JsonKeySettings           types.List   `tfsdk:"json_key_settings"`
+	JsonKeySettings           types.Set    `tfsdk:"json_key_settings"`
 	ProjectServiceNowSettings types.Object `tfsdk:"project_servicenow_settings"`
-	HolidaySettings           types.List   `tfsdk:"holiday_settings"`
+	HolidaySettings           types.Set    `tfsdk:"holiday_settings"`
 }
 
 type holidaySettingModel struct {
@@ -751,7 +750,7 @@ func (r *projectResource) Schema(_ context.Context, _ resource.SchemaRequest, re
 				Optional:    true,
 				Computed:    true,
 			},
-			"log_label_settings": schema.ListNestedAttribute{
+			"log_label_settings": schema.SetNestedAttribute{
 				Description: "List of log label settings for the project. Each setting is applied individually via API.",
 				Optional:    true,
 				Computed:    true,
@@ -830,7 +829,7 @@ func (r *projectResource) Schema(_ context.Context, _ resource.SchemaRequest, re
 					},
 				},
 			},
-			"holiday_settings": schema.ListNestedAttribute{
+			"holiday_settings": schema.SetNestedAttribute{
 				Description: "List of holiday settings for the project. Each holiday has a name, start date, and end date (MM-DD format).",
 				Optional:    true,
 				Computed:    true,
@@ -851,8 +850,8 @@ func (r *projectResource) Schema(_ context.Context, _ resource.SchemaRequest, re
 					},
 				},
 			},
-			"json_key_settings": schema.ListNestedAttribute{
-				Description: "List of JSON key settings for the project. Manages custom JSON fields extracted from logs.",
+			"json_key_settings": schema.SetNestedAttribute{
+				Description: "Set of JSON key settings for the project. Manages custom JSON fields extracted from logs.",
 				Optional:    true,
 				Computed:    true,
 				NestedObject: schema.NestedAttributeObject{
@@ -2010,11 +2009,10 @@ func (r *projectResource) Create(ctx context.Context, req resource.CreateRequest
 			}
 		}
 
-		// Preserve the config order in plan
 		plan.HolidaySettings = config.HolidaySettings
 	} else {
 		// No holiday settings in config - set to null
-		plan.HolidaySettings = types.ListNull(types.ObjectType{
+		plan.HolidaySettings = types.SetNull(types.ObjectType{
 			AttrTypes: map[string]attr.Type{
 				"name":       types.StringType,
 				"start_date": types.StringType,
@@ -2091,7 +2089,7 @@ func (r *projectResource) Create(ctx context.Context, req resource.CreateRequest
 		plan.JsonKeySettings = config.JsonKeySettings
 	} else {
 		// No JSON key settings in config - set to null
-		plan.JsonKeySettings = types.ListNull(types.ObjectType{
+		plan.JsonKeySettings = types.SetNull(types.ObjectType{
 			AttrTypes: map[string]attr.Type{
 				"json_key":                types.StringType,
 				"type":                    types.StringType,
@@ -2436,14 +2434,8 @@ func (r *projectResource) Read(ctx context.Context, req resource.ReadRequest, re
 		// Convert API response to state model
 		// Response format: {"holidayName": "startDate,endDate", ...}
 
-		// First, try to preserve the order from existing state
-		var existingHolidays []holidaySettingModel
-		if !state.HolidaySettings.IsNull() && !state.HolidaySettings.IsUnknown() {
-			state.HolidaySettings.ElementsAs(ctx, &existingHolidays, false)
-		}
-
-		// Create a map of API holidays for lookup
-		apiHolidayMap := make(map[string]holidaySettingModel)
+		// Build holiday settings from API response
+		var holidaySettings []holidaySettingModel
 		for name, dates := range holidays {
 			// Parse the dates string "MM-DD,MM-DD"
 			var startDate, endDate string
@@ -2472,42 +2464,16 @@ func (r *projectResource) Read(ctx context.Context, req resource.ReadRequest, re
 				}
 			}
 
-			apiHolidayMap[name] = holidaySettingModel{
+			holidaySettings = append(holidaySettings, holidaySettingModel{
 				Name:      types.StringValue(name),
 				StartDate: types.StringValue(startDate),
 				EndDate:   types.StringValue(endDate),
-			}
+			})
 		}
 
-		// Build the final list, preserving existing order where possible
-		var holidaySettings []holidaySettingModel
-		seenNames := make(map[string]bool)
-
-		// First, add holidays that were in the existing state (preserving order)
-		for _, existing := range existingHolidays {
-			name := existing.Name.ValueString()
-			if apiHoliday, exists := apiHolidayMap[name]; exists {
-				holidaySettings = append(holidaySettings, apiHoliday)
-				seenNames[name] = true
-			}
-		}
-
-		// Then, add any new holidays from API that weren't in existing state (sorted)
-		var newHolidays []holidaySettingModel
-		for name, holiday := range apiHolidayMap {
-			if !seenNames[name] {
-				newHolidays = append(newHolidays, holiday)
-			}
-		}
-		// Sort new holidays by name
-		sort.Slice(newHolidays, func(i, j int) bool {
-			return newHolidays[i].Name.ValueString() < newHolidays[j].Name.ValueString()
-		})
-		holidaySettings = append(holidaySettings, newHolidays...)
-
-		// Convert to types.List
+		// Convert to types.Set
 		if len(holidaySettings) > 0 {
-			listValue, diags := types.ListValueFrom(ctx, types.ObjectType{
+			setValue, diags := types.SetValueFrom(ctx, types.ObjectType{
 				AttrTypes: map[string]attr.Type{
 					"name":       types.StringType,
 					"start_date": types.StringType,
@@ -2516,10 +2482,10 @@ func (r *projectResource) Read(ctx context.Context, req resource.ReadRequest, re
 			}, holidaySettings)
 			resp.Diagnostics.Append(diags...)
 			if !resp.Diagnostics.HasError() {
-				state.HolidaySettings = listValue
+				state.HolidaySettings = setValue
 			}
 		} else {
-			state.HolidaySettings = types.ListNull(types.ObjectType{
+			state.HolidaySettings = types.SetNull(types.ObjectType{
 				AttrTypes: map[string]attr.Type{
 					"name":       types.StringType,
 					"start_date": types.StringType,
@@ -2558,53 +2524,21 @@ func (r *projectResource) Read(ctx context.Context, req resource.ReadRequest, re
 			dampeningFieldSet[key] = true
 		}
 
-		// Extract existing state for order preservation
-		var existingJsonKeys []jsonKeySettingModel
-		if !state.JsonKeySettings.IsNull() && !state.JsonKeySettings.IsUnknown() {
-			state.JsonKeySettings.ElementsAs(ctx, &existingJsonKeys, false)
-		}
-
-		// Create a map of API JSON keys for lookup
-		apiJsonKeyMap := make(map[string]jsonKeySettingModel)
+		// Build the set of JSON key settings from API response
+		var jsonKeySettings []jsonKeySettingModel
 		for _, jsonKey := range jsonKeyTypes {
-			apiJsonKeyMap[jsonKey.JsonKey] = jsonKeySettingModel{
+			jsonKeySettings = append(jsonKeySettings, jsonKeySettingModel{
 				JsonKey:               types.StringValue(jsonKey.JsonKey),
 				Type:                  types.StringValue(jsonKey.Type),
 				SummarySetting:        types.BoolValue(summarySet[jsonKey.JsonKey]),
 				MetafieldSetting:      types.BoolValue(metafieldSet[jsonKey.JsonKey]),
 				DampeningfieldSetting: types.BoolValue(dampeningFieldSet[jsonKey.JsonKey]),
-			}
+			})
 		}
 
-		// Build the final list, preserving existing order where possible
-		var jsonKeySettings []jsonKeySettingModel
-		seenKeys := make(map[string]bool)
-
-		// First, add JSON keys that were in the existing state (preserving order)
-		for _, existing := range existingJsonKeys {
-			key := existing.JsonKey.ValueString()
-			if apiKey, exists := apiJsonKeyMap[key]; exists {
-				jsonKeySettings = append(jsonKeySettings, apiKey)
-				seenKeys[key] = true
-			}
-		}
-
-		// Then, add any new JSON keys from API that weren't in existing state (sorted)
-		var newKeys []jsonKeySettingModel
-		for key, jsonKey := range apiJsonKeyMap {
-			if !seenKeys[key] {
-				newKeys = append(newKeys, jsonKey)
-			}
-		}
-		// Sort new keys by json_key name for consistent ordering
-		sort.Slice(newKeys, func(i, j int) bool {
-			return newKeys[i].JsonKey.ValueString() < newKeys[j].JsonKey.ValueString()
-		})
-		jsonKeySettings = append(jsonKeySettings, newKeys...)
-
-		// Convert to types.List
+		// Convert to types.Set
 		if len(jsonKeySettings) > 0 {
-			listValue, diags := types.ListValueFrom(ctx, types.ObjectType{
+			setValue, diags := types.SetValueFrom(ctx, types.ObjectType{
 				AttrTypes: map[string]attr.Type{
 					"json_key":                types.StringType,
 					"type":                    types.StringType,
@@ -2615,10 +2549,10 @@ func (r *projectResource) Read(ctx context.Context, req resource.ReadRequest, re
 			}, jsonKeySettings)
 			resp.Diagnostics.Append(diags...)
 			if !resp.Diagnostics.HasError() {
-				state.JsonKeySettings = listValue
+				state.JsonKeySettings = setValue
 			}
 		} else {
-			state.JsonKeySettings = types.ListNull(types.ObjectType{
+			state.JsonKeySettings = types.SetNull(types.ObjectType{
 				AttrTypes: map[string]attr.Type{
 					"json_key":                types.StringType,
 					"type":                    types.StringType,
@@ -2629,7 +2563,7 @@ func (r *projectResource) Read(ctx context.Context, req resource.ReadRequest, re
 			})
 		}
 	} else {
-		state.JsonKeySettings = types.ListNull(types.ObjectType{
+		state.JsonKeySettings = types.SetNull(types.ObjectType{
 			AttrTypes: map[string]attr.Type{
 				"json_key":                types.StringType,
 				"type":                    types.StringType,
@@ -3225,7 +3159,6 @@ func (r *projectResource) Update(ctx context.Context, req resource.UpdateRequest
 			}
 		}
 
-		// Preserve the config order in plan
 		plan.HolidaySettings = config.HolidaySettings
 	} else {
 		// No holiday settings in config - delete all existing holidays
@@ -3254,7 +3187,7 @@ func (r *projectResource) Update(ctx context.Context, req resource.UpdateRequest
 		}
 
 		// Set to null
-		plan.HolidaySettings = types.ListNull(types.ObjectType{
+		plan.HolidaySettings = types.SetNull(types.ObjectType{
 			AttrTypes: map[string]attr.Type{
 				"name":       types.StringType,
 				"start_date": types.StringType,
@@ -3327,11 +3260,10 @@ func (r *projectResource) Update(ctx context.Context, req resource.UpdateRequest
 			return
 		}
 
-		// Preserve the config order in plan
 		plan.JsonKeySettings = config.JsonKeySettings
 	} else {
 		// No JSON key settings in config - set to null
-		plan.JsonKeySettings = types.ListNull(types.ObjectType{
+		plan.JsonKeySettings = types.SetNull(types.ObjectType{
 			AttrTypes: map[string]attr.Type{
 				"json_key":                types.StringType,
 				"type":                    types.StringType,
