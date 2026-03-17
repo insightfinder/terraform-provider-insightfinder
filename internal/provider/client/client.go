@@ -155,18 +155,26 @@ func (c *Client) DoMultipartFormRequest(method, path string, fields map[string]s
 	w := multipart.NewWriter(&buf)
 
 	// Add authentication fields
-	w.WriteField("userName", c.Username)
-	w.WriteField("licenseKey", c.LicenseKey)
+	if err := w.WriteField("userName", c.Username); err != nil {
+		return nil, 0, fmt.Errorf("failed to write userName field: %w", err)
+	}
+	if err := w.WriteField("licenseKey", c.LicenseKey); err != nil {
+		return nil, 0, fmt.Errorf("failed to write licenseKey field: %w", err)
+	}
 
 	for k, v := range fields {
-		w.WriteField(k, v)
+		if err := w.WriteField(k, v); err != nil {
+			return nil, 0, fmt.Errorf("failed to write field %s: %w", k, err)
+		}
 	}
 	for fieldName, data := range fileParts {
 		part, err := w.CreateFormFile(fieldName, fieldName+".json")
 		if err != nil {
 			return nil, 0, fmt.Errorf("failed to create form file part: %w", err)
 		}
-		part.Write(data)
+		if _, err := part.Write(data); err != nil {
+			return nil, 0, fmt.Errorf("failed to write file data for part %s: %w", fieldName, err)
+		}
 	}
 	w.Close()
 
