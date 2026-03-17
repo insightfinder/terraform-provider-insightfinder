@@ -8,8 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [1.8.1] - 2026-03-17
 
 ### Fixed
-- **insightfinder_project**: Changed `json_key_settings` from a list to a set so that order changes in the API response no longer produce a diff in the Terraform plan
-- **insightfinder_project**: Changed `holiday_settings` from a list to a set for the same reason — order of holidays returned by the API is now irrelevant
+- **insightfinder_project**: Changed `json_key_settings`, `holiday_settings`, and `log_label_settings` from lists to sets so that order changes in the API response no longer produce a diff in the Terraform plan
 
 ## [1.8.0] - 2026-03-16
 

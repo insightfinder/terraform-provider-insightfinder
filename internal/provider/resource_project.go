@@ -161,7 +161,7 @@ type projectResourceModel struct {
 	LogToLogSettingList       types.String `tfsdk:"log_to_log_setting_list"`
 	WebhookHeaderList         types.String `tfsdk:"webhook_header_list"`
 	SharedUsernames           types.String `tfsdk:"shared_usernames"`
-	LogLabelSettings          types.List   `tfsdk:"log_label_settings"`
+	LogLabelSettings          types.Set    `tfsdk:"log_label_settings"`
 	JsonKeySettings           types.Set    `tfsdk:"json_key_settings"`
 	ProjectServiceNowSettings types.Object `tfsdk:"project_servicenow_settings"`
 	HolidaySettings           types.Set    `tfsdk:"holiday_settings"`
@@ -1870,19 +1870,19 @@ func (r *projectResource) Create(ctx context.Context, req resource.CreateRequest
 				})
 			}
 
-			// Convert back to types.List
-			listValue, diags := types.ListValueFrom(ctx, config.LogLabelSettings.ElementType(ctx), normalizedSettings)
+			// Convert back to types.Set
+			setValue, diags := types.SetValueFrom(ctx, config.LogLabelSettings.ElementType(ctx), normalizedSettings)
 			resp.Diagnostics.Append(diags...)
 			if resp.Diagnostics.HasError() {
 				return
 			}
-			plan.LogLabelSettings = listValue
+			plan.LogLabelSettings = setValue
 		}
 	}
 
-	// If LogLabelSettings is null or empty, set it to an empty list
+	// If LogLabelSettings is null or empty, set it to an empty set
 	if config.LogLabelSettings.IsNull() {
-		emptyList, diags := types.ListValueFrom(ctx, types.ObjectType{
+		emptySet, diags := types.SetValueFrom(ctx, types.ObjectType{
 			AttrTypes: map[string]attr.Type{
 				"label_type":       types.StringType,
 				"log_label_string": types.StringType,
@@ -1890,7 +1890,7 @@ func (r *projectResource) Create(ctx context.Context, req resource.CreateRequest
 		}, []logLabelSettingModel{})
 		resp.Diagnostics.Append(diags...)
 		if !resp.Diagnostics.HasError() {
-			plan.LogLabelSettings = emptyList
+			plan.LogLabelSettings = emptySet
 		}
 	}
 
@@ -2355,8 +2355,8 @@ func (r *projectResource) Read(ctx context.Context, req resource.ReadRequest, re
 		// Convert API response to state model, preserving the order from existing state
 		convertedSettings := convertLogLabelsToState(logLabels, existingSettings)
 
-		// Convert back to types.List
-		listValue, diags := types.ListValueFrom(ctx, types.ObjectType{
+		// Convert back to types.Set
+		setValue, diags := types.SetValueFrom(ctx, types.ObjectType{
 			AttrTypes: map[string]attr.Type{
 				"label_type":       types.StringType,
 				"log_label_string": types.StringType,
@@ -2364,7 +2364,7 @@ func (r *projectResource) Read(ctx context.Context, req resource.ReadRequest, re
 		}, convertedSettings)
 		resp.Diagnostics.Append(diags...)
 		if !resp.Diagnostics.HasError() {
-			state.LogLabelSettings = listValue
+			state.LogLabelSettings = setValue
 		}
 	}
 
@@ -2952,8 +2952,8 @@ func (r *projectResource) Update(ctx context.Context, req resource.UpdateRequest
 			plan.LogLabelSettings = config.LogLabelSettings
 		}
 	} else if config.LogLabelSettings.IsNull() {
-		// Explicitly set empty list if none configured
-		emptyList, diags := types.ListValueFrom(ctx, types.ObjectType{
+		// Explicitly set empty set if none configured
+		emptySet, diags := types.SetValueFrom(ctx, types.ObjectType{
 			AttrTypes: map[string]attr.Type{
 				"label_type":       types.StringType,
 				"log_label_string": types.StringType,
@@ -2961,7 +2961,7 @@ func (r *projectResource) Update(ctx context.Context, req resource.UpdateRequest
 		}, []logLabelSettingModel{})
 		resp.Diagnostics.Append(diags...)
 		if !resp.Diagnostics.HasError() {
-			plan.LogLabelSettings = emptyList
+			plan.LogLabelSettings = emptySet
 		}
 	}
 
