@@ -70,6 +70,9 @@ resource "insightfinder_servicenow" "full" {
   # Only correlate events within a 7-day window
   trigger_window_in_mills = 604800000
 
+  # Enable feedback collection from ServiceNow
+  enable_feedback_collect = true
+
   # Map InsightFinder projects to ServiceNow tables
   table_mapping = {
     "my-project"      = "incident"
@@ -99,6 +102,7 @@ resource "insightfinder_servicenow" "full" {
 - `service_now_field` (String) ServiceNow field to write integration content to (e.g., `u_probable_cause`).
 - `content_source` (String, Computed) ServiceNow field to write incident notes to (e.g., `work_notes`, `comments`). Defaults to `work_notes`.
 - `trigger_window_in_mills` (Number) Time window in milliseconds within which events are correlated into a single incident (e.g., `604800000` for 7 days).
+- `enable_feedback_collect` (Boolean, Computed) Whether to enable ServiceNow feedback collection. Defaults to `false`.
 - `table_mapping` (Map of String) Mapping of InsightFinder project names to ServiceNow table names (e.g., `{ "my-project" = "incident" }`).
 
 ### Read-Only

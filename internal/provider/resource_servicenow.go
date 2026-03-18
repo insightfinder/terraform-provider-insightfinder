@@ -12,6 +12,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema/booldefault"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringdefault"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
@@ -40,22 +41,23 @@ type servicenowResource struct {
 
 // servicenowResourceModel maps the resource schema data.
 type servicenowResourceModel struct {
-	ID                   types.String `tfsdk:"id"`
-	Account              types.String `tfsdk:"account"`
-	ServiceHost          types.String `tfsdk:"service_host"`
-	Password             types.String `tfsdk:"password"`
-	Proxy                types.String `tfsdk:"proxy"`
-	DampeningPeriod      types.Int64  `tfsdk:"dampening_period"`
-	AppID                types.String `tfsdk:"app_id"`
-	AppKey               types.String `tfsdk:"app_key"`
-	AuthType             types.String `tfsdk:"auth_type"`
-	SystemNames          types.List   `tfsdk:"system_names"`
-	Options              types.Set    `tfsdk:"options"`
-	ContentOption        types.Set    `tfsdk:"content_option"`
-	ServiceNowField      types.String `tfsdk:"service_now_field"`
-	ContentSource        types.String `tfsdk:"content_source"`
-	TriggerWindowInMills types.Int64  `tfsdk:"trigger_window_in_mills"`
-	TableMapping         types.Map    `tfsdk:"table_mapping"`
+	ID                    types.String `tfsdk:"id"`
+	Account               types.String `tfsdk:"account"`
+	ServiceHost           types.String `tfsdk:"service_host"`
+	Password              types.String `tfsdk:"password"`
+	Proxy                 types.String `tfsdk:"proxy"`
+	DampeningPeriod       types.Int64  `tfsdk:"dampening_period"`
+	AppID                 types.String `tfsdk:"app_id"`
+	AppKey                types.String `tfsdk:"app_key"`
+	AuthType              types.String `tfsdk:"auth_type"`
+	SystemNames           types.List   `tfsdk:"system_names"`
+	Options               types.Set    `tfsdk:"options"`
+	ContentOption         types.Set    `tfsdk:"content_option"`
+	ServiceNowField       types.String `tfsdk:"service_now_field"`
+	ContentSource         types.String `tfsdk:"content_source"`
+	TriggerWindowInMills  types.Int64  `tfsdk:"trigger_window_in_mills"`
+	EnableFeedbackCollect types.Bool   `tfsdk:"enable_feedback_collect"`
+	TableMapping          types.Map    `tfsdk:"table_mapping"`
 }
 
 // Metadata returns the resource type name.
@@ -146,6 +148,12 @@ func (r *servicenowResource) Schema(_ context.Context, _ resource.SchemaRequest,
 			"trigger_window_in_mills": schema.Int64Attribute{
 				Description: "Trigger window in milliseconds for ServiceNow integration (e.g., 604800000 for 7 days).",
 				Optional:    true,
+			},
+			"enable_feedback_collect": schema.BoolAttribute{
+				Description: "Whether to enable ServiceNow feedback collection.",
+				Optional:    true,
+				Computed:    true,
+				Default:     booldefault.StaticBool(false),
 			},
 			"table_mapping": schema.MapAttribute{
 				Description: "Mapping of InsightFinder project names to ServiceNow table names (e.g., {\"my-project\" = \"incident\"}).",
@@ -255,20 +263,21 @@ func (r *servicenowResource) Create(ctx context.Context, req resource.CreateRequ
 	}
 
 	config := &client.ServiceNowConfig{
-		Account:              plan.Account.ValueString(),
-		ServiceHost:          plan.ServiceHost.ValueString(),
-		Password:             plan.Password.ValueString(),
-		Proxy:                plan.Proxy.ValueString(),
-		DampeningPeriod:      int(plan.DampeningPeriod.ValueInt64()),
-		AppID:                plan.AppID.ValueString(),
-		AppKey:               plan.AppKey.ValueString(),
-		AuthType:             authType,
-		SystemIDs:            systemIDs,
-		Options:              options,
-		ContentOption:        contentOption,
-		ServiceNowField:      plan.ServiceNowField.ValueString(),
-		ContentSource:        plan.ContentSource.ValueString(),
-		TriggerWindowInMills: plan.TriggerWindowInMills.ValueInt64(),
+		Account:               plan.Account.ValueString(),
+		ServiceHost:           plan.ServiceHost.ValueString(),
+		Password:              plan.Password.ValueString(),
+		Proxy:                 plan.Proxy.ValueString(),
+		DampeningPeriod:       int(plan.DampeningPeriod.ValueInt64()),
+		AppID:                 plan.AppID.ValueString(),
+		AppKey:                plan.AppKey.ValueString(),
+		AuthType:              authType,
+		SystemIDs:             systemIDs,
+		Options:               options,
+		ContentOption:         contentOption,
+		ServiceNowField:       plan.ServiceNowField.ValueString(),
+		ContentSource:         plan.ContentSource.ValueString(),
+		TriggerWindowInMills:  plan.TriggerWindowInMills.ValueInt64(),
+		EnableFeedbackCollect: plan.EnableFeedbackCollect.ValueBool(),
 	}
 
 	err := r.client.CreateOrUpdateServiceNowConfig(config, r.client.Username, true)
@@ -411,6 +420,8 @@ func (r *servicenowResource) Read(ctx context.Context, req resource.ReadRequest,
 		state.TriggerWindowInMills = types.Int64Null()
 	}
 
+	state.EnableFeedbackCollect = types.BoolValue(config.EnableFeedbackCollect)
+
 	if len(config.TableMapping) > 0 {
 		tableMappingValues := make(map[string]attr.Value, len(config.TableMapping))
 		for _, row := range config.TableMapping {
@@ -531,20 +542,21 @@ func (r *servicenowResource) Update(ctx context.Context, req resource.UpdateRequ
 	}
 
 	config := &client.ServiceNowConfig{
-		Account:              plan.Account.ValueString(),
-		ServiceHost:          plan.ServiceHost.ValueString(),
-		Password:             plan.Password.ValueString(),
-		Proxy:                plan.Proxy.ValueString(),
-		DampeningPeriod:      int(plan.DampeningPeriod.ValueInt64()),
-		AppID:                appIDValue,
-		AppKey:               appKeyValue,
-		AuthType:             authType,
-		SystemIDs:            systemIDs,
-		Options:              options,
-		ContentOption:        contentOption,
-		ServiceNowField:      plan.ServiceNowField.ValueString(),
-		ContentSource:        plan.ContentSource.ValueString(),
-		TriggerWindowInMills: plan.TriggerWindowInMills.ValueInt64(),
+		Account:               plan.Account.ValueString(),
+		ServiceHost:           plan.ServiceHost.ValueString(),
+		Password:              plan.Password.ValueString(),
+		Proxy:                 plan.Proxy.ValueString(),
+		DampeningPeriod:       int(plan.DampeningPeriod.ValueInt64()),
+		AppID:                 appIDValue,
+		AppKey:                appKeyValue,
+		AuthType:              authType,
+		SystemIDs:             systemIDs,
+		Options:               options,
+		ContentOption:         contentOption,
+		ServiceNowField:       plan.ServiceNowField.ValueString(),
+		ContentSource:         plan.ContentSource.ValueString(),
+		TriggerWindowInMills:  plan.TriggerWindowInMills.ValueInt64(),
+		EnableFeedbackCollect: plan.EnableFeedbackCollect.ValueBool(),
 	}
 
 	err := r.client.CreateOrUpdateServiceNowConfig(config, r.client.Username, true)

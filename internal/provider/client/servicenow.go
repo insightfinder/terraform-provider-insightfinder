@@ -12,22 +12,23 @@ import (
 
 // ServiceNowConfig represents ServiceNow integration configuration
 type ServiceNowConfig struct {
-	Account              string     `json:"account"`
-	ServiceHost          string     `json:"service_host"`
-	Password             string     `json:"password"`
-	Proxy                string     `json:"proxy,omitempty"`
-	DampeningPeriod      int        `json:"dampening_period"`
-	AppID                string     `json:"app_id,omitempty"`
-	AppKey               string     `json:"app_key,omitempty"`
-	AuthType             string     `json:"auth_type,omitempty"`
-	SystemIDs            []string   `json:"system_ids"`
-	SystemNames          []string   `json:"system_names,omitempty"`
-	Options              []string   `json:"options"`
-	ContentOption        []string   `json:"content_option"`
-	ServiceNowField      string     `json:"service_now_field,omitempty"`
-	ContentSource        string     `json:"content_source,omitempty"`
-	TriggerWindowInMills int64      `json:"trigger_window_in_mills,omitempty"`
-	TableMapping         [][]string `json:"table_mapping,omitempty"`
+	Account               string     `json:"account"`
+	ServiceHost           string     `json:"service_host"`
+	Password              string     `json:"password"`
+	Proxy                 string     `json:"proxy,omitempty"`
+	DampeningPeriod       int        `json:"dampening_period"`
+	AppID                 string     `json:"app_id,omitempty"`
+	AppKey                string     `json:"app_key,omitempty"`
+	AuthType              string     `json:"auth_type,omitempty"`
+	SystemIDs             []string   `json:"system_ids"`
+	SystemNames           []string   `json:"system_names,omitempty"`
+	Options               []string   `json:"options"`
+	ContentOption         []string   `json:"content_option"`
+	ServiceNowField       string     `json:"service_now_field,omitempty"`
+	ContentSource         string     `json:"content_source,omitempty"`
+	TriggerWindowInMills  int64      `json:"trigger_window_in_mills,omitempty"`
+	EnableFeedbackCollect bool       `json:"enable_feedback_collect,omitempty"`
+	TableMapping          [][]string `json:"table_mapping,omitempty"`
 }
 
 // ServiceNowResponse represents the API response for ServiceNow operations
@@ -115,6 +116,9 @@ func (c *Client) GetServiceNowConfig(account, serviceHost, username string) (*Se
 	if contentSource, ok := entry["contentSource"].(string); ok {
 		config.ContentSource = contentSource
 	}
+	if enableFeedback, ok := entry["enableServiceNowFeedbackCollect"].(bool); ok {
+		config.EnableFeedbackCollect = enableFeedback
+	}
 
 	// Determine auth type from appId/appKey presence
 	if config.AppID != "" && config.AppKey != "" {
@@ -149,6 +153,9 @@ func (c *Client) GetServiceNowConfig(account, serviceHost, username string) (*Se
 				if cs, ok := configs["contentSource"].(string); ok {
 					config.ContentSource = cs
 				}
+			}
+			if enableFeedback, ok := configs["enableFeedbackCollect"].(bool); ok {
+				config.EnableFeedbackCollect = enableFeedback
 			}
 		}
 	}
@@ -236,6 +243,7 @@ func (c *Client) CreateOrUpdateServiceNowConfig(config *ServiceNowConfig, userna
 		if config.TriggerWindowInMills > 0 {
 			formData.Set("triggerWindowInMills", fmt.Sprintf("%d", config.TriggerWindowInMills))
 		}
+		formData.Set("enableFeedbackCollect", fmt.Sprintf("%t", config.EnableFeedbackCollect))
 	}
 
 	path := "/api/external/v1/service-integration"
