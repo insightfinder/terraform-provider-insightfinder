@@ -88,12 +88,13 @@ type projectResourceModel struct {
 	IncidentRelationSearchWindow types.Int64 `tfsdk:"incident_relation_search_window"`
 
 	// Instance Settings
-	InstanceConvertFlag  types.Bool `tfsdk:"instance_convert_flag"`
-	InstanceDownEnable   types.Bool `tfsdk:"instance_down_enable"`
-	IsEdgeBrain          types.Bool `tfsdk:"is_edge_brain"`
-	IsGroupingByInstance types.Bool `tfsdk:"is_grouping_by_instance"`
-	IsTracePrompt        types.Bool `tfsdk:"is_trace_prompt"`
-	ShowInstanceDown     types.Bool `tfsdk:"show_instance_down"`
+	ComponentNameAutoOverwrite types.Bool `tfsdk:"component_name_auto_overwrite"`
+	InstanceConvertFlag        types.Bool `tfsdk:"instance_convert_flag"`
+	InstanceDownEnable         types.Bool `tfsdk:"instance_down_enable"`
+	IsEdgeBrain                types.Bool `tfsdk:"is_edge_brain"`
+	IsGroupingByInstance       types.Bool `tfsdk:"is_grouping_by_instance"`
+	IsTracePrompt              types.Bool `tfsdk:"is_trace_prompt"`
+	ShowInstanceDown           types.Bool `tfsdk:"show_instance_down"`
 
 	// Log Settings
 	KeywordFeatureNumber     types.Int64  `tfsdk:"keyword_feature_number"`
@@ -432,6 +433,11 @@ func (r *projectResource) Schema(_ context.Context, _ resource.SchemaRequest, re
 			},
 			"incident_relation_search_window": schema.Int64Attribute{
 				Description: "Window for incident relation search",
+				Optional:    true,
+				Computed:    true,
+			},
+			"component_name_auto_overwrite": schema.BoolAttribute{
+				Description: "Enable automatic overwrite of component names",
 				Optional:    true,
 				Computed:    true,
 			},
@@ -1105,6 +1111,9 @@ func populateSettings(plan *projectResourceModel) map[string]interface{} {
 	if !plan.DisableModelKeywordStatsCollection.IsNull() {
 		s["disableModelKeywordStatsCollection"] = plan.DisableModelKeywordStatsCollection.ValueBool()
 	}
+	if !plan.ComponentNameAutoOverwrite.IsNull() {
+		s["componentNameAutoOverwrite"] = plan.ComponentNameAutoOverwrite.ValueBool()
+	}
 	if !plan.InstanceConvertFlag.IsNull() {
 		s["instanceConvertFlag"] = plan.InstanceConvertFlag.ValueBool()
 	}
@@ -1442,6 +1451,7 @@ func (r *projectResource) Create(ctx context.Context, req resource.CreateRequest
 		plan.IncidentRelationSearchWindow = getInt64("incidentRelationSearchWindow")
 
 		// Instance Settings
+		plan.ComponentNameAutoOverwrite = getBool("componentNameAutoOverwrite")
 		plan.InstanceConvertFlag = getBool("instanceConvertFlag")
 		plan.InstanceDownEnable = getBool("instanceDownEnable")
 		plan.IsEdgeBrain = getBool("isEdgeBrain")
@@ -2252,6 +2262,7 @@ func (r *projectResource) Read(ctx context.Context, req resource.ReadRequest, re
 	state.IncidentRelationSearchWindow = getInt64("incidentRelationSearchWindow")
 
 	// Instance Settings
+	state.ComponentNameAutoOverwrite = getBool("componentNameAutoOverwrite")
 	state.InstanceConvertFlag = getBool("instanceConvertFlag")
 	state.InstanceDownEnable = getBool("instanceDownEnable")
 	state.IsEdgeBrain = getBool("isEdgeBrain")
@@ -2741,6 +2752,7 @@ func (r *projectResource) Update(ctx context.Context, req resource.UpdateRequest
 		plan.IncidentRelationSearchWindow = getInt64("incidentRelationSearchWindow")
 
 		// Instance Settings
+		plan.ComponentNameAutoOverwrite = getBool("componentNameAutoOverwrite")
 		plan.InstanceConvertFlag = getBool("instanceConvertFlag")
 		plan.InstanceDownEnable = getBool("instanceDownEnable")
 		plan.IsEdgeBrain = getBool("isEdgeBrain")
