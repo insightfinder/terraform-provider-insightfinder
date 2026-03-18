@@ -54,6 +54,9 @@ resource "insightfinder_servicenow" "full" {
   # Only correlate events within a 7-day window
   trigger_window_in_mills = 604800000
 
+  # Enable feedback collection from ServiceNow
+  enable_feedback_collect = true
+
   # Map InsightFinder projects to ServiceNow tables
   table_mapping = {
     "my-project"      = "incident"
