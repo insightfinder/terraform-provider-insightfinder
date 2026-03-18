@@ -229,6 +229,7 @@ resource "insightfinder_project" "json_logs_example" {
 - `sampling_interval` (Number) Data sampling interval in seconds. Default: `600`
 - `retention_time` (Number) Data retention period in days. Default: `90`
 - `anomaly_detection_mode` (Number) Anomaly detection mode. Default: `0`
+- `component_name_auto_overwrite` (Boolean) Enable automatic overwrite of component names
 - `enable_hot_event` (Boolean) Enable hot event detection. Default: `true`
 - `enable_new_alert_email` (Boolean) Enable email alerts. Default: `false`
 - `email_setting` (String) JSON-encoded email configuration
