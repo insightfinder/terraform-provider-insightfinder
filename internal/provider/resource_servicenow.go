@@ -57,6 +57,7 @@ type servicenowResourceModel struct {
 	ContentSource         types.String `tfsdk:"content_source"`
 	TriggerWindowInMills  types.Int64  `tfsdk:"trigger_window_in_mills"`
 	EnableFeedbackCollect types.Bool   `tfsdk:"enable_feedback_collect"`
+	EnableTicketCreation  types.Bool   `tfsdk:"enable_ticket_creation"`
 	TableMapping          types.Map    `tfsdk:"table_mapping"`
 }
 
@@ -151,6 +152,12 @@ func (r *servicenowResource) Schema(_ context.Context, _ resource.SchemaRequest,
 			},
 			"enable_feedback_collect": schema.BoolAttribute{
 				Description: "Whether to enable ServiceNow feedback collection.",
+				Optional:    true,
+				Computed:    true,
+				Default:     booldefault.StaticBool(false),
+			},
+			"enable_ticket_creation": schema.BoolAttribute{
+				Description: "Whether to enable ServiceNow ticket creation.",
 				Optional:    true,
 				Computed:    true,
 				Default:     booldefault.StaticBool(false),
@@ -278,6 +285,7 @@ func (r *servicenowResource) Create(ctx context.Context, req resource.CreateRequ
 		ContentSource:         plan.ContentSource.ValueString(),
 		TriggerWindowInMills:  plan.TriggerWindowInMills.ValueInt64(),
 		EnableFeedbackCollect: plan.EnableFeedbackCollect.ValueBool(),
+		EnableTicketCreation:  plan.EnableTicketCreation.ValueBool(),
 	}
 
 	err := r.client.CreateOrUpdateServiceNowConfig(config, r.client.Username, true)
@@ -421,6 +429,7 @@ func (r *servicenowResource) Read(ctx context.Context, req resource.ReadRequest,
 	}
 
 	state.EnableFeedbackCollect = types.BoolValue(config.EnableFeedbackCollect)
+	state.EnableTicketCreation = types.BoolValue(config.EnableTicketCreation)
 
 	if len(config.TableMapping) > 0 {
 		tableMappingValues := make(map[string]attr.Value, len(config.TableMapping))
@@ -557,6 +566,7 @@ func (r *servicenowResource) Update(ctx context.Context, req resource.UpdateRequ
 		ContentSource:         plan.ContentSource.ValueString(),
 		TriggerWindowInMills:  plan.TriggerWindowInMills.ValueInt64(),
 		EnableFeedbackCollect: plan.EnableFeedbackCollect.ValueBool(),
+		EnableTicketCreation:  plan.EnableTicketCreation.ValueBool(),
 	}
 
 	err := r.client.CreateOrUpdateServiceNowConfig(config, r.client.Username, true)

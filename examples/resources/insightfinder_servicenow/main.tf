@@ -57,6 +57,9 @@ resource "insightfinder_servicenow" "full" {
   # Enable feedback collection from ServiceNow
   enable_feedback_collect = true
 
+  # Enable ticket creation in ServiceNow
+  enable_ticket_creation = true
+
   # Map InsightFinder projects to ServiceNow tables
   table_mapping = {
     "my-project"      = "incident"
