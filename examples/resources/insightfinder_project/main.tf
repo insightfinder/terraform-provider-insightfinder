@@ -97,6 +97,20 @@ resource "insightfinder_project" "servicenow_incidents" {
   project_time_zone    = "UTC"
   sampling_interval    = 600
   retention_time       = 90
+
+  # ServiceNow third-party settings
+  project_servicenow_settings = {
+    host                 = "https://dev123456.service-now.com/"
+    servicenow_user      = "admin"
+    servicenow_password  = var.servicenow_password
+    instance_field       = "configuration item"
+    instance_field_regex = ""
+    timestamp_format     = "yyyy-MM-dd HH:mm:ss"
+    sysparm_query        = ""
+    proxy                = ""
+    additional_fields    = ["work_end", "priority"]
+    component_name_rule  = ""
+  }
 }
 
 # Project with custom JSON key settings
@@ -163,6 +177,12 @@ variable "username" {
 
 variable "license_key" {
   description = "InsightFinder license key"
+  type        = string
+  sensitive   = true
+}
+
+variable "servicenow_password" {
+  description = "ServiceNow account password"
   type        = string
   sensitive   = true
 }

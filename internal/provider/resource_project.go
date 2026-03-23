@@ -202,6 +202,7 @@ type projectServiceNowSettingsModel struct {
 	ClientID           types.String `tfsdk:"client_id"`
 	ClientSecret       types.String `tfsdk:"client_secret"`
 	AdditionalFields   types.List   `tfsdk:"additional_fields"`
+	ComponentNameRule  types.String `tfsdk:"component_name_rule"`
 }
 
 // Metadata returns the resource type name.
@@ -832,6 +833,11 @@ func (r *projectResource) Schema(_ context.Context, _ resource.SchemaRequest, re
 						Optional:    true,
 						Computed:    true,
 						ElementType: types.StringType,
+					},
+					"component_name_rule": schema.StringAttribute{
+						Description: "Rule for determining the component name from ServiceNow data",
+						Optional:    true,
+						Computed:    true,
 					},
 				},
 			},
@@ -1930,6 +1936,7 @@ func (r *projectResource) Create(ctx context.Context, req resource.CreateRequest
 				TimestampFormat:    serviceNowSettings.TimestampFormat.ValueString(),
 				ClientID:           serviceNowSettings.ClientID.ValueString(),
 				ClientSecret:       serviceNowSettings.ClientSecret.ValueString(),
+				ComponentNameRule:  serviceNowSettings.ComponentNameRule.ValueString(),
 			}
 
 			// Convert additional fields list
@@ -1971,6 +1978,7 @@ func (r *projectResource) Create(ctx context.Context, req resource.CreateRequest
 				"client_id":            types.StringType,
 				"client_secret":        types.StringType,
 				"additional_fields":    types.ListType{ElemType: types.StringType},
+				"component_name_rule":  types.StringType,
 			})
 		}
 	} else {
@@ -1987,6 +1995,7 @@ func (r *projectResource) Create(ctx context.Context, req resource.CreateRequest
 			"client_id":            types.StringType,
 			"client_secret":        types.StringType,
 			"additional_fields":    types.ListType{ElemType: types.StringType},
+			"component_name_rule":  types.StringType,
 		})
 	}
 
@@ -2401,6 +2410,7 @@ func (r *projectResource) Read(ctx context.Context, req resource.ReadRequest, re
 					TimestampFormat:    types.StringValue(serviceNowSettings.TimestampFormat),
 					ClientID:           types.StringValue(serviceNowSettings.ClientID),
 					ClientSecret:       types.StringValue(serviceNowSettings.ClientSecret),
+					ComponentNameRule:  types.StringValue(serviceNowSettings.ComponentNameRule),
 				}
 
 				// Convert additional fields
@@ -2427,6 +2437,7 @@ func (r *projectResource) Read(ctx context.Context, req resource.ReadRequest, re
 					"client_id":            types.StringType,
 					"client_secret":        types.StringType,
 					"additional_fields":    types.ListType{ElemType: types.StringType},
+					"component_name_rule":  types.StringType,
 				}, serviceNowModel)
 				resp.Diagnostics.Append(diags...)
 				if !resp.Diagnostics.HasError() {
@@ -3003,6 +3014,7 @@ func (r *projectResource) Update(ctx context.Context, req resource.UpdateRequest
 				TimestampFormat:    serviceNowSettings.TimestampFormat.ValueString(),
 				ClientID:           serviceNowSettings.ClientID.ValueString(),
 				ClientSecret:       serviceNowSettings.ClientSecret.ValueString(),
+				ComponentNameRule:  serviceNowSettings.ComponentNameRule.ValueString(),
 			}
 
 			// Convert additional fields list
@@ -3044,6 +3056,7 @@ func (r *projectResource) Update(ctx context.Context, req resource.UpdateRequest
 				"client_id":            types.StringType,
 				"client_secret":        types.StringType,
 				"additional_fields":    types.ListType{ElemType: types.StringType},
+				"component_name_rule":  types.StringType,
 			})
 		}
 	} else {
@@ -3060,6 +3073,7 @@ func (r *projectResource) Update(ctx context.Context, req resource.UpdateRequest
 			"client_id":            types.StringType,
 			"client_secret":        types.StringType,
 			"additional_fields":    types.ListType{ElemType: types.StringType},
+			"component_name_rule":  types.StringType,
 		})
 	}
 
