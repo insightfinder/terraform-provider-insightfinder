@@ -26,6 +26,7 @@ type ServiceNowThirdPartySettings struct {
 	AdditionalFields   []string `json:"additionalFields"`
 	DefaultFields      []string `json:"defaultFields"`
 	Fields             []string `json:"fields"`
+	ComponentNameRule  string   `json:"componentNameRule"`
 }
 
 // ServiceNowThirdPartyResponse represents the API response
@@ -127,6 +128,9 @@ func (c *Client) GetServiceNowThirdPartySettings(projectName string) (*ServiceNo
 	if clientSecret, ok := rawResponse["clientSecret"].(string); ok {
 		settings.ClientSecret = clientSecret
 	}
+	if componentNameRule, ok := rawResponse["componentNameRule"].(string); ok {
+		settings.ComponentNameRule = componentNameRule
+	}
 
 	// Parse array fields
 	if additionalFields, ok := rawResponse["additionalFields"].([]interface{}); ok {
@@ -170,6 +174,7 @@ func (c *Client) CreateOrUpdateServiceNowThirdPartySettings(projectName string, 
 	params.Add("instanceField", settings.InstanceField)
 	params.Add("instanceFieldRegex", settings.InstanceFieldRegex)
 	params.Add("useHostName", "false")
+	params.Add("componentNameRule", settings.ComponentNameRule)
 
 	// Encode additional fields as JSON array
 	if settings.AdditionalFields != nil {

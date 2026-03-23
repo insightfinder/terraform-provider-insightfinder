@@ -110,6 +110,7 @@ resource "insightfinder_project" "servicenow_project" {
     sysparm_query        = ""
     proxy                = ""
     additional_fields    = ["work_end", "priority"]
+    component_name_rule  = "cmdb_ci"
   }
 }
 ```
@@ -250,6 +251,7 @@ resource "insightfinder_project" "json_logs_example" {
   - `sysparm_query` (String, Optional) ServiceNow query parameter
   - `proxy` (String, Optional) Proxy URL for ServiceNow connection
   - `additional_fields` (List of String, Optional) Additional fields to fetch from ServiceNow
+  - `component_name_rule` (String, Optional) Rule for determining the component name from ServiceNow data (e.g., `"cmdb_ci"`)
 - `holiday_settings` (List of Objects) List of holiday settings for the project. Each holiday defines a period that should be treated as a holiday for anomaly detection purposes.
   - `name` (String, Required) Name of the holiday (must be unique within the project)
   - `start_date` (String, Required) Start date of the holiday in MM-DD format (e.g., `12-25`)
