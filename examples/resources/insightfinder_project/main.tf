@@ -109,7 +109,7 @@ resource "insightfinder_project" "servicenow_incidents" {
     sysparm_query        = ""
     proxy                = ""
     additional_fields    = ["work_end", "priority"]
-    component_name_rule  = "cmdb_ci"
+    component_name_rule  = ""
   }
 }
 
