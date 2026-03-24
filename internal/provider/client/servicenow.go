@@ -257,7 +257,7 @@ func (c *Client) CreateOrUpdateServiceNowConfig(config *ServiceNowConfig, userna
 		if config.TriggerWindowInMills > 0 {
 			formData.Set("triggerWindowInMills", fmt.Sprintf("%d", config.TriggerWindowInMills))
 		}
-		formData.Set("enableFeedbackCollect", fmt.Sprintf("%t", config.EnableFeedbackCollect))
+		formData.Set("enableServiceNowFeedbackCollect", fmt.Sprintf("%t", config.EnableFeedbackCollect))
 		formData.Set("enableTicketCreation", fmt.Sprintf("%t", config.EnableTicketCreation))
 	}
 

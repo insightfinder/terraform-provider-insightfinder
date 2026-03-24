@@ -5,10 +5,15 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [1.8.5] - 2026-03-23
+## [1.8.5] - 2026-03-24
 
 ### Added
 - **insightfinder_servicenow**: New `enable_ticket_creation` attribute (Boolean, Optional, Computed, default `false`) — controls whether ServiceNow ticket creation is enabled for the integration
+
+### Fixed
+- **insightfinder_servicenow**: `system_names` changed from a list to a set so that order differences between the config and the API response no longer produce a false diff in the Terraform plan
+- **insightfinder_servicenow**: `content_option` no longer shows a perpetual diff when the API returns an empty array — null and empty set are now treated as equivalent
+- **insightfinder_servicenow**: `enable_feedback_collect` was using the wrong API field name (`enableFeedbackCollect`) in the POST request; corrected to `enableServiceNowFeedbackCollect` so the value is now persisted properly
 
 ## [1.8.4] - 2026-03-23
 
