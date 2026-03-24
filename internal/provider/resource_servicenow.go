@@ -50,7 +50,7 @@ type servicenowResourceModel struct {
 	AppID                 types.String `tfsdk:"app_id"`
 	AppKey                types.String `tfsdk:"app_key"`
 	AuthType              types.String `tfsdk:"auth_type"`
-	SystemNames           types.List   `tfsdk:"system_names"`
+	SystemNames           types.Set    `tfsdk:"system_names"`
 	Options               types.Set    `tfsdk:"options"`
 	ContentOption         types.Set    `tfsdk:"content_option"`
 	ServiceNowField       types.String `tfsdk:"service_now_field"`
@@ -121,8 +121,8 @@ func (r *servicenowResource) Schema(_ context.Context, _ resource.SchemaRequest,
 				Computed:    true,
 				Default:     stringdefault.StaticString("basic"),
 			},
-			"system_names": schema.ListAttribute{
-				Description: "List of system names to integrate.",
+			"system_names": schema.SetAttribute{
+				Description: "Set of system names to integrate.",
 				Optional:    true,
 				ElementType: types.StringType,
 			},
@@ -374,12 +374,12 @@ func (r *servicenowResource) Read(ctx context.Context, req resource.ReadRequest,
 	if len(config.SystemIDs) > 0 {
 		names, err := r.client.ResolveSystemIDsToNames(config.SystemIDs, r.client.Username)
 		if err == nil && len(names) > 0 {
-			systemNamesList, diags := types.ListValueFrom(ctx, types.StringType, names)
+			systemNamesSet, diags := types.SetValueFrom(ctx, types.StringType, names)
 			resp.Diagnostics.Append(diags...)
 			if resp.Diagnostics.HasError() {
 				return
 			}
-			state.SystemNames = systemNamesList
+			state.SystemNames = systemNamesSet
 		}
 		// If resolution fails, keep state.SystemNames as-is.
 	}
@@ -392,7 +392,11 @@ func (r *servicenowResource) Read(ctx context.Context, req resource.ReadRequest,
 	}
 	state.Options = optionsSet
 
-	contentOptionSet, diags := types.SetValueFrom(ctx, types.StringType, config.ContentOption)
+	contentOptionSlice := config.ContentOption
+	if contentOptionSlice == nil {
+		contentOptionSlice = []string{}
+	}
+	contentOptionSet, diags := types.SetValueFrom(ctx, types.StringType, contentOptionSlice)
 	resp.Diagnostics.Append(diags...)
 	if resp.Diagnostics.HasError() {
 		return
