@@ -71,10 +71,10 @@ resource "insightfinder_servicenow" "full" {
   trigger_window_in_mills = 604800000
 
   # Enable feedback collection from ServiceNow
-  enable_feedback_collect = true
+  enable_feedback_collect = false
 
   # Enable ticket creation in ServiceNow
-  enable_ticket_creation = true
+  enable_ticket_creation = false
 
   # Map InsightFinder projects to ServiceNow tables
   table_mapping = {
