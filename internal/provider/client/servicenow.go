@@ -28,6 +28,7 @@ type ServiceNowConfig struct {
 	ContentSource         string     `json:"content_source,omitempty"`
 	TriggerWindowInMills  int64      `json:"trigger_window_in_mills,omitempty"`
 	EnableFeedbackCollect bool       `json:"enable_feedback_collect,omitempty"`
+	EnableTicketCreation  bool       `json:"enable_ticket_creation,omitempty"`
 	TableMapping          [][]string `json:"table_mapping,omitempty"`
 }
 
@@ -119,6 +120,9 @@ func (c *Client) GetServiceNowConfig(account, serviceHost, username string) (*Se
 	if enableFeedback, ok := entry["enableServiceNowFeedbackCollect"].(bool); ok {
 		config.EnableFeedbackCollect = enableFeedback
 	}
+	if enableTicket, ok := entry["enableTicketCreation"].(bool); ok {
+		config.EnableTicketCreation = enableTicket
+	}
 
 	// Determine auth type from appId/appKey presence
 	if config.AppID != "" && config.AppKey != "" {
@@ -154,8 +158,18 @@ func (c *Client) GetServiceNowConfig(account, serviceHost, username string) (*Se
 					config.ContentSource = cs
 				}
 			}
-			if enableFeedback, ok := configs["enableFeedbackCollect"].(bool); ok {
-				config.EnableFeedbackCollect = enableFeedback
+			// enableFeedbackCollect in configs only fills in if root-level key was absent
+			// (root uses "enableServiceNowFeedbackCollect", configs uses "enableFeedbackCollect")
+			if !config.EnableFeedbackCollect {
+				if enableFeedback, ok := configs["enableFeedbackCollect"].(bool); ok {
+					config.EnableFeedbackCollect = enableFeedback
+				}
+			}
+			// enableTicketCreation in configs only fills in if not already set at root
+			if !config.EnableTicketCreation {
+				if enableTicket, ok := configs["enableTicketCreation"].(bool); ok {
+					config.EnableTicketCreation = enableTicket
+				}
 			}
 		}
 	}
@@ -244,6 +258,7 @@ func (c *Client) CreateOrUpdateServiceNowConfig(config *ServiceNowConfig, userna
 			formData.Set("triggerWindowInMills", fmt.Sprintf("%d", config.TriggerWindowInMills))
 		}
 		formData.Set("enableFeedbackCollect", fmt.Sprintf("%t", config.EnableFeedbackCollect))
+		formData.Set("enableTicketCreation", fmt.Sprintf("%t", config.EnableTicketCreation))
 	}
 
 	path := "/api/external/v1/service-integration"

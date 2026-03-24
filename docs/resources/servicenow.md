@@ -71,7 +71,10 @@ resource "insightfinder_servicenow" "full" {
   trigger_window_in_mills = 604800000
 
   # Enable feedback collection from ServiceNow
-  enable_feedback_collect = true
+  enable_feedback_collect = false
+
+  # Enable ticket creation in ServiceNow
+  enable_ticket_creation = false
 
   # Map InsightFinder projects to ServiceNow tables
   table_mapping = {
@@ -103,6 +106,7 @@ resource "insightfinder_servicenow" "full" {
 - `content_source` (String, Computed) ServiceNow field to write incident notes to (e.g., `work_notes`, `comments`). Defaults to `work_notes`.
 - `trigger_window_in_mills` (Number) Time window in milliseconds within which events are correlated into a single incident (e.g., `604800000` for 7 days).
 - `enable_feedback_collect` (Boolean, Computed) Whether to enable ServiceNow feedback collection. Defaults to `false`.
+- `enable_ticket_creation` (Boolean, Computed) Whether to enable ServiceNow ticket creation. Defaults to `false`.
 - `table_mapping` (Map of String) Mapping of InsightFinder project names to ServiceNow table names (e.g., `{ "my-project" = "incident" }`).
 
 ### Read-Only
