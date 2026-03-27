@@ -12,24 +12,27 @@ import (
 
 // ServiceNowConfig represents ServiceNow integration configuration
 type ServiceNowConfig struct {
-	Account               string     `json:"account"`
-	ServiceHost           string     `json:"service_host"`
-	Password              string     `json:"password"`
-	Proxy                 string     `json:"proxy,omitempty"`
-	DampeningPeriod       int        `json:"dampening_period"`
-	AppID                 string     `json:"app_id,omitempty"`
-	AppKey                string     `json:"app_key,omitempty"`
-	AuthType              string     `json:"auth_type,omitempty"`
-	SystemIDs             []string   `json:"system_ids"`
-	SystemNames           []string   `json:"system_names,omitempty"`
-	Options               []string   `json:"options"`
-	ContentOption         []string   `json:"content_option"`
-	ServiceNowField       string     `json:"service_now_field,omitempty"`
-	ContentSource         string     `json:"content_source,omitempty"`
-	TriggerWindowInMills  int64      `json:"trigger_window_in_mills,omitempty"`
-	EnableFeedbackCollect bool       `json:"enable_feedback_collect,omitempty"`
-	EnableTicketCreation  bool       `json:"enable_ticket_creation,omitempty"`
-	TableMapping          [][]string `json:"table_mapping,omitempty"`
+	Account                    string     `json:"account"`
+	ServiceHost                string     `json:"service_host"`
+	Password                   string     `json:"password"`
+	Proxy                      string     `json:"proxy,omitempty"`
+	DampeningPeriod            int        `json:"dampening_period"`
+	AppID                      string     `json:"app_id,omitempty"`
+	AppKey                     string     `json:"app_key,omitempty"`
+	AuthType                   string     `json:"auth_type,omitempty"`
+	SystemIDs                  []string   `json:"system_ids"`
+	SystemNames                []string   `json:"system_names,omitempty"`
+	Options                    []string   `json:"options"`
+	ContentOption              []string   `json:"content_option"`
+	ServiceNowField            string     `json:"service_now_field,omitempty"`
+	ContentSource              string     `json:"content_source,omitempty"`
+	TriggerWindowInMills       int64      `json:"trigger_window_in_mills,omitempty"`
+	EnableFeedbackCollect      bool       `json:"enable_feedback_collect,omitempty"`
+	EnableTicketCreation       bool       `json:"enable_ticket_creation,omitempty"`
+	TicketCreatedBySourceKey   string     `json:"ticket_created_by_source_key,omitempty"`
+	TicketCreatedBySourceValue string     `json:"ticket_created_by_source_value,omitempty"`
+	ConfigurationItem          string     `json:"configuration_item,omitempty"`
+	TableMapping               [][]string `json:"table_mapping,omitempty"`
 }
 
 // ServiceNowResponse represents the API response for ServiceNow operations
@@ -123,6 +126,15 @@ func (c *Client) GetServiceNowConfig(account, serviceHost, username string) (*Se
 	if enableTicket, ok := entry["enableTicketCreation"].(bool); ok {
 		config.EnableTicketCreation = enableTicket
 	}
+	if ticketKey, ok := entry["ticketCreatedBySourceKey"].(string); ok {
+		config.TicketCreatedBySourceKey = ticketKey
+	}
+	if ticketValue, ok := entry["ticketCreatedBySourceValue"].(string); ok {
+		config.TicketCreatedBySourceValue = ticketValue
+	}
+	if configItem, ok := entry["configurationItem"].(string); ok {
+		config.ConfigurationItem = configItem
+	}
 
 	// Determine auth type from appId/appKey presence
 	if config.AppID != "" && config.AppKey != "" {
@@ -169,6 +181,21 @@ func (c *Client) GetServiceNowConfig(account, serviceHost, username string) (*Se
 			if !config.EnableTicketCreation {
 				if enableTicket, ok := configs["enableTicketCreation"].(bool); ok {
 					config.EnableTicketCreation = enableTicket
+				}
+			}
+			if config.TicketCreatedBySourceKey == "" {
+				if v, ok := configs["ticketCreatedBySourceKey"].(string); ok {
+					config.TicketCreatedBySourceKey = v
+				}
+			}
+			if config.TicketCreatedBySourceValue == "" {
+				if v, ok := configs["ticketCreatedBySourceValue"].(string); ok {
+					config.TicketCreatedBySourceValue = v
+				}
+			}
+			if config.ConfigurationItem == "" {
+				if v, ok := configs["configurationItem"].(string); ok {
+					config.ConfigurationItem = v
 				}
 			}
 		}
@@ -259,6 +286,15 @@ func (c *Client) CreateOrUpdateServiceNowConfig(config *ServiceNowConfig, userna
 		}
 		formData.Set("enableServiceNowFeedbackCollect", fmt.Sprintf("%t", config.EnableFeedbackCollect))
 		formData.Set("enableTicketCreation", fmt.Sprintf("%t", config.EnableTicketCreation))
+		if config.TicketCreatedBySourceKey != "" {
+			formData.Set("ticketCreatedBySourceKey", config.TicketCreatedBySourceKey)
+		}
+		if config.TicketCreatedBySourceValue != "" {
+			formData.Set("ticketCreatedBySourceValue", config.TicketCreatedBySourceValue)
+		}
+		if config.ConfigurationItem != "" {
+			formData.Set("configurationItem", config.ConfigurationItem)
+		}
 	}
 
 	path := "/api/external/v1/service-integration"
