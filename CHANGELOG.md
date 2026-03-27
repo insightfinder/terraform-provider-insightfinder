@@ -5,6 +5,13 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.8.6] - 2026-03-27
+
+### Added
+- **insightfinder_servicenow**: New `ticket_created_by_source_key` attribute (String, Optional) — ServiceNow field key used to filter when a ticket is created (e.g., `activity_due`)
+- **insightfinder_servicenow**: New `ticket_created_by_source_value` attribute (String, Optional) — value matched against `ticket_created_by_source_key` to determine whether to create a ticket
+- **insightfinder_servicenow**: New `configuration_item` attribute (String, Optional) — ServiceNow CMDB configuration item to associate with created tickets
+
 ## [1.8.5] - 2026-03-24
 
 ### Added

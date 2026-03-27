@@ -41,24 +41,27 @@ type servicenowResource struct {
 
 // servicenowResourceModel maps the resource schema data.
 type servicenowResourceModel struct {
-	ID                    types.String `tfsdk:"id"`
-	Account               types.String `tfsdk:"account"`
-	ServiceHost           types.String `tfsdk:"service_host"`
-	Password              types.String `tfsdk:"password"`
-	Proxy                 types.String `tfsdk:"proxy"`
-	DampeningPeriod       types.Int64  `tfsdk:"dampening_period"`
-	AppID                 types.String `tfsdk:"app_id"`
-	AppKey                types.String `tfsdk:"app_key"`
-	AuthType              types.String `tfsdk:"auth_type"`
-	SystemNames           types.Set    `tfsdk:"system_names"`
-	Options               types.Set    `tfsdk:"options"`
-	ContentOption         types.Set    `tfsdk:"content_option"`
-	ServiceNowField       types.String `tfsdk:"service_now_field"`
-	ContentSource         types.String `tfsdk:"content_source"`
-	TriggerWindowInMills  types.Int64  `tfsdk:"trigger_window_in_mills"`
-	EnableFeedbackCollect types.Bool   `tfsdk:"enable_feedback_collect"`
-	EnableTicketCreation  types.Bool   `tfsdk:"enable_ticket_creation"`
-	TableMapping          types.Map    `tfsdk:"table_mapping"`
+	ID                         types.String `tfsdk:"id"`
+	Account                    types.String `tfsdk:"account"`
+	ServiceHost                types.String `tfsdk:"service_host"`
+	Password                   types.String `tfsdk:"password"`
+	Proxy                      types.String `tfsdk:"proxy"`
+	DampeningPeriod            types.Int64  `tfsdk:"dampening_period"`
+	AppID                      types.String `tfsdk:"app_id"`
+	AppKey                     types.String `tfsdk:"app_key"`
+	AuthType                   types.String `tfsdk:"auth_type"`
+	SystemNames                types.Set    `tfsdk:"system_names"`
+	Options                    types.Set    `tfsdk:"options"`
+	ContentOption              types.Set    `tfsdk:"content_option"`
+	ServiceNowField            types.String `tfsdk:"service_now_field"`
+	ContentSource              types.String `tfsdk:"content_source"`
+	TriggerWindowInMills       types.Int64  `tfsdk:"trigger_window_in_mills"`
+	EnableFeedbackCollect      types.Bool   `tfsdk:"enable_feedback_collect"`
+	EnableTicketCreation       types.Bool   `tfsdk:"enable_ticket_creation"`
+	TicketCreatedBySourceKey   types.String `tfsdk:"ticket_created_by_source_key"`
+	TicketCreatedBySourceValue types.String `tfsdk:"ticket_created_by_source_value"`
+	ConfigurationItem          types.String `tfsdk:"configuration_item"`
+	TableMapping               types.Map    `tfsdk:"table_mapping"`
 }
 
 // Metadata returns the resource type name.
@@ -161,6 +164,18 @@ func (r *servicenowResource) Schema(_ context.Context, _ resource.SchemaRequest,
 				Optional:    true,
 				Computed:    true,
 				Default:     booldefault.StaticBool(false),
+			},
+			"ticket_created_by_source_key": schema.StringAttribute{
+				Description: "ServiceNow field key used to filter when a ticket is created (e.g., 'activity_due').",
+				Optional:    true,
+			},
+			"ticket_created_by_source_value": schema.StringAttribute{
+				Description: "Value for the ticket_created_by_source_key field filter.",
+				Optional:    true,
+			},
+			"configuration_item": schema.StringAttribute{
+				Description: "ServiceNow configuration item (CMDB CI) to associate with created tickets.",
+				Optional:    true,
 			},
 			"table_mapping": schema.MapAttribute{
 				Description: "Mapping of InsightFinder project names to ServiceNow table names (e.g., {\"my-project\" = \"incident\"}).",
@@ -270,22 +285,25 @@ func (r *servicenowResource) Create(ctx context.Context, req resource.CreateRequ
 	}
 
 	config := &client.ServiceNowConfig{
-		Account:               plan.Account.ValueString(),
-		ServiceHost:           plan.ServiceHost.ValueString(),
-		Password:              plan.Password.ValueString(),
-		Proxy:                 plan.Proxy.ValueString(),
-		DampeningPeriod:       int(plan.DampeningPeriod.ValueInt64()),
-		AppID:                 plan.AppID.ValueString(),
-		AppKey:                plan.AppKey.ValueString(),
-		AuthType:              authType,
-		SystemIDs:             systemIDs,
-		Options:               options,
-		ContentOption:         contentOption,
-		ServiceNowField:       plan.ServiceNowField.ValueString(),
-		ContentSource:         plan.ContentSource.ValueString(),
-		TriggerWindowInMills:  plan.TriggerWindowInMills.ValueInt64(),
-		EnableFeedbackCollect: plan.EnableFeedbackCollect.ValueBool(),
-		EnableTicketCreation:  plan.EnableTicketCreation.ValueBool(),
+		Account:                    plan.Account.ValueString(),
+		ServiceHost:                plan.ServiceHost.ValueString(),
+		Password:                   plan.Password.ValueString(),
+		Proxy:                      plan.Proxy.ValueString(),
+		DampeningPeriod:            int(plan.DampeningPeriod.ValueInt64()),
+		AppID:                      plan.AppID.ValueString(),
+		AppKey:                     plan.AppKey.ValueString(),
+		AuthType:                   authType,
+		SystemIDs:                  systemIDs,
+		Options:                    options,
+		ContentOption:              contentOption,
+		ServiceNowField:            plan.ServiceNowField.ValueString(),
+		ContentSource:              plan.ContentSource.ValueString(),
+		TriggerWindowInMills:       plan.TriggerWindowInMills.ValueInt64(),
+		EnableFeedbackCollect:      plan.EnableFeedbackCollect.ValueBool(),
+		EnableTicketCreation:       plan.EnableTicketCreation.ValueBool(),
+		TicketCreatedBySourceKey:   plan.TicketCreatedBySourceKey.ValueString(),
+		TicketCreatedBySourceValue: plan.TicketCreatedBySourceValue.ValueString(),
+		ConfigurationItem:          plan.ConfigurationItem.ValueString(),
 	}
 
 	err := r.client.CreateOrUpdateServiceNowConfig(config, r.client.Username, true)
@@ -435,6 +453,22 @@ func (r *servicenowResource) Read(ctx context.Context, req resource.ReadRequest,
 	state.EnableFeedbackCollect = types.BoolValue(config.EnableFeedbackCollect)
 	state.EnableTicketCreation = types.BoolValue(config.EnableTicketCreation)
 
+	if config.TicketCreatedBySourceKey != "" {
+		state.TicketCreatedBySourceKey = types.StringValue(config.TicketCreatedBySourceKey)
+	} else {
+		state.TicketCreatedBySourceKey = types.StringNull()
+	}
+	if config.TicketCreatedBySourceValue != "" {
+		state.TicketCreatedBySourceValue = types.StringValue(config.TicketCreatedBySourceValue)
+	} else {
+		state.TicketCreatedBySourceValue = types.StringNull()
+	}
+	if config.ConfigurationItem != "" {
+		state.ConfigurationItem = types.StringValue(config.ConfigurationItem)
+	} else {
+		state.ConfigurationItem = types.StringNull()
+	}
+
 	if len(config.TableMapping) > 0 {
 		tableMappingValues := make(map[string]attr.Value, len(config.TableMapping))
 		for _, row := range config.TableMapping {
@@ -555,22 +589,25 @@ func (r *servicenowResource) Update(ctx context.Context, req resource.UpdateRequ
 	}
 
 	config := &client.ServiceNowConfig{
-		Account:               plan.Account.ValueString(),
-		ServiceHost:           plan.ServiceHost.ValueString(),
-		Password:              plan.Password.ValueString(),
-		Proxy:                 plan.Proxy.ValueString(),
-		DampeningPeriod:       int(plan.DampeningPeriod.ValueInt64()),
-		AppID:                 appIDValue,
-		AppKey:                appKeyValue,
-		AuthType:              authType,
-		SystemIDs:             systemIDs,
-		Options:               options,
-		ContentOption:         contentOption,
-		ServiceNowField:       plan.ServiceNowField.ValueString(),
-		ContentSource:         plan.ContentSource.ValueString(),
-		TriggerWindowInMills:  plan.TriggerWindowInMills.ValueInt64(),
-		EnableFeedbackCollect: plan.EnableFeedbackCollect.ValueBool(),
-		EnableTicketCreation:  plan.EnableTicketCreation.ValueBool(),
+		Account:                    plan.Account.ValueString(),
+		ServiceHost:                plan.ServiceHost.ValueString(),
+		Password:                   plan.Password.ValueString(),
+		Proxy:                      plan.Proxy.ValueString(),
+		DampeningPeriod:            int(plan.DampeningPeriod.ValueInt64()),
+		AppID:                      appIDValue,
+		AppKey:                     appKeyValue,
+		AuthType:                   authType,
+		SystemIDs:                  systemIDs,
+		Options:                    options,
+		ContentOption:              contentOption,
+		ServiceNowField:            plan.ServiceNowField.ValueString(),
+		ContentSource:              plan.ContentSource.ValueString(),
+		TriggerWindowInMills:       plan.TriggerWindowInMills.ValueInt64(),
+		EnableFeedbackCollect:      plan.EnableFeedbackCollect.ValueBool(),
+		EnableTicketCreation:       plan.EnableTicketCreation.ValueBool(),
+		TicketCreatedBySourceKey:   plan.TicketCreatedBySourceKey.ValueString(),
+		TicketCreatedBySourceValue: plan.TicketCreatedBySourceValue.ValueString(),
+		ConfigurationItem:          plan.ConfigurationItem.ValueString(),
 	}
 
 	err := r.client.CreateOrUpdateServiceNowConfig(config, r.client.Username, true)

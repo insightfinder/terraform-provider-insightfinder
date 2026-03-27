@@ -60,6 +60,13 @@ resource "insightfinder_servicenow" "full" {
   # Enable ticket creation in ServiceNow
   enable_ticket_creation = false
 
+  # Filter ticket creation by a specific field value
+  ticket_created_by_source_key   = "activity_due"
+  ticket_created_by_source_value = "xyzzz"
+
+  # Associate created tickets with a CMDB configuration item
+  configuration_item = "My-Server-CI"
+
   # Map InsightFinder projects to ServiceNow tables
   table_mapping = {
     "my-project"      = "incident"
