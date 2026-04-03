@@ -60,6 +60,9 @@ resource "insightfinder_servicenow" "full" {
   # Enable ticket creation in ServiceNow
   enable_ticket_creation = false
 
+  # Enable ticket update in ServiceNow
+  enable_ticket_update = false
+
   # Filter ticket creation by a specific field value
   ticket_created_by_source_key   = "activity_due"
   ticket_created_by_source_value = "xyzzz"

@@ -76,6 +76,9 @@ resource "insightfinder_servicenow" "full" {
   # Enable ticket creation in ServiceNow
   enable_ticket_creation = false
 
+  # Enable ticket update in ServiceNow
+  enable_ticket_update = false
+
   # Filter ticket creation by a specific field value
   ticket_created_by_source_key   = "activity_due"
   ticket_created_by_source_value = "xyzzz"
@@ -114,6 +117,7 @@ resource "insightfinder_servicenow" "full" {
 - `trigger_window_in_mills` (Number) Time window in milliseconds within which events are correlated into a single incident (e.g., `604800000` for 7 days).
 - `enable_feedback_collect` (Boolean, Computed) Whether to enable ServiceNow feedback collection. Defaults to `false`.
 - `enable_ticket_creation` (Boolean, Computed) Whether to enable ServiceNow ticket creation. Defaults to `false`.
+- `enable_ticket_update` (Boolean, Computed) Whether to enable ServiceNow ticket update. Defaults to `false`.
 - `ticket_created_by_source_key` (String) ServiceNow field key used to filter when a ticket is created (e.g., `activity_due`).
 - `ticket_created_by_source_value` (String) Value matched against `ticket_created_by_source_key` to determine whether to create a ticket.
 - `configuration_item` (String) ServiceNow CMDB configuration item to associate with created tickets.

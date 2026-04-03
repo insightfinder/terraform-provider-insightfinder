@@ -29,6 +29,7 @@ type ServiceNowConfig struct {
 	TriggerWindowInMills       int64      `json:"trigger_window_in_mills,omitempty"`
 	EnableFeedbackCollect      bool       `json:"enable_feedback_collect,omitempty"`
 	EnableTicketCreation       bool       `json:"enable_ticket_creation,omitempty"`
+	EnableTicketUpdate         bool       `json:"enable_ticket_update,omitempty"`
 	TicketCreatedBySourceKey   string     `json:"ticket_created_by_source_key,omitempty"`
 	TicketCreatedBySourceValue string     `json:"ticket_created_by_source_value,omitempty"`
 	ConfigurationItem          string     `json:"configuration_item,omitempty"`
@@ -126,6 +127,9 @@ func (c *Client) GetServiceNowConfig(account, serviceHost, username string) (*Se
 	if enableTicket, ok := entry["enableTicketCreation"].(bool); ok {
 		config.EnableTicketCreation = enableTicket
 	}
+	if enableTicketUpdate, ok := entry["enableTicketUpdate"].(bool); ok {
+		config.EnableTicketUpdate = enableTicketUpdate
+	}
 	if ticketKey, ok := entry["ticketCreatedBySourceKey"].(string); ok {
 		config.TicketCreatedBySourceKey = ticketKey
 	}
@@ -181,6 +185,11 @@ func (c *Client) GetServiceNowConfig(account, serviceHost, username string) (*Se
 			if !config.EnableTicketCreation {
 				if enableTicket, ok := configs["enableTicketCreation"].(bool); ok {
 					config.EnableTicketCreation = enableTicket
+				}
+			}
+			if !config.EnableTicketUpdate {
+				if enableTicketUpdate, ok := configs["enableTicketUpdate"].(bool); ok {
+					config.EnableTicketUpdate = enableTicketUpdate
 				}
 			}
 			if config.TicketCreatedBySourceKey == "" {
@@ -286,6 +295,7 @@ func (c *Client) CreateOrUpdateServiceNowConfig(config *ServiceNowConfig, userna
 		}
 		formData.Set("enableServiceNowFeedbackCollect", fmt.Sprintf("%t", config.EnableFeedbackCollect))
 		formData.Set("enableTicketCreation", fmt.Sprintf("%t", config.EnableTicketCreation))
+		formData.Set("enableTicketUpdate", fmt.Sprintf("%t", config.EnableTicketUpdate))
 		if config.TicketCreatedBySourceKey != "" {
 			formData.Set("ticketCreatedBySourceKey", config.TicketCreatedBySourceKey)
 		}
