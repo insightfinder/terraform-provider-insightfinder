@@ -58,6 +58,7 @@ type servicenowResourceModel struct {
 	TriggerWindowInMills       types.Int64  `tfsdk:"trigger_window_in_mills"`
 	EnableFeedbackCollect      types.Bool   `tfsdk:"enable_feedback_collect"`
 	EnableTicketCreation       types.Bool   `tfsdk:"enable_ticket_creation"`
+	EnableTicketUpdate         types.Bool   `tfsdk:"enable_ticket_update"`
 	TicketCreatedBySourceKey   types.String `tfsdk:"ticket_created_by_source_key"`
 	TicketCreatedBySourceValue types.String `tfsdk:"ticket_created_by_source_value"`
 	ConfigurationItem          types.String `tfsdk:"configuration_item"`
@@ -161,6 +162,12 @@ func (r *servicenowResource) Schema(_ context.Context, _ resource.SchemaRequest,
 			},
 			"enable_ticket_creation": schema.BoolAttribute{
 				Description: "Whether to enable ServiceNow ticket creation.",
+				Optional:    true,
+				Computed:    true,
+				Default:     booldefault.StaticBool(false),
+			},
+			"enable_ticket_update": schema.BoolAttribute{
+				Description: "Whether to enable ServiceNow ticket update.",
 				Optional:    true,
 				Computed:    true,
 				Default:     booldefault.StaticBool(false),
@@ -301,6 +308,7 @@ func (r *servicenowResource) Create(ctx context.Context, req resource.CreateRequ
 		TriggerWindowInMills:       plan.TriggerWindowInMills.ValueInt64(),
 		EnableFeedbackCollect:      plan.EnableFeedbackCollect.ValueBool(),
 		EnableTicketCreation:       plan.EnableTicketCreation.ValueBool(),
+		EnableTicketUpdate:         plan.EnableTicketUpdate.ValueBool(),
 		TicketCreatedBySourceKey:   plan.TicketCreatedBySourceKey.ValueString(),
 		TicketCreatedBySourceValue: plan.TicketCreatedBySourceValue.ValueString(),
 		ConfigurationItem:          plan.ConfigurationItem.ValueString(),
@@ -452,6 +460,7 @@ func (r *servicenowResource) Read(ctx context.Context, req resource.ReadRequest,
 
 	state.EnableFeedbackCollect = types.BoolValue(config.EnableFeedbackCollect)
 	state.EnableTicketCreation = types.BoolValue(config.EnableTicketCreation)
+	state.EnableTicketUpdate = types.BoolValue(config.EnableTicketUpdate)
 
 	if config.TicketCreatedBySourceKey != "" {
 		state.TicketCreatedBySourceKey = types.StringValue(config.TicketCreatedBySourceKey)
@@ -605,6 +614,7 @@ func (r *servicenowResource) Update(ctx context.Context, req resource.UpdateRequ
 		TriggerWindowInMills:       plan.TriggerWindowInMills.ValueInt64(),
 		EnableFeedbackCollect:      plan.EnableFeedbackCollect.ValueBool(),
 		EnableTicketCreation:       plan.EnableTicketCreation.ValueBool(),
+		EnableTicketUpdate:         plan.EnableTicketUpdate.ValueBool(),
 		TicketCreatedBySourceKey:   plan.TicketCreatedBySourceKey.ValueString(),
 		TicketCreatedBySourceValue: plan.TicketCreatedBySourceValue.ValueString(),
 		ConfigurationItem:          plan.ConfigurationItem.ValueString(),
