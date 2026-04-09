@@ -107,10 +107,11 @@ resource "insightfinder_project" "servicenow_project" {
     instance_field       = "short_description"
     instance_field_regex = "1"
     timestamp_format     = "yyyy-MM-dd HH:mm:ss"
-    sysparm_query        = ""
-    proxy                = ""
-    additional_fields    = ["work_end", "priority"]
-    component_name_rule  = ""
+    sysparm_query           = ""
+    proxy                   = ""
+    additional_fields       = ["work_end", "priority"]
+    component_name_rule     = ""
+    service_now_import_flag = true
   }
 }
 ```
@@ -252,6 +253,7 @@ resource "insightfinder_project" "json_logs_example" {
   - `proxy` (String, Optional) Proxy URL for ServiceNow connection
   - `additional_fields` (List of String, Optional) Additional fields to fetch from ServiceNow
   - `component_name_rule` (String, Optional) Rule for determining the component name from ServiceNow data
+  - `service_now_import_flag` (Boolean, Optional, Computed) Whether to enable importing data from ServiceNow
 - `holiday_settings` (List of Objects) List of holiday settings for the project. Each holiday defines a period that should be treated as a holiday for anomaly detection purposes.
   - `name` (String, Required) Name of the holiday (must be unique within the project)
   - `start_date` (String, Required) Start date of the holiday in MM-DD format (e.g., `12-25`)

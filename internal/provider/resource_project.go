@@ -191,18 +191,19 @@ type projectCreationConfigModel struct {
 }
 
 type projectServiceNowSettingsModel struct {
-	Host               types.String `tfsdk:"host"`
-	SysparmQuery       types.String `tfsdk:"sysparm_query"`
-	Proxy              types.String `tfsdk:"proxy"`
-	ServiceNowUser     types.String `tfsdk:"servicenow_user"`
-	ServiceNowPassword types.String `tfsdk:"servicenow_password"`
-	InstanceField      types.String `tfsdk:"instance_field"`
-	InstanceFieldRegex types.String `tfsdk:"instance_field_regex"`
-	TimestampFormat    types.String `tfsdk:"timestamp_format"`
-	ClientID           types.String `tfsdk:"client_id"`
-	ClientSecret       types.String `tfsdk:"client_secret"`
-	AdditionalFields   types.List   `tfsdk:"additional_fields"`
-	ComponentNameRule  types.String `tfsdk:"component_name_rule"`
+	Host                 types.String `tfsdk:"host"`
+	SysparmQuery         types.String `tfsdk:"sysparm_query"`
+	Proxy                types.String `tfsdk:"proxy"`
+	ServiceNowUser       types.String `tfsdk:"servicenow_user"`
+	ServiceNowPassword   types.String `tfsdk:"servicenow_password"`
+	InstanceField        types.String `tfsdk:"instance_field"`
+	InstanceFieldRegex   types.String `tfsdk:"instance_field_regex"`
+	TimestampFormat      types.String `tfsdk:"timestamp_format"`
+	ClientID             types.String `tfsdk:"client_id"`
+	ClientSecret         types.String `tfsdk:"client_secret"`
+	AdditionalFields     types.List   `tfsdk:"additional_fields"`
+	ComponentNameRule    types.String `tfsdk:"component_name_rule"`
+	ServiceNowImportFlag types.Bool   `tfsdk:"service_now_import_flag"`
 }
 
 // Metadata returns the resource type name.
@@ -836,6 +837,11 @@ func (r *projectResource) Schema(_ context.Context, _ resource.SchemaRequest, re
 					},
 					"component_name_rule": schema.StringAttribute{
 						Description: "Rule for determining the component name from ServiceNow data",
+						Optional:    true,
+						Computed:    true,
+					},
+					"service_now_import_flag": schema.BoolAttribute{
+						Description: "Whether to enable importing data from ServiceNow",
 						Optional:    true,
 						Computed:    true,
 					},
@@ -1926,17 +1932,18 @@ func (r *projectResource) Create(ctx context.Context, req resource.CreateRequest
 
 			// Convert to client model
 			clientSettings := &client.ServiceNowThirdPartySettings{
-				Host:               serviceNowSettings.Host.ValueString(),
-				SysparmQuery:       serviceNowSettings.SysparmQuery.ValueString(),
-				Proxy:              serviceNowSettings.Proxy.ValueString(),
-				ServiceNowUser:     serviceNowSettings.ServiceNowUser.ValueString(),
-				ServiceNowPassword: serviceNowSettings.ServiceNowPassword.ValueString(),
-				InstanceField:      serviceNowSettings.InstanceField.ValueString(),
-				InstanceFieldRegex: serviceNowSettings.InstanceFieldRegex.ValueString(),
-				TimestampFormat:    serviceNowSettings.TimestampFormat.ValueString(),
-				ClientID:           serviceNowSettings.ClientID.ValueString(),
-				ClientSecret:       serviceNowSettings.ClientSecret.ValueString(),
-				ComponentNameRule:  serviceNowSettings.ComponentNameRule.ValueString(),
+				Host:                 serviceNowSettings.Host.ValueString(),
+				SysparmQuery:         serviceNowSettings.SysparmQuery.ValueString(),
+				Proxy:                serviceNowSettings.Proxy.ValueString(),
+				ServiceNowUser:       serviceNowSettings.ServiceNowUser.ValueString(),
+				ServiceNowPassword:   serviceNowSettings.ServiceNowPassword.ValueString(),
+				InstanceField:        serviceNowSettings.InstanceField.ValueString(),
+				InstanceFieldRegex:   serviceNowSettings.InstanceFieldRegex.ValueString(),
+				TimestampFormat:      serviceNowSettings.TimestampFormat.ValueString(),
+				ClientID:             serviceNowSettings.ClientID.ValueString(),
+				ClientSecret:         serviceNowSettings.ClientSecret.ValueString(),
+				ComponentNameRule:    serviceNowSettings.ComponentNameRule.ValueString(),
+				ServiceNowImportFlag: serviceNowSettings.ServiceNowImportFlag.ValueBool(),
 			}
 
 			// Convert additional fields list
@@ -2400,17 +2407,18 @@ func (r *projectResource) Read(ctx context.Context, req resource.ReadRequest, re
 			} else if serviceNowSettings != nil {
 				// Convert to terraform model
 				serviceNowModel := projectServiceNowSettingsModel{
-					Host:               types.StringValue(serviceNowSettings.Host),
-					SysparmQuery:       types.StringValue(serviceNowSettings.SysparmQuery),
-					Proxy:              types.StringValue(serviceNowSettings.Proxy),
-					ServiceNowUser:     types.StringValue(serviceNowSettings.ServiceNowUser),
-					ServiceNowPassword: types.StringValue(serviceNowSettings.ServiceNowPassword),
-					InstanceField:      types.StringValue(serviceNowSettings.InstanceField),
-					InstanceFieldRegex: types.StringValue(serviceNowSettings.InstanceFieldRegex),
-					TimestampFormat:    types.StringValue(serviceNowSettings.TimestampFormat),
-					ClientID:           types.StringValue(serviceNowSettings.ClientID),
-					ClientSecret:       types.StringValue(serviceNowSettings.ClientSecret),
-					ComponentNameRule:  types.StringValue(serviceNowSettings.ComponentNameRule),
+					Host:                 types.StringValue(serviceNowSettings.Host),
+					SysparmQuery:         types.StringValue(serviceNowSettings.SysparmQuery),
+					Proxy:                types.StringValue(serviceNowSettings.Proxy),
+					ServiceNowUser:       types.StringValue(serviceNowSettings.ServiceNowUser),
+					ServiceNowPassword:   types.StringValue(serviceNowSettings.ServiceNowPassword),
+					InstanceField:        types.StringValue(serviceNowSettings.InstanceField),
+					InstanceFieldRegex:   types.StringValue(serviceNowSettings.InstanceFieldRegex),
+					TimestampFormat:      types.StringValue(serviceNowSettings.TimestampFormat),
+					ClientID:             types.StringValue(serviceNowSettings.ClientID),
+					ClientSecret:         types.StringValue(serviceNowSettings.ClientSecret),
+					ComponentNameRule:    types.StringValue(serviceNowSettings.ComponentNameRule),
+					ServiceNowImportFlag: types.BoolValue(serviceNowSettings.ServiceNowImportFlag),
 				}
 
 				// Convert additional fields
@@ -2426,18 +2434,19 @@ func (r *projectResource) Read(ctx context.Context, req resource.ReadRequest, re
 
 				// Convert to types.Object
 				serviceNowObject, diags := types.ObjectValueFrom(ctx, map[string]attr.Type{
-					"host":                 types.StringType,
-					"sysparm_query":        types.StringType,
-					"proxy":                types.StringType,
-					"servicenow_user":      types.StringType,
-					"servicenow_password":  types.StringType,
-					"instance_field":       types.StringType,
-					"instance_field_regex": types.StringType,
-					"timestamp_format":     types.StringType,
-					"client_id":            types.StringType,
-					"client_secret":        types.StringType,
-					"additional_fields":    types.ListType{ElemType: types.StringType},
-					"component_name_rule":  types.StringType,
+					"host":                    types.StringType,
+					"sysparm_query":           types.StringType,
+					"proxy":                   types.StringType,
+					"servicenow_user":         types.StringType,
+					"servicenow_password":     types.StringType,
+					"instance_field":          types.StringType,
+					"instance_field_regex":    types.StringType,
+					"timestamp_format":        types.StringType,
+					"client_id":               types.StringType,
+					"client_secret":           types.StringType,
+					"additional_fields":       types.ListType{ElemType: types.StringType},
+					"component_name_rule":     types.StringType,
+					"service_now_import_flag": types.BoolType,
 				}, serviceNowModel)
 				resp.Diagnostics.Append(diags...)
 				if !resp.Diagnostics.HasError() {
@@ -3004,17 +3013,18 @@ func (r *projectResource) Update(ctx context.Context, req resource.UpdateRequest
 
 			// Convert to client model
 			clientSettings := &client.ServiceNowThirdPartySettings{
-				Host:               serviceNowSettings.Host.ValueString(),
-				SysparmQuery:       serviceNowSettings.SysparmQuery.ValueString(),
-				Proxy:              serviceNowSettings.Proxy.ValueString(),
-				ServiceNowUser:     serviceNowSettings.ServiceNowUser.ValueString(),
-				ServiceNowPassword: serviceNowSettings.ServiceNowPassword.ValueString(),
-				InstanceField:      serviceNowSettings.InstanceField.ValueString(),
-				InstanceFieldRegex: serviceNowSettings.InstanceFieldRegex.ValueString(),
-				TimestampFormat:    serviceNowSettings.TimestampFormat.ValueString(),
-				ClientID:           serviceNowSettings.ClientID.ValueString(),
-				ClientSecret:       serviceNowSettings.ClientSecret.ValueString(),
-				ComponentNameRule:  serviceNowSettings.ComponentNameRule.ValueString(),
+				Host:                 serviceNowSettings.Host.ValueString(),
+				SysparmQuery:         serviceNowSettings.SysparmQuery.ValueString(),
+				Proxy:                serviceNowSettings.Proxy.ValueString(),
+				ServiceNowUser:       serviceNowSettings.ServiceNowUser.ValueString(),
+				ServiceNowPassword:   serviceNowSettings.ServiceNowPassword.ValueString(),
+				InstanceField:        serviceNowSettings.InstanceField.ValueString(),
+				InstanceFieldRegex:   serviceNowSettings.InstanceFieldRegex.ValueString(),
+				TimestampFormat:      serviceNowSettings.TimestampFormat.ValueString(),
+				ClientID:             serviceNowSettings.ClientID.ValueString(),
+				ClientSecret:         serviceNowSettings.ClientSecret.ValueString(),
+				ComponentNameRule:    serviceNowSettings.ComponentNameRule.ValueString(),
+				ServiceNowImportFlag: serviceNowSettings.ServiceNowImportFlag.ValueBool(),
 			}
 
 			// Convert additional fields list
