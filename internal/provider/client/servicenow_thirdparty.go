@@ -13,20 +13,21 @@ import (
 
 // ServiceNowThirdPartySettings represents ServiceNow third-party settings
 type ServiceNowThirdPartySettings struct {
-	Host               string   `json:"host"`
-	SysparmQuery       string   `json:"sysparmQuery"`
-	Proxy              string   `json:"proxy"`
-	ServiceNowUser     string   `json:"serviceNowUser"`
-	ServiceNowPassword string   `json:"serviceNowPassword"`
-	InstanceField      string   `json:"instanceField"`
-	InstanceFieldRegex string   `json:"instanceFieldRegex"`
-	TimestampFormat    string   `json:"timestampFormat"`
-	ClientID           string   `json:"clientId"`
-	ClientSecret       string   `json:"clientSecret"`
-	AdditionalFields   []string `json:"additionalFields"`
-	DefaultFields      []string `json:"defaultFields"`
-	Fields             []string `json:"fields"`
-	ComponentNameRule  string   `json:"componentNameRule"`
+	Host                 string   `json:"host"`
+	SysparmQuery         string   `json:"sysparmQuery"`
+	Proxy                string   `json:"proxy"`
+	ServiceNowUser       string   `json:"serviceNowUser"`
+	ServiceNowPassword   string   `json:"serviceNowPassword"`
+	InstanceField        string   `json:"instanceField"`
+	InstanceFieldRegex   string   `json:"instanceFieldRegex"`
+	TimestampFormat      string   `json:"timestampFormat"`
+	ClientID             string   `json:"clientId"`
+	ClientSecret         string   `json:"clientSecret"`
+	AdditionalFields     []string `json:"additionalFields"`
+	DefaultFields        []string `json:"defaultFields"`
+	Fields               []string `json:"fields"`
+	ComponentNameRule    string   `json:"componentNameRule"`
+	ServiceNowImportFlag bool     `json:"serviceNowImportFlag"`
 }
 
 // ServiceNowThirdPartyResponse represents the API response
@@ -131,6 +132,9 @@ func (c *Client) GetServiceNowThirdPartySettings(projectName string) (*ServiceNo
 	if componentNameRule, ok := rawResponse["componentNameRule"].(string); ok {
 		settings.ComponentNameRule = componentNameRule
 	}
+	if serviceNowImportFlag, ok := rawResponse["serviceNowImportFlag"].(bool); ok {
+		settings.ServiceNowImportFlag = serviceNowImportFlag
+	}
 
 	// Parse array fields
 	if additionalFields, ok := rawResponse["additionalFields"].([]interface{}); ok {
@@ -175,6 +179,11 @@ func (c *Client) CreateOrUpdateServiceNowThirdPartySettings(projectName string, 
 	params.Add("instanceFieldRegex", settings.InstanceFieldRegex)
 	params.Add("useHostName", "false")
 	params.Add("componentNameRule", settings.ComponentNameRule)
+	if settings.ServiceNowImportFlag {
+		params.Add("serviceNowImportFlag", "true")
+	} else {
+		params.Add("serviceNowImportFlag", "false")
+	}
 
 	// Encode additional fields as JSON array
 	if settings.AdditionalFields != nil {
