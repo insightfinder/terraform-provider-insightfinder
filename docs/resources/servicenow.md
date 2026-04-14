@@ -56,8 +56,8 @@ resource "insightfinder_servicenow" "full" {
     "Production-EU",
     "Production-APAC"
   ]
-  options        = ["Root Cause", "Predicted Incident", "Detected Incident with RCA"]
-  content_option = ["SUMMARY", "RECOMMENDATION"]
+  options        = ["Root Cause"]
+  content_option = ["SUMMARY"]
   auth_type      = "basic"
   proxy          = "http://proxy.company.com:8080"
 
