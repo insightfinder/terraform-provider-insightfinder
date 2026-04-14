@@ -102,6 +102,56 @@ resource "insightfinder_system_settings" "example" {
 }
 ```
 
+### Notifications with Project-Level Dampening Windows
+
+```terraform
+resource "insightfinder_system_settings" "with_dampening_windows" {
+  system_name = "my-production-system"
+
+  notifications_settings = {
+    aggregation_interval                   = 10
+    order                                  = 0
+    hide_flag                              = false
+    enable_splunk_export                   = false
+    only_send_with_rca                     = false
+    enable_system_down_email_alert         = false
+    enable_incident_prediction_email_alert = true
+    enable_incident_detection_email_alert  = true
+    enable_alerts_email                    = false
+    enable_health_email_alert              = false
+    enable_root_cause_email_alert          = false
+    prediction_email                       = ""
+    alert_email                            = ""
+    health_alert_email                     = ""
+    incident_detection_email               = ""
+    root_cause_email                       = ""
+    alert_health_score                     = 0.0
+    alert_frequency                        = 0
+    email_dampening_period                 = 3600000
+    alerts_email_dampening_period          = 3600000
+    prediction_email_dampening_period      = 3600000
+    incident_dampening_window              = 14400000
+    incident_count_threshold               = jsonencode({ "my-llm-project@admin" = 3 })
+    assignment_map                         = jsonencode({})
+
+    project_level_dampening_windows = [
+      {
+        source_project = "change-detection-project"
+        target_project = "change-detection-project"
+        duration       = 21600000
+      },
+      {
+        source_project  = "llm-trace-project"
+        target_project  = "change-detection-project"
+        source_customer = "admin"
+        target_customer = "admin"
+        duration        = 28800000
+      }
+    ]
+  }
+}
+```
+
 ### Notifications with System Down, Reports, and Instance Down
 
 ```terraform
@@ -388,6 +438,18 @@ A list of per-project instance-down alert configurations via `/api/external/v1/p
 | `instance_down_report_number` | Number | Number of instances that must be down before an alert is sent. |
 | `instance_down_emails` | List of String | Email addresses to notify when instances go down. |
 
+#### Project Level Dampening Windows
+
+A set of project-pair dampening window rules stored in the health view setting. Each rule overrides the system-level `incident_dampening_window` for a specific source→target project relationship. Order does not matter — Terraform compares entries by value regardless of the order returned by the API.
+
+| Attribute | Type | Description |
+|-----------|------|-------------|
+| `source_project` | String (Required) | The source project name (`ps`). |
+| `target_project` | String (Required) | The target project name (`pt`). |
+| `source_customer` | String | Customer (username) of the source project (`cs`). Defaults to the provider username when omitted. |
+| `target_customer` | String | Customer (username) of the target project (`ct`). Defaults to the provider username when omitted. |
+| `duration` | Number (Required) | Dampening duration in milliseconds (`d`). |
+
 ---
 
 ## Import
@@ -406,4 +468,5 @@ After import, run `terraform plan` to review which computed fields will be popul
 - **Delete behavior**: Removing this resource from Terraform state does not change the settings on the InsightFinder server. The settings persist and must be manually reset if needed.
 - **`satellite_system_set`**: Must be provided as a JSON-encoded string using `jsonencode(...)`. The value is semantically compared during plan/apply to avoid spurious diffs caused by JSON key ordering.
 - **`incident_count_threshold` and `assignment_map`**: Must be provided as JSON-encoded strings using `jsonencode(...)`. These fields are stored as serialized JSON in Terraform state and compared semantically to avoid key-ordering diffs.
+- **`project_level_dampening_windows`**: Optional and Computed list. When omitted, the server value is preserved in state. When set (even to `[]`), the declared list replaces any existing rules on the server. `source_customer` and `target_customer` default to the provider username when not specified.
 - **API endpoints**: `knowledgebase_settings` maps to two separate API calls — `SetGlobalKBSetting` and `SetIncidentPredictionSetting`. `notifications_settings` maps to `SetHealthViewSetting`.

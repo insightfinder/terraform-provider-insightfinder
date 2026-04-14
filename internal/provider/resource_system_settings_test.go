@@ -524,6 +524,118 @@ resource "insightfinder_system_settings" "test" {
 `
 }
 
+func TestAccSystemSettingsResource_ProjectLevelDampeningWindows(t *testing.T) {
+	resource.Test(t, resource.TestCase{
+		PreCheck:                 func() { testAccPreCheck(t) },
+		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
+		Steps: []resource.TestStep{
+			{
+				Config: testAccSystemSettingsResourceConfigDampeningWindows("test-system-dampening"),
+				Check: resource.ComposeAggregateTestCheckFunc(
+					resource.TestCheckResourceAttr("insightfinder_system_settings.test", "system_name", "test-system-dampening"),
+					resource.TestCheckResourceAttr("insightfinder_system_settings.test", "notifications_settings.project_level_dampening_windows.#", "2"),
+					resource.TestCheckTypeSetElemNestedAttrs("insightfinder_system_settings.test", "notifications_settings.project_level_dampening_windows.*", map[string]string{
+						"source_project": "change-project",
+						"target_project": "change-project",
+						"duration":       "21600000",
+					}),
+					resource.TestCheckTypeSetElemNestedAttrs("insightfinder_system_settings.test", "notifications_settings.project_level_dampening_windows.*", map[string]string{
+						"source_project": "llm-project",
+						"target_project": "change-project",
+						"duration":       "28800000",
+					}),
+					resource.TestCheckResourceAttrSet("insightfinder_system_settings.test", "id"),
+				),
+			},
+			{
+				ResourceName:      "insightfinder_system_settings.test",
+				ImportState:       true,
+				ImportStateVerify: true,
+			},
+			// Update: clear windows
+			{
+				Config: testAccSystemSettingsResourceConfigDampeningWindowsCleared("test-system-dampening"),
+				Check: resource.ComposeAggregateTestCheckFunc(
+					resource.TestCheckResourceAttr("insightfinder_system_settings.test", "notifications_settings.project_level_dampening_windows.#", "0"),
+				),
+			},
+		},
+	})
+}
+
+func testAccSystemSettingsResourceConfigDampeningWindows(systemName string) string {
+	return `
+resource "insightfinder_system_settings" "test" {
+  system_name = "` + systemName + `"
+
+  notifications_settings = {
+    prediction_email                       = ""
+    enable_system_down_email_alert         = false
+    alert_health_score                     = 0.5
+    aggregation_interval                   = 10
+    alert_frequency                        = 0
+    email_dampening_period                 = 3600000
+    alerts_email_dampening_period          = 3600000
+    prediction_email_dampening_period      = 3600000
+    incident_dampening_window              = 14400000
+    hide_flag                              = false
+    enable_splunk_export                   = false
+    only_send_with_rca                     = false
+    enable_incident_prediction_email_alert = false
+    enable_incident_detection_email_alert  = true
+    enable_alerts_email                    = false
+    enable_health_email_alert              = false
+    enable_root_cause_email_alert          = false
+    order                                  = 0
+
+    project_level_dampening_windows = [
+      {
+        source_project = "change-project"
+        target_project = "change-project"
+        duration       = 21600000
+      },
+      {
+        source_project = "llm-project"
+        target_project = "change-project"
+        duration       = 28800000
+      }
+    ]
+  }
+}
+`
+}
+
+func testAccSystemSettingsResourceConfigDampeningWindowsCleared(systemName string) string {
+	return `
+resource "insightfinder_system_settings" "test" {
+  system_name = "` + systemName + `"
+
+  notifications_settings = {
+    prediction_email                       = ""
+    enable_system_down_email_alert         = false
+    alert_health_score                     = 0.5
+    aggregation_interval                   = 10
+    alert_frequency                        = 0
+    email_dampening_period                 = 3600000
+    alerts_email_dampening_period          = 3600000
+    prediction_email_dampening_period      = 3600000
+    incident_dampening_window              = 14400000
+    hide_flag                              = false
+    enable_splunk_export                   = false
+    only_send_with_rca                     = false
+    enable_incident_prediction_email_alert = false
+    enable_incident_detection_email_alert  = true
+    enable_alerts_email                    = false
+    enable_health_email_alert              = false
+    enable_root_cause_email_alert          = false
+    order                                  = 0
+
+    project_level_dampening_windows = []
+  }
+}
+`
+}
+
 func testAccSystemSettingsResourceConfigInstanceDownUpdated(systemName string) string {
 	return `
 resource "insightfinder_system_settings" "test" {

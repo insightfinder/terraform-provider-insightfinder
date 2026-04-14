@@ -108,6 +108,22 @@ resource "insightfinder_system_settings" "with_notifications" {
         instance_down_emails        = []
       }
     ]
+
+    # Project-level dampening window overrides
+    project_level_dampening_windows = [
+      {
+        source_project = "change-detection-project"
+        target_project = "change-detection-project"
+        duration       = 21600000
+      },
+      {
+        source_project  = "llm-trace-project"
+        target_project  = "change-detection-project"
+        source_customer = "admin"
+        target_customer = "admin"
+        duration        = 28800000
+      }
+    ]
   }
 }
 
@@ -183,6 +199,14 @@ resource "insightfinder_system_settings" "full" {
         instance_down_threshold     = 300000
         instance_down_report_number = 1
         instance_down_emails        = ["oncall@example.com"]
+      }
+    ]
+
+    project_level_dampening_windows = [
+      {
+        source_project = "production-metrics"
+        target_project = "production-metrics"
+        duration       = 21600000
       }
     ]
   }

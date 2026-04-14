@@ -109,11 +109,21 @@ type HealthViewSetting struct {
 	IncidentDetectionEmail                string                 `json:"incidentDetectionEmail"`
 	EnableRootCauseEmailAlert             bool                   `json:"enableRootCauseEmailAlert"`
 	RootCauseEmail                        string                 `json:"rootCauseEmail"`
-	IncidentCountThreshold                map[string]int64       `json:"incidentCountThreshold,omitempty"`
-	AssignmentMap                         map[string]any         `json:"assignmentMap"`
-	IncidentDampeningWindow               int64                  `json:"incidentDampeningWindow"`
-	SystemID                              string                 `json:"systemId,omitempty"`
-	ID                                    string                 `json:"id,omitempty"`
+	IncidentCountThreshold                map[string]int64             `json:"incidentCountThreshold,omitempty"`
+	AssignmentMap                         map[string]any               `json:"assignmentMap"`
+	IncidentDampeningWindow               int64                        `json:"incidentDampeningWindow"`
+	ProjectLevelDampeningWindows          []ProjectLevelDampeningWindow `json:"projectLevelDampeningWindows"`
+	SystemID                              string                       `json:"systemId,omitempty"`
+	ID                                    string                       `json:"id,omitempty"`
+}
+
+// ProjectLevelDampeningWindow represents a project-level dampening window entry
+type ProjectLevelDampeningWindow struct {
+	SourceProject  string `json:"ps"`
+	TargetProject  string `json:"pt"`
+	SourceCustomer string `json:"cs"`
+	TargetCustomer string `json:"ct"`
+	Duration       int64  `json:"d"`
 }
 
 // SystemDownSetting represents system down notification settings for a system
@@ -688,6 +698,7 @@ func (c *Client) SetHealthViewSetting(systemID string, updates *HealthViewSettin
 	current.EnableRootCauseEmailAlert = updates.EnableRootCauseEmailAlert
 	current.RootCauseEmail = updates.RootCauseEmail
 	current.IncidentDampeningWindow = updates.IncidentDampeningWindow
+	current.ProjectLevelDampeningWindows = updates.ProjectLevelDampeningWindows
 	current.SystemID = systemID
 	current.ID = systemID
 
