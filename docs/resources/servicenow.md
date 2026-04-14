@@ -74,8 +74,8 @@ resource "insightfinder_servicenow" "full" {
   enable_feedback_collect = true
 
   # Filter ticket creation by a specific field value
-  ticket_created_by_source_key   = "activity_source"
-  ticket_created_by_source_value = "abccccdddd"
+  ticket_created_by_source_key   = "activity_due"
+  ticket_created_by_source_value = "xyzzz"
 
   # Associate created tickets with a CMDB configuration item
   configuration_item = "My-Server-CI"
