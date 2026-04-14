@@ -9,6 +9,7 @@ import (
 	"strings"
 
 	"github.com/hashicorp/terraform-plugin-framework/attr"
+	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
@@ -39,6 +40,13 @@ type servicenowResource struct {
 	client *client.Client
 }
 
+// projectConfigModel maps per-project ServiceNow ticket settings.
+type projectConfigModel struct {
+	EnableTicketCreation                  types.Bool `tfsdk:"enable_ticket_creation"`
+	EnableTicketUpdate                    types.Bool `tfsdk:"enable_ticket_update"`
+	EnableIncidentConsolidationInfoUpdate types.Bool `tfsdk:"enable_incident_consolidation_info_update"`
+}
+
 // servicenowResourceModel maps the resource schema data.
 type servicenowResourceModel struct {
 	ID                         types.String `tfsdk:"id"`
@@ -57,11 +65,10 @@ type servicenowResourceModel struct {
 	ContentSource              types.String `tfsdk:"content_source"`
 	TriggerWindowInMills       types.Int64  `tfsdk:"trigger_window_in_mills"`
 	EnableFeedbackCollect      types.Bool   `tfsdk:"enable_feedback_collect"`
-	EnableTicketCreation       types.Bool   `tfsdk:"enable_ticket_creation"`
-	EnableTicketUpdate         types.Bool   `tfsdk:"enable_ticket_update"`
 	TicketCreatedBySourceKey   types.String `tfsdk:"ticket_created_by_source_key"`
 	TicketCreatedBySourceValue types.String `tfsdk:"ticket_created_by_source_value"`
 	ConfigurationItem          types.String `tfsdk:"configuration_item"`
+	ProjectConfigs             types.Map    `tfsdk:"project_configs"`
 	TableMapping               types.Map    `tfsdk:"table_mapping"`
 }
 
@@ -160,18 +167,6 @@ func (r *servicenowResource) Schema(_ context.Context, _ resource.SchemaRequest,
 				Computed:    true,
 				Default:     booldefault.StaticBool(false),
 			},
-			"enable_ticket_creation": schema.BoolAttribute{
-				Description: "Whether to enable ServiceNow ticket creation.",
-				Optional:    true,
-				Computed:    true,
-				Default:     booldefault.StaticBool(false),
-			},
-			"enable_ticket_update": schema.BoolAttribute{
-				Description: "Whether to enable ServiceNow ticket update.",
-				Optional:    true,
-				Computed:    true,
-				Default:     booldefault.StaticBool(false),
-			},
 			"ticket_created_by_source_key": schema.StringAttribute{
 				Description: "ServiceNow field key used to filter when a ticket is created (e.g., 'activity_due').",
 				Optional:    true,
@@ -183,6 +178,32 @@ func (r *servicenowResource) Schema(_ context.Context, _ resource.SchemaRequest,
 			"configuration_item": schema.StringAttribute{
 				Description: "ServiceNow configuration item (CMDB CI) to associate with created tickets.",
 				Optional:    true,
+			},
+			"project_configs": schema.MapNestedAttribute{
+				Description: "Per-project ServiceNow ticket configuration.",
+				Optional:    true,
+				NestedObject: schema.NestedAttributeObject{
+					Attributes: map[string]schema.Attribute{
+						"enable_ticket_creation": schema.BoolAttribute{
+							Description: "Whether to enable ServiceNow ticket creation for this project.",
+							Optional:    true,
+							Computed:    true,
+							Default:     booldefault.StaticBool(false),
+						},
+						"enable_ticket_update": schema.BoolAttribute{
+							Description: "Whether to enable ServiceNow ticket updates for this project.",
+							Optional:    true,
+							Computed:    true,
+							Default:     booldefault.StaticBool(false),
+						},
+						"enable_incident_consolidation_info_update": schema.BoolAttribute{
+							Description: "Whether to enable incident consolidation info updates for this project.",
+							Optional:    true,
+							Computed:    true,
+							Default:     booldefault.StaticBool(false),
+						},
+					},
+				},
 			},
 			"table_mapping": schema.MapAttribute{
 				Description: "Mapping of InsightFinder project names to ServiceNow table names (e.g., {\"my-project\" = \"incident\"}).",
@@ -291,6 +312,12 @@ func (r *servicenowResource) Create(ctx context.Context, req resource.CreateRequ
 		return
 	}
 
+	projectConfigs, err := projectConfigsFromTF(ctx, plan.ProjectConfigs)
+	if err != nil {
+		resp.Diagnostics.AddError("Error Reading project_configs", err.Error())
+		return
+	}
+
 	config := &client.ServiceNowConfig{
 		Account:                    plan.Account.ValueString(),
 		ServiceHost:                plan.ServiceHost.ValueString(),
@@ -307,14 +334,13 @@ func (r *servicenowResource) Create(ctx context.Context, req resource.CreateRequ
 		ContentSource:              plan.ContentSource.ValueString(),
 		TriggerWindowInMills:       plan.TriggerWindowInMills.ValueInt64(),
 		EnableFeedbackCollect:      plan.EnableFeedbackCollect.ValueBool(),
-		EnableTicketCreation:       plan.EnableTicketCreation.ValueBool(),
-		EnableTicketUpdate:         plan.EnableTicketUpdate.ValueBool(),
 		TicketCreatedBySourceKey:   plan.TicketCreatedBySourceKey.ValueString(),
 		TicketCreatedBySourceValue: plan.TicketCreatedBySourceValue.ValueString(),
 		ConfigurationItem:          plan.ConfigurationItem.ValueString(),
+		ProjectConfigs:             projectConfigs,
 	}
 
-	err := r.client.CreateOrUpdateServiceNowConfig(config, r.client.Username, true)
+	err = r.client.CreateOrUpdateServiceNowConfig(config, r.client.Username, true)
 	if err != nil {
 		resp.Diagnostics.AddError(
 			"Error Creating ServiceNow Config (Verification)",
@@ -459,8 +485,6 @@ func (r *servicenowResource) Read(ctx context.Context, req resource.ReadRequest,
 	}
 
 	state.EnableFeedbackCollect = types.BoolValue(config.EnableFeedbackCollect)
-	state.EnableTicketCreation = types.BoolValue(config.EnableTicketCreation)
-	state.EnableTicketUpdate = types.BoolValue(config.EnableTicketUpdate)
 
 	if config.TicketCreatedBySourceKey != "" {
 		state.TicketCreatedBySourceKey = types.StringValue(config.TicketCreatedBySourceKey)
@@ -476,6 +500,17 @@ func (r *servicenowResource) Read(ctx context.Context, req resource.ReadRequest,
 		state.ConfigurationItem = types.StringValue(config.ConfigurationItem)
 	} else {
 		state.ConfigurationItem = types.StringNull()
+	}
+
+	if len(config.ProjectConfigs) > 0 {
+		projectConfigsMap, d := projectConfigsToTF(ctx, config.ProjectConfigs)
+		resp.Diagnostics.Append(d...)
+		if resp.Diagnostics.HasError() {
+			return
+		}
+		state.ProjectConfigs = projectConfigsMap
+	} else {
+		state.ProjectConfigs = types.MapNull(projectConfigAttrTypes())
 	}
 
 	if len(config.TableMapping) > 0 {
@@ -597,6 +632,12 @@ func (r *servicenowResource) Update(ctx context.Context, req resource.UpdateRequ
 		return
 	}
 
+	projectConfigs, err := projectConfigsFromTF(ctx, plan.ProjectConfigs)
+	if err != nil {
+		resp.Diagnostics.AddError("Error Reading project_configs", err.Error())
+		return
+	}
+
 	config := &client.ServiceNowConfig{
 		Account:                    plan.Account.ValueString(),
 		ServiceHost:                plan.ServiceHost.ValueString(),
@@ -613,14 +654,13 @@ func (r *servicenowResource) Update(ctx context.Context, req resource.UpdateRequ
 		ContentSource:              plan.ContentSource.ValueString(),
 		TriggerWindowInMills:       plan.TriggerWindowInMills.ValueInt64(),
 		EnableFeedbackCollect:      plan.EnableFeedbackCollect.ValueBool(),
-		EnableTicketCreation:       plan.EnableTicketCreation.ValueBool(),
-		EnableTicketUpdate:         plan.EnableTicketUpdate.ValueBool(),
 		TicketCreatedBySourceKey:   plan.TicketCreatedBySourceKey.ValueString(),
 		TicketCreatedBySourceValue: plan.TicketCreatedBySourceValue.ValueString(),
 		ConfigurationItem:          plan.ConfigurationItem.ValueString(),
+		ProjectConfigs:             projectConfigs,
 	}
 
-	err := r.client.CreateOrUpdateServiceNowConfig(config, r.client.Username, true)
+	err = r.client.CreateOrUpdateServiceNowConfig(config, r.client.Username, true)
 	if err != nil {
 		resp.Diagnostics.AddError(
 			"Error Updating ServiceNow Config (Verification)",
@@ -718,6 +758,61 @@ func (r *servicenowResource) ImportState(ctx context.Context, req resource.Impor
 	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("account"), parts[0])...)
 	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("service_host"), parts[1])...)
 	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("id"), req.ID)...)
+}
+
+// projectConfigAttrTypes returns the attr.Type map for a projectConfigModel object.
+func projectConfigAttrTypes() attr.Type {
+	return types.ObjectType{
+		AttrTypes: map[string]attr.Type{
+			"enable_ticket_creation":                    types.BoolType,
+			"enable_ticket_update":                      types.BoolType,
+			"enable_incident_consolidation_info_update": types.BoolType,
+		},
+	}
+}
+
+// projectConfigsFromTF converts a Terraform types.Map into a client.ProjectConfig map.
+// Returns nil (not an error) when the map is null or unknown.
+func projectConfigsFromTF(ctx context.Context, m types.Map) (map[string]client.ServiceNowProjectConfig, error) {
+	if m.IsNull() || m.IsUnknown() {
+		return nil, nil
+	}
+	var models map[string]projectConfigModel
+	diags := m.ElementsAs(ctx, &models, false)
+	if diags.HasError() {
+		return nil, fmt.Errorf("failed to read project_configs: %s", diags[0].Detail())
+	}
+	result := make(map[string]client.ServiceNowProjectConfig, len(models))
+	for projectName, pc := range models {
+		result[projectName] = client.ServiceNowProjectConfig{
+			EnableTicketCreation:                  pc.EnableTicketCreation.ValueBool(),
+			EnableTicketUpdate:                    pc.EnableTicketUpdate.ValueBool(),
+			EnableIncidentConsolidationInfoUpdate: pc.EnableIncidentConsolidationInfoUpdate.ValueBool(),
+		}
+	}
+	return result, nil
+}
+
+// projectConfigsToTF converts a ServiceNowProjectConfig map into a Terraform types.Map.
+func projectConfigsToTF(_ context.Context, configs map[string]client.ServiceNowProjectConfig) (types.Map, diag.Diagnostics) {
+	attrTypes := map[string]attr.Type{
+		"enable_ticket_creation":                    types.BoolType,
+		"enable_ticket_update":                      types.BoolType,
+		"enable_incident_consolidation_info_update": types.BoolType,
+	}
+	elements := make(map[string]attr.Value, len(configs))
+	for projectName, pc := range configs {
+		obj, d := types.ObjectValue(attrTypes, map[string]attr.Value{
+			"enable_ticket_creation":                    types.BoolValue(pc.EnableTicketCreation),
+			"enable_ticket_update":                      types.BoolValue(pc.EnableTicketUpdate),
+			"enable_incident_consolidation_info_update": types.BoolValue(pc.EnableIncidentConsolidationInfoUpdate),
+		})
+		if d.HasError() {
+			return types.MapNull(types.ObjectType{AttrTypes: attrTypes}), d
+		}
+		elements[projectName] = obj
+	}
+	return types.MapValue(types.ObjectType{AttrTypes: attrTypes}, elements)
 }
 
 // tableMappingFromTF converts a Terraform types.Map to [][]string for the API

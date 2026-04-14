@@ -5,6 +5,16 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.8.9] - 2026-04-14
+
+### Changed
+- **insightfinder_servicenow**: Replaced flat `enable_ticket_creation` and `enable_ticket_update` attributes with the new `project_configs` map — ticket creation, update, and incident consolidation info settings are now configured per project
+  - Added `project_configs` (Map of Object, Optional): maps each InsightFinder project name to an object with `enable_ticket_creation`, `enable_ticket_update`, and `enable_incident_consolidation_info_update` booleans
+  - Removed `enable_ticket_creation` (Boolean) — superseded by `project_configs.<project>.enable_ticket_creation`
+  - Removed `enable_ticket_update` (Boolean) — superseded by `project_configs.<project>.enable_ticket_update`
+  - `projectConfigs` is now sent as a JSON object in the POST body to `/api/external/v1/service-integration`
+  - Read now parses `projectConfigs` from the root-level API response with fallback to the embedded `configs` JSON string
+
 ## [1.8.8] - 2026-04-09
 
 ### Added
@@ -378,11 +388,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## Version History
 
+- **1.8.9** - Replaced flat `enable_ticket_creation`/`enable_ticket_update` with per-project `project_configs` map in `insightfinder_servicenow`
+- **1.8.8** - Added `service_now_import_flag` to `insightfinder_project` ServiceNow settings
 - **1.8.0** - Added `insightfinder_metric_project` resource; fixed `omitempty` zero-value bug in both metric and log project updates
 - **1.7.0** - Added `dampening_field_setting` to `json_key_settings`; fixed system settings and email_setting generation in CLI tool
 - **1.0.0** - Initial release with core functionality
 
+[1.8.9]: https://github.com/insightfinder/terraform-provider-insightfinder/releases/tag/v1.8.9
+[1.8.8]: https://github.com/insightfinder/terraform-provider-insightfinder/releases/tag/v1.8.8
 [1.8.0]: https://github.com/insightfinder/terraform-provider-insightfinder/releases/tag/v1.8.0
 [1.7.0]: https://github.com/insightfinder/terraform-provider-insightfinder/releases/tag/v1.7.0
 [1.0.0]: https://github.com/insightfinder/terraform-provider-insightfinder/releases/tag/v1.0.0
-[Unreleased]: https://github.com/insightfinder/terraform-provider-insightfinder/compare/v1.8.0...HEAD
+[Unreleased]: https://github.com/insightfinder/terraform-provider-insightfinder/compare/v1.8.9...HEAD
