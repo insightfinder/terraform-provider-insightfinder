@@ -99,10 +99,11 @@ type notificationsSettingsModel struct {
 	RootCauseEmail                     types.String  `tfsdk:"root_cause_email"`
 	IncidentDampeningWindow            types.Int64   `tfsdk:"incident_dampening_window"`
 	// New notification settings
-	SystemDownNotification   *systemDownNotificationModel     `tfsdk:"system_down_notification"`
-	DailyReportNotification  *insightsReportNotificationModel `tfsdk:"daily_report_notification"`
-	WeeklyReportNotification *insightsReportNotificationModel `tfsdk:"weekly_report_notification"`
-	InstanceDownNotification []instanceDownNotificationModel  `tfsdk:"instance_down_notification"`
+	SystemDownNotification       *systemDownNotificationModel       `tfsdk:"system_down_notification"`
+	DailyReportNotification      *insightsReportNotificationModel   `tfsdk:"daily_report_notification"`
+	WeeklyReportNotification     *insightsReportNotificationModel   `tfsdk:"weekly_report_notification"`
+	InstanceDownNotification     []instanceDownNotificationModel    `tfsdk:"instance_down_notification"`
+	ProjectLevelDampeningWindows []projectLevelDampeningWindowModel `tfsdk:"project_level_dampening_windows"`
 }
 
 // systemDownNotificationModel holds system down notification settings
@@ -126,6 +127,15 @@ type instanceDownNotificationModel struct {
 	InstanceDownThreshold    types.Int64  `tfsdk:"instance_down_threshold"`
 	InstanceDownReportNumber types.Int64  `tfsdk:"instance_down_report_number"`
 	InstanceDownEmails       types.List   `tfsdk:"instance_down_emails"`
+}
+
+// projectLevelDampeningWindowModel holds a single project-level dampening window entry
+type projectLevelDampeningWindowModel struct {
+	SourceProject  types.String `tfsdk:"source_project"`
+	TargetProject  types.String `tfsdk:"target_project"`
+	SourceCustomer types.String `tfsdk:"source_customer"`
+	TargetCustomer types.String `tfsdk:"target_customer"`
+	Duration       types.Int64  `tfsdk:"duration"`
 }
 
 // Metadata returns the resource type name.
@@ -620,6 +630,36 @@ func (r *systemSettingsResource) Schema(_ context.Context, _ resource.SchemaRequ
 							},
 						},
 					},
+					"project_level_dampening_windows": schema.SetNestedAttribute{
+						Description: "Project-level dampening window rules. Each rule overrides the system-level incident dampening window for a specific source→target project pair.",
+						Optional:    true,
+						NestedObject: schema.NestedAttributeObject{
+							Attributes: map[string]schema.Attribute{
+								"source_project": schema.StringAttribute{
+									Description: "The source project name.",
+									Required:    true,
+								},
+								"target_project": schema.StringAttribute{
+									Description: "The target project name.",
+									Required:    true,
+								},
+								"source_customer": schema.StringAttribute{
+									Description: "The customer (username) of the source project. Defaults to the provider username.",
+									Optional:    true,
+									Computed:    true,
+								},
+								"target_customer": schema.StringAttribute{
+									Description: "The customer (username) of the target project. Defaults to the provider username.",
+									Optional:    true,
+									Computed:    true,
+								},
+								"duration": schema.Int64Attribute{
+									Description: "Dampening duration in milliseconds.",
+									Required:    true,
+								},
+							},
+						},
+					},
 				},
 			},
 		},
@@ -870,6 +910,26 @@ func (r *systemSettingsResource) applyNotificationsSettings(_ context.Context, s
 		updates.AssignmentMap = am
 	}
 
+	windows := make([]client.ProjectLevelDampeningWindow, 0, len(m.ProjectLevelDampeningWindows))
+	for _, w := range m.ProjectLevelDampeningWindows {
+		sc := w.SourceCustomer.ValueString()
+		if sc == "" {
+			sc = r.client.Username
+		}
+		tc := w.TargetCustomer.ValueString()
+		if tc == "" {
+			tc = r.client.Username
+		}
+		windows = append(windows, client.ProjectLevelDampeningWindow{
+			SourceProject:  w.SourceProject.ValueString(),
+			TargetProject:  w.TargetProject.ValueString(),
+			SourceCustomer: sc,
+			TargetCustomer: tc,
+			Duration:       w.Duration.ValueInt64(),
+		})
+	}
+	updates.ProjectLevelDampeningWindows = windows
+
 	if err := r.client.SetHealthViewSetting(systemID, updates); err != nil {
 		return fmt.Errorf("failed to set health view setting: %w", err)
 	}
@@ -1043,6 +1103,20 @@ func (r *systemSettingsResource) readIntoModel(_ context.Context, systemID strin
 			m.NotificationsSettings.EnableRootCauseEmailAlert = types.BoolValue(hvSetting.EnableRootCauseEmailAlert)
 			m.NotificationsSettings.RootCauseEmail = types.StringValue(hvSetting.RootCauseEmail)
 			m.NotificationsSettings.IncidentDampeningWindow = types.Int64Value(hvSetting.IncidentDampeningWindow)
+
+			if m.NotificationsSettings.ProjectLevelDampeningWindows != nil {
+				newWindows := make([]projectLevelDampeningWindowModel, 0, len(hvSetting.ProjectLevelDampeningWindows))
+				for _, w := range hvSetting.ProjectLevelDampeningWindows {
+					newWindows = append(newWindows, projectLevelDampeningWindowModel{
+						SourceProject:  types.StringValue(w.SourceProject),
+						TargetProject:  types.StringValue(w.TargetProject),
+						SourceCustomer: types.StringValue(w.SourceCustomer),
+						TargetCustomer: types.StringValue(w.TargetCustomer),
+						Duration:       types.Int64Value(w.Duration),
+					})
+				}
+				m.NotificationsSettings.ProjectLevelDampeningWindows = newWindows
+			}
 		}
 
 		// System down notification
