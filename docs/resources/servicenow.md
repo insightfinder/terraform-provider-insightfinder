@@ -43,7 +43,7 @@ resource "insightfinder_servicenow" "oauth" {
 }
 ```
 
-### Full Configuration with Table Mapping
+### Full Configuration with Per-Project Settings and Table Mapping
 
 ```terraform
 resource "insightfinder_servicenow" "full" {
@@ -56,8 +56,8 @@ resource "insightfinder_servicenow" "full" {
     "Production-EU",
     "Production-APAC"
   ]
-  options        = ["Root Cause"]
-  content_option = ["SUMMARY"]
+  options        = ["Root Cause", "Predicted Incident", "Detected Incident with RCA"]
+  content_option = ["SUMMARY", "RECOMMENDATION"]
   auth_type      = "basic"
   proxy          = "http://proxy.company.com:8080"
 
@@ -71,20 +71,28 @@ resource "insightfinder_servicenow" "full" {
   trigger_window_in_mills = 604800000
 
   # Enable feedback collection from ServiceNow
-  enable_feedback_collect = false
-
-  # Enable ticket creation in ServiceNow
-  enable_ticket_creation = false
-
-  # Enable ticket update in ServiceNow
-  enable_ticket_update = false
+  enable_feedback_collect = true
 
   # Filter ticket creation by a specific field value
-  ticket_created_by_source_key   = "activity_due"
-  ticket_created_by_source_value = "xyzzz"
+  ticket_created_by_source_key   = "activity_source"
+  ticket_created_by_source_value = "abccccdddd"
 
   # Associate created tickets with a CMDB configuration item
   configuration_item = "My-Server-CI"
+
+  # Per-project ticket creation, update, and consolidation settings
+  project_configs = {
+    "my-project" = {
+      enable_ticket_creation                    = true
+      enable_ticket_update                      = true
+      enable_incident_consolidation_info_update = false
+    }
+    "another-project" = {
+      enable_ticket_creation                    = false
+      enable_ticket_update                      = false
+      enable_incident_consolidation_info_update = true
+    }
+  }
 
   # Map InsightFinder projects to ServiceNow tables
   table_mapping = {
@@ -116,11 +124,13 @@ resource "insightfinder_servicenow" "full" {
 - `content_source` (String, Computed) ServiceNow field to write incident notes to (e.g., `work_notes`, `comments`). Defaults to `work_notes`.
 - `trigger_window_in_mills` (Number) Time window in milliseconds within which events are correlated into a single incident (e.g., `604800000` for 7 days).
 - `enable_feedback_collect` (Boolean, Computed) Whether to enable ServiceNow feedback collection. Defaults to `false`.
-- `enable_ticket_creation` (Boolean, Computed) Whether to enable ServiceNow ticket creation. Defaults to `false`.
-- `enable_ticket_update` (Boolean, Computed) Whether to enable ServiceNow ticket update. Defaults to `false`.
-- `ticket_created_by_source_key` (String) ServiceNow field key used to filter when a ticket is created (e.g., `activity_due`).
+- `ticket_created_by_source_key` (String) ServiceNow field key used to filter when a ticket is created (e.g., `activity_source`).
 - `ticket_created_by_source_value` (String) Value matched against `ticket_created_by_source_key` to determine whether to create a ticket.
 - `configuration_item` (String) ServiceNow CMDB configuration item to associate with created tickets.
+- `project_configs` (Map of Object) Per-project ServiceNow ticket configuration. Each key is an InsightFinder project name, and the value is an object with:
+  - `enable_ticket_creation` (Boolean, Computed) Whether to enable ticket creation for this project. Defaults to `false`.
+  - `enable_ticket_update` (Boolean, Computed) Whether to enable ticket updates for this project. Defaults to `false`.
+  - `enable_incident_consolidation_info_update` (Boolean, Computed) Whether to enable incident consolidation info updates for this project. Defaults to `false`.
 - `table_mapping` (Map of String) Mapping of InsightFinder project names to ServiceNow table names (e.g., `{ "my-project" = "incident" }`).
 
 ### Read-Only

@@ -108,6 +108,32 @@ func TestAccServiceNowResource_WithProxy(t *testing.T) {
 	})
 }
 
+func TestAccServiceNowResource_WithProjectConfigs(t *testing.T) {
+	resource.Test(t, resource.TestCase{
+		PreCheck:                 func() { testAccPreCheck(t) },
+		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
+		Steps: []resource.TestStep{
+			{
+				Config: testAccServiceNowResourceConfigWithProjectConfigs(
+					"test-account",
+					"test.service-now.com",
+					"testpass",
+					[]string{"system1"},
+				),
+				Check: resource.ComposeAggregateTestCheckFunc(
+					resource.TestCheckResourceAttr("insightfinder_servicenow.test", "account", "test-account"),
+					resource.TestCheckResourceAttr("insightfinder_servicenow.test", "project_configs.my-project.enable_ticket_creation", "true"),
+					resource.TestCheckResourceAttr("insightfinder_servicenow.test", "project_configs.my-project.enable_ticket_update", "true"),
+					resource.TestCheckResourceAttr("insightfinder_servicenow.test", "project_configs.my-project.enable_incident_consolidation_info_update", "false"),
+					resource.TestCheckResourceAttr("insightfinder_servicenow.test", "project_configs.another-project.enable_ticket_creation", "false"),
+					resource.TestCheckResourceAttr("insightfinder_servicenow.test", "project_configs.another-project.enable_ticket_update", "false"),
+					resource.TestCheckResourceAttr("insightfinder_servicenow.test", "project_configs.another-project.enable_incident_consolidation_info_update", "true"),
+				),
+			},
+		},
+	})
+}
+
 func TestAccServiceNowResource_WithDampeningPeriod(t *testing.T) {
 	resource.Test(t, resource.TestCase{
 		PreCheck:                 func() { testAccPreCheck(t) },
@@ -145,12 +171,12 @@ resource "insightfinder_servicenow" "test" {
   service_host  = %[2]q
   password      = %[4]q
   system_names  = [%[5]s]
-  
+
   options = [
     "send_incident",
     "sync_status"
   ]
-  
+
   content_option = [
     "root_cause",
     "related_incidents"
@@ -176,11 +202,11 @@ resource "insightfinder_servicenow" "test" {
   app_id       = %[3]q
   app_key      = %[4]q
   system_names = [%[5]s]
-  
+
   options = [
     "send_incident"
   ]
-  
+
   content_option = [
     "root_cause"
   ]
@@ -204,11 +230,11 @@ resource "insightfinder_servicenow" "test" {
   password     = %[4]q
   proxy        = %[5]q
   system_names = [%[6]s]
-  
+
   options = [
     "send_incident"
   ]
-  
+
   content_option = [
     "root_cause"
   ]
@@ -227,19 +253,69 @@ func testAccServiceNowResourceConfigWithDampening(account, serviceHost, username
 
 	return fmt.Sprintf(`
 resource "insightfinder_servicenow" "test" {
-  account           = %[1]q
-  service_host      = %[2]q
-  password          = %[4]q
-  dampening_period  = %[5]d
-  system_names      = [%[6]s]
-  
+  account          = %[1]q
+  service_host     = %[2]q
+  password         = %[4]q
+  dampening_period = %[5]d
+  system_names     = [%[6]s]
+
   options = [
     "send_incident"
   ]
-  
+
   content_option = [
     "root_cause"
   ]
 }
 `, account, serviceHost, username, password, dampeningPeriod, systemNamesStr)
+}
+
+func testAccServiceNowResourceConfigWithProjectConfigs(account, serviceHost, password string, systemNames []string) string {
+	systemNamesStr := ""
+	for _, name := range systemNames {
+		systemNamesStr += fmt.Sprintf("%q,", name)
+	}
+	if len(systemNamesStr) > 0 {
+		systemNamesStr = systemNamesStr[:len(systemNamesStr)-1]
+	}
+
+	return fmt.Sprintf(`
+resource "insightfinder_servicenow" "test" {
+  account          = %[1]q
+  service_host     = %[2]q
+  password         = %[3]q
+  dampening_period = 7200000
+  system_names     = [%[4]s]
+
+  options = [
+    "Root Cause",
+    "Predicted Incident",
+    "Detected Incident with RCA"
+  ]
+
+  content_option = ["SUMMARY", "RECOMMENDATION"]
+
+  trigger_window_in_mills = 604800000
+  enable_feedback_collect = true
+  service_now_field       = "u_probable_cause"
+  content_source          = "work_notes"
+
+  ticket_created_by_source_key   = "activity_source"
+  ticket_created_by_source_value = "abccccdddd"
+  configuration_item             = "aaglskdfjasdl"
+
+  project_configs = {
+    "my-project" = {
+      enable_ticket_creation                    = true
+      enable_ticket_update                      = true
+      enable_incident_consolidation_info_update = false
+    }
+    "another-project" = {
+      enable_ticket_creation                    = false
+      enable_ticket_update                      = false
+      enable_incident_consolidation_info_update = true
+    }
+  }
+}
+`, account, serviceHost, password, systemNamesStr)
 }

@@ -55,13 +55,7 @@ resource "insightfinder_servicenow" "full" {
   trigger_window_in_mills = 604800000
 
   # Enable feedback collection from ServiceNow
-  enable_feedback_collect = false
-
-  # Enable ticket creation in ServiceNow
-  enable_ticket_creation = false
-
-  # Enable ticket update in ServiceNow
-  enable_ticket_update = false
+  enable_feedback_collect = true
 
   # Filter ticket creation by a specific field value
   ticket_created_by_source_key   = "activity_due"
@@ -69,6 +63,20 @@ resource "insightfinder_servicenow" "full" {
 
   # Associate created tickets with a CMDB configuration item
   configuration_item = "My-Server-CI"
+
+  # Per-project ticket configuration
+  project_configs = {
+    "my-project" = {
+      enable_ticket_creation                    = true
+      enable_ticket_update                      = true
+      enable_incident_consolidation_info_update = false
+    }
+    "another-project" = {
+      enable_ticket_creation                    = false
+      enable_ticket_update                      = false
+      enable_incident_consolidation_info_update = true
+    }
+  }
 
   # Map InsightFinder projects to ServiceNow tables
   table_mapping = {

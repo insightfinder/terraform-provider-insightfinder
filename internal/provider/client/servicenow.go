@@ -10,30 +10,36 @@ import (
 	"strings"
 )
 
+// ServiceNowProjectConfig represents per-project ServiceNow ticket configuration
+type ServiceNowProjectConfig struct {
+	EnableTicketCreation                  bool `json:"enableTicketCreation"`
+	EnableTicketUpdate                    bool `json:"enableTicketUpdate"`
+	EnableIncidentConsolidationInfoUpdate bool `json:"enableIncidentConsolidationInfoUpdate"`
+}
+
 // ServiceNowConfig represents ServiceNow integration configuration
 type ServiceNowConfig struct {
-	Account                    string     `json:"account"`
-	ServiceHost                string     `json:"service_host"`
-	Password                   string     `json:"password"`
-	Proxy                      string     `json:"proxy,omitempty"`
-	DampeningPeriod            int        `json:"dampening_period"`
-	AppID                      string     `json:"app_id,omitempty"`
-	AppKey                     string     `json:"app_key,omitempty"`
-	AuthType                   string     `json:"auth_type,omitempty"`
-	SystemIDs                  []string   `json:"system_ids"`
-	SystemNames                []string   `json:"system_names,omitempty"`
-	Options                    []string   `json:"options"`
-	ContentOption              []string   `json:"content_option"`
-	ServiceNowField            string     `json:"service_now_field,omitempty"`
-	ContentSource              string     `json:"content_source,omitempty"`
-	TriggerWindowInMills       int64      `json:"trigger_window_in_mills,omitempty"`
-	EnableFeedbackCollect      bool       `json:"enable_feedback_collect,omitempty"`
-	EnableTicketCreation       bool       `json:"enable_ticket_creation,omitempty"`
-	EnableTicketUpdate         bool       `json:"enable_ticket_update,omitempty"`
-	TicketCreatedBySourceKey   string     `json:"ticket_created_by_source_key,omitempty"`
-	TicketCreatedBySourceValue string     `json:"ticket_created_by_source_value,omitempty"`
-	ConfigurationItem          string     `json:"configuration_item,omitempty"`
-	TableMapping               [][]string `json:"table_mapping,omitempty"`
+	Account                    string                             `json:"account"`
+	ServiceHost                string                             `json:"service_host"`
+	Password                   string                             `json:"password"`
+	Proxy                      string                             `json:"proxy,omitempty"`
+	DampeningPeriod            int                                `json:"dampening_period"`
+	AppID                      string                             `json:"app_id,omitempty"`
+	AppKey                     string                             `json:"app_key,omitempty"`
+	AuthType                   string                             `json:"auth_type,omitempty"`
+	SystemIDs                  []string                           `json:"system_ids"`
+	SystemNames                []string                           `json:"system_names,omitempty"`
+	Options                    []string                           `json:"options"`
+	ContentOption              []string                           `json:"content_option"`
+	ServiceNowField            string                             `json:"service_now_field,omitempty"`
+	ContentSource              string                             `json:"content_source,omitempty"`
+	TriggerWindowInMills       int64                              `json:"trigger_window_in_mills,omitempty"`
+	EnableFeedbackCollect      bool                               `json:"enable_feedback_collect,omitempty"`
+	TicketCreatedBySourceKey   string                             `json:"ticket_created_by_source_key,omitempty"`
+	TicketCreatedBySourceValue string                             `json:"ticket_created_by_source_value,omitempty"`
+	ConfigurationItem          string                             `json:"configuration_item,omitempty"`
+	ProjectConfigs             map[string]ServiceNowProjectConfig `json:"project_configs,omitempty"`
+	TableMapping               [][]string                         `json:"table_mapping,omitempty"`
 }
 
 // ServiceNowResponse represents the API response for ServiceNow operations
@@ -41,6 +47,29 @@ type ServiceNowResponse struct {
 	Success bool        `json:"success"`
 	Message string      `json:"message,omitempty"`
 	Data    interface{} `json:"data,omitempty"`
+}
+
+// parseProjectConfigs converts a raw map[string]interface{} into a typed ProjectConfig map
+func parseProjectConfigs(raw map[string]interface{}) map[string]ServiceNowProjectConfig {
+	result := make(map[string]ServiceNowProjectConfig, len(raw))
+	for projectName, v := range raw {
+		pcMap, ok := v.(map[string]interface{})
+		if !ok {
+			continue
+		}
+		pc := ServiceNowProjectConfig{}
+		if b, ok := pcMap["enableTicketCreation"].(bool); ok {
+			pc.EnableTicketCreation = b
+		}
+		if b, ok := pcMap["enableTicketUpdate"].(bool); ok {
+			pc.EnableTicketUpdate = b
+		}
+		if b, ok := pcMap["enableIncidentConsolidationInfoUpdate"].(bool); ok {
+			pc.EnableIncidentConsolidationInfoUpdate = b
+		}
+		result[projectName] = pc
+	}
+	return result
 }
 
 // GetServiceNowConfig retrieves ServiceNow integration configuration
@@ -124,12 +153,6 @@ func (c *Client) GetServiceNowConfig(account, serviceHost, username string) (*Se
 	if enableFeedback, ok := entry["enableServiceNowFeedbackCollect"].(bool); ok {
 		config.EnableFeedbackCollect = enableFeedback
 	}
-	if enableTicket, ok := entry["enableTicketCreation"].(bool); ok {
-		config.EnableTicketCreation = enableTicket
-	}
-	if enableTicketUpdate, ok := entry["enableTicketUpdate"].(bool); ok {
-		config.EnableTicketUpdate = enableTicketUpdate
-	}
 	if ticketKey, ok := entry["ticketCreatedBySourceKey"].(string); ok {
 		config.TicketCreatedBySourceKey = ticketKey
 	}
@@ -147,7 +170,12 @@ func (c *Client) GetServiceNowConfig(account, serviceHost, username string) (*Se
 		config.AuthType = "basic"
 	}
 
-	// Parse configs JSON string for systemIds, contentOption, and triggerWindowInMills
+	// Parse projectConfigs from root level
+	if projectConfigsRaw, ok := entry["projectConfigs"].(map[string]interface{}); ok {
+		config.ProjectConfigs = parseProjectConfigs(projectConfigsRaw)
+	}
+
+	// Parse configs JSON string for systemIds, contentOption, triggerWindowInMills, and fallback fields
 	if configsStr, ok := entry["configs"].(string); ok && configsStr != "" {
 		var configs map[string]interface{}
 		if err := json.Unmarshal([]byte(configsStr), &configs); err == nil {
@@ -181,17 +209,6 @@ func (c *Client) GetServiceNowConfig(account, serviceHost, username string) (*Se
 					config.EnableFeedbackCollect = enableFeedback
 				}
 			}
-			// enableTicketCreation in configs only fills in if not already set at root
-			if !config.EnableTicketCreation {
-				if enableTicket, ok := configs["enableTicketCreation"].(bool); ok {
-					config.EnableTicketCreation = enableTicket
-				}
-			}
-			if !config.EnableTicketUpdate {
-				if enableTicketUpdate, ok := configs["enableTicketUpdate"].(bool); ok {
-					config.EnableTicketUpdate = enableTicketUpdate
-				}
-			}
 			if config.TicketCreatedBySourceKey == "" {
 				if v, ok := configs["ticketCreatedBySourceKey"].(string); ok {
 					config.TicketCreatedBySourceKey = v
@@ -205,6 +222,12 @@ func (c *Client) GetServiceNowConfig(account, serviceHost, username string) (*Se
 			if config.ConfigurationItem == "" {
 				if v, ok := configs["configurationItem"].(string); ok {
 					config.ConfigurationItem = v
+				}
+			}
+			// Fall back to projectConfigs from configs JSON if not found at root level
+			if config.ProjectConfigs == nil {
+				if pcRaw, ok := configs["projectConfigs"].(map[string]interface{}); ok {
+					config.ProjectConfigs = parseProjectConfigs(pcRaw)
 				}
 			}
 		}
@@ -294,8 +317,6 @@ func (c *Client) CreateOrUpdateServiceNowConfig(config *ServiceNowConfig, userna
 			formData.Set("triggerWindowInMills", fmt.Sprintf("%d", config.TriggerWindowInMills))
 		}
 		formData.Set("enableServiceNowFeedbackCollect", fmt.Sprintf("%t", config.EnableFeedbackCollect))
-		formData.Set("enableTicketCreation", fmt.Sprintf("%t", config.EnableTicketCreation))
-		formData.Set("enableTicketUpdate", fmt.Sprintf("%t", config.EnableTicketUpdate))
 		if config.TicketCreatedBySourceKey != "" {
 			formData.Set("ticketCreatedBySourceKey", config.TicketCreatedBySourceKey)
 		}
@@ -304,6 +325,13 @@ func (c *Client) CreateOrUpdateServiceNowConfig(config *ServiceNowConfig, userna
 		}
 		if config.ConfigurationItem != "" {
 			formData.Set("configurationItem", config.ConfigurationItem)
+		}
+		if len(config.ProjectConfigs) > 0 {
+			projectConfigsJSON, err := json.Marshal(config.ProjectConfigs)
+			if err != nil {
+				return fmt.Errorf("failed to marshal project configs: %w", err)
+			}
+			formData.Set("projectConfigs", string(projectConfigsJSON))
 		}
 	}
 
