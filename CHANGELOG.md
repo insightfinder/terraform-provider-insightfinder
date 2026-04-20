@@ -5,6 +5,13 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.8.11] - 2026-04-20
+
+### Added
+- **insightfinder_project**: New `mode` attribute (Number, Optional, Computed) — sets the process mode for the project via the dedicated `/api/v1/logdedicatedmode` API
+  - Maps to the `processMode` field returned by the API
+  - Read via GET and written via POST to `/api/v1/logdedicatedmode?userName=...&projectName=...&mode=...&licenseKey=...`
+
 ## [1.8.10] - 2026-04-14
 
 ### Added

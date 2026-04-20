@@ -117,6 +117,33 @@ func (c *Client) DoRequestWithLicenseKeyHeader(method, path string, body interfa
 	return respBody, resp.StatusCode, nil
 }
 
+// DoRequestWithCookieAuth performs an HTTP request using Cookie-based auth.
+// Some older /api/v1/ endpoints (e.g. logdedicatedmode) only accept Cookie: userName=...
+// for authentication and ignore X-User-Name/X-API-Key headers.
+// Credentials (userName, licenseKey) must be included in the path as query params by the caller.
+func (c *Client) DoRequestWithCookieAuth(method, path string) ([]byte, int, error) {
+	url := fmt.Sprintf("%s%s", c.BaseURL, path)
+	req, err := http.NewRequest(method, url, nil)
+	if err != nil {
+		return nil, 0, fmt.Errorf("failed to create request: %w", err)
+	}
+
+	req.Header.Set("Cookie", fmt.Sprintf("userName=%s;", c.Username))
+
+	resp, err := c.HTTPClient.Do(req)
+	if err != nil {
+		return nil, 0, fmt.Errorf("failed to execute request: %w", err)
+	}
+	defer resp.Body.Close()
+
+	respBody, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, resp.StatusCode, fmt.Errorf("failed to read response body: %w", err)
+	}
+
+	return respBody, resp.StatusCode, nil
+}
+
 // DoFormRequest performs an HTTP request with form data
 func (c *Client) DoFormRequest(method, path string, formData url.Values) ([]byte, int, error) {
 	// Add authentication to form data

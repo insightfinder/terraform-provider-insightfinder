@@ -211,6 +211,28 @@ resource "insightfinder_project" "json_logs_example" {
   ]
 }
 ```
+### Project with Mode
+
+```terraform
+resource "insightfinder_project" "loki_logs" {
+  project_name = "loki-logs"
+  system_name  = "Production"
+
+  project_creation_config = {
+    data_type          = "Log"
+    instance_type      = "PrivateCloud"
+    project_cloud_type = "PrivateCloud"
+    insight_agent_type = "LogStreaming"
+  }
+
+  project_display_name = "Loki Logs"
+  sampling_interval    = 600
+  retention_time       = 90
+
+  mode = 4
+}
+```
+
 ## Schema
 
 ### Required
@@ -264,6 +286,7 @@ resource "insightfinder_project" "json_logs_example" {
   - `summary_setting` (Boolean, Required) Whether to include this key in the summary statistics. When `true`, the key's values will be aggregated in summary reports.
   - `metafield_setting` (Boolean, Required) Whether to include this key in the metafield statistics. When `true`, the key's values will be tracked as metafield data for enhanced log analysis.
   - `dampening_field_setting` (Boolean, Required) Whether to include this key in the dampening field list. When `true`, the key is used to control alert dampening logic — alerts with the same value for this field will be grouped and suppressed during the dampening window.
+- `mode` (Number, Optional, Computed) Process mode for the project. Set and read via the `/api/v1/logdedicatedmode` API. Maps to the `processMode` field in the API response.
 
 See full schema in the [complete example](https://github.com/insightfinder/terraform-provider-insightfinder/tree/main/examples/resources/insightfinder_project).
 

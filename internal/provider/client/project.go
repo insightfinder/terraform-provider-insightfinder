@@ -374,6 +374,80 @@ func (c *Client) DeleteProject(projectName string) error {
 	return nil
 }
 
+// ProjectModeResponse represents the API response for logdedicatedmode
+type ProjectModeResponse struct {
+	Success bool   `json:"success"`
+	Message string `json:"message,omitempty"`
+	Data    []struct {
+		ProjectName string `json:"projectName"`
+		ProjectType string `json:"projectType"`
+		ProcessMode int    `json:"processMode"`
+	} `json:"data,omitempty"`
+}
+
+// GetProjectMode retrieves the process mode for a project
+func (c *Client) GetProjectMode(projectName string) (int, error) {
+	params := url.Values{}
+	params.Set("userName", c.Username)
+	params.Set("projectName", projectName)
+	params.Set("licenseKey", c.LicenseKey)
+
+	path := fmt.Sprintf("/api/v1/logdedicatedmode?%s", params.Encode())
+	body, statusCode, err := c.DoRequestWithCookieAuth("GET", path)
+	if err != nil {
+		return 0, err
+	}
+
+	if statusCode == 404 || statusCode == 204 {
+		return 0, nil
+	}
+
+	if statusCode != 200 {
+		return 0, fmt.Errorf("failed to get project mode: HTTP %d", statusCode)
+	}
+
+	var response ProjectModeResponse
+	if err := json.Unmarshal(body, &response); err != nil {
+		return 0, fmt.Errorf("failed to parse project mode response: %w", err)
+	}
+
+	if !response.Success || len(response.Data) == 0 {
+		return 0, nil
+	}
+
+	return response.Data[0].ProcessMode, nil
+}
+
+// SetProjectMode sets the process mode for a project
+func (c *Client) SetProjectMode(projectName string, mode int) error {
+	params := url.Values{}
+	params.Set("userName", c.Username)
+	params.Set("projectName", projectName)
+	params.Set("mode", fmt.Sprintf("%d", mode))
+	params.Set("licenseKey", c.LicenseKey)
+
+	path := fmt.Sprintf("/api/v1/logdedicatedmode?%s", params.Encode())
+	body, statusCode, err := c.DoRequestWithCookieAuth("POST", path)
+	if err != nil {
+		return err
+	}
+
+	if statusCode != 200 {
+		return fmt.Errorf("failed to set project mode: HTTP %d - %s", statusCode, string(body))
+	}
+
+	var response ProjectModeResponse
+	if err := json.Unmarshal(body, &response); err != nil {
+		return fmt.Errorf("failed to parse project mode response: %w", err)
+	}
+
+	if !response.Success {
+		return fmt.Errorf("failed to set project mode: %s", response.Message)
+	}
+
+	return nil
+}
+
 // JsonKeyType represents a JSON key configuration
 type JsonKeyType struct {
 	JsonKey        string `json:"jsonKey"`
