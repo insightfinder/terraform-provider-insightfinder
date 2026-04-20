@@ -229,7 +229,7 @@ resource "insightfinder_project" "loki_logs" {
   sampling_interval    = 600
   retention_time       = 90
 
-  mode = 4
+  mode = 1
 }
 ```
 
