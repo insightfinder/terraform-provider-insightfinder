@@ -169,6 +169,25 @@ resource "insightfinder_project" "json_logs" {
     }
   ]
 }
+# Project with process mode
+resource "insightfinder_project" "loki_logs" {
+  project_name = "loki-logs"
+  system_name  = "Production"
+
+  project_creation_config = {
+    data_type          = "Log"
+    instance_type      = "PrivateCloud"
+    project_cloud_type = "PrivateCloud"
+    insight_agent_type = "LogStreaming"
+  }
+
+  project_display_name = "Loki Logs"
+  sampling_interval    = 600
+  retention_time       = 90
+
+  mode = 1
+}
+
 variable "username" {
   description = "InsightFinder username"
   type        = string

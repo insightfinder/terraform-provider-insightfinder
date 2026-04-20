@@ -166,6 +166,7 @@ type projectResourceModel struct {
 	JsonKeySettings           types.Set    `tfsdk:"json_key_settings"`
 	ProjectServiceNowSettings types.Object `tfsdk:"project_servicenow_settings"`
 	HolidaySettings           types.Set    `tfsdk:"holiday_settings"`
+	Mode                      types.Int64  `tfsdk:"mode"`
 }
 
 type holidaySettingModel struct {
@@ -896,6 +897,11 @@ func (r *projectResource) Schema(_ context.Context, _ resource.SchemaRequest, re
 						},
 					},
 				},
+			},
+			"mode": schema.Int64Attribute{
+				Description: "The process mode for the project (set via logdedicatedmode API).",
+				Optional:    true,
+				Computed:    true,
 			},
 		},
 	}
@@ -1974,35 +1980,37 @@ func (r *projectResource) Create(ctx context.Context, req resource.CreateRequest
 			})
 			// Set to null for non-ServiceNow projects
 			plan.ProjectServiceNowSettings = types.ObjectNull(map[string]attr.Type{
-				"host":                 types.StringType,
-				"sysparm_query":        types.StringType,
-				"proxy":                types.StringType,
-				"servicenow_user":      types.StringType,
-				"servicenow_password":  types.StringType,
-				"instance_field":       types.StringType,
-				"instance_field_regex": types.StringType,
-				"timestamp_format":     types.StringType,
-				"client_id":            types.StringType,
-				"client_secret":        types.StringType,
-				"additional_fields":    types.ListType{ElemType: types.StringType},
-				"component_name_rule":  types.StringType,
+				"host":                    types.StringType,
+				"sysparm_query":           types.StringType,
+				"proxy":                   types.StringType,
+				"servicenow_user":         types.StringType,
+				"servicenow_password":     types.StringType,
+				"instance_field":          types.StringType,
+				"instance_field_regex":    types.StringType,
+				"timestamp_format":        types.StringType,
+				"client_id":               types.StringType,
+				"client_secret":           types.StringType,
+				"additional_fields":       types.ListType{ElemType: types.StringType},
+				"component_name_rule":     types.StringType,
+				"service_now_import_flag": types.BoolType,
 			})
 		}
 	} else {
 		// No ServiceNow settings in config - explicitly set to null
 		plan.ProjectServiceNowSettings = types.ObjectNull(map[string]attr.Type{
-			"host":                 types.StringType,
-			"sysparm_query":        types.StringType,
-			"proxy":                types.StringType,
-			"servicenow_user":      types.StringType,
-			"servicenow_password":  types.StringType,
-			"instance_field":       types.StringType,
-			"instance_field_regex": types.StringType,
-			"timestamp_format":     types.StringType,
-			"client_id":            types.StringType,
-			"client_secret":        types.StringType,
-			"additional_fields":    types.ListType{ElemType: types.StringType},
-			"component_name_rule":  types.StringType,
+			"host":                    types.StringType,
+			"sysparm_query":           types.StringType,
+			"proxy":                   types.StringType,
+			"servicenow_user":         types.StringType,
+			"servicenow_password":     types.StringType,
+			"instance_field":          types.StringType,
+			"instance_field_regex":    types.StringType,
+			"timestamp_format":        types.StringType,
+			"client_id":               types.StringType,
+			"client_secret":           types.StringType,
+			"additional_fields":       types.ListType{ElemType: types.StringType},
+			"component_name_rule":     types.StringType,
+			"service_now_import_flag": types.BoolType,
 		})
 	}
 
@@ -2124,6 +2132,28 @@ func (r *projectResource) Create(ctx context.Context, req resource.CreateRequest
 				"dampening_field_setting": types.BoolType,
 			},
 		})
+	}
+
+	// Process mode setting via dedicated API
+	if !config.Mode.IsNull() && !config.Mode.IsUnknown() {
+		modeVal := int(config.Mode.ValueInt64())
+		err := r.client.SetProjectMode(plan.ProjectName.ValueString(), modeVal)
+		if err != nil {
+			resp.Diagnostics.AddError(
+				"Error setting project mode",
+				fmt.Sprintf("Could not set project mode: %s", err.Error()),
+			)
+			return
+		}
+		plan.Mode = config.Mode
+	} else {
+		// Read current mode from API
+		mode, err := r.client.GetProjectMode(plan.ProjectName.ValueString())
+		if err != nil {
+			tflog.Warn(ctx, "Could not read project mode", map[string]any{"error": err.Error()})
+		} else {
+			plan.Mode = types.Int64Value(int64(mode))
+		}
 	}
 
 	// SystemName and ProjectCreationConfig are config-only (not returned by API)
@@ -2605,6 +2635,14 @@ func (r *projectResource) Read(ctx context.Context, req resource.ReadRequest, re
 		})
 	}
 
+	// Read mode from dedicated API
+	mode, err := r.client.GetProjectMode(state.ProjectName.ValueString())
+	if err != nil {
+		tflog.Warn(ctx, "Could not read project mode", map[string]any{"error": err.Error()})
+	} else {
+		state.Mode = types.Int64Value(int64(mode))
+	}
+
 	diags = resp.State.Set(ctx, &state)
 	resp.Diagnostics.Append(diags...)
 	if resp.Diagnostics.HasError() {
@@ -3055,35 +3093,37 @@ func (r *projectResource) Update(ctx context.Context, req resource.UpdateRequest
 			})
 			// Set to null for non-ServiceNow projects
 			plan.ProjectServiceNowSettings = types.ObjectNull(map[string]attr.Type{
-				"host":                 types.StringType,
-				"sysparm_query":        types.StringType,
-				"proxy":                types.StringType,
-				"servicenow_user":      types.StringType,
-				"servicenow_password":  types.StringType,
-				"instance_field":       types.StringType,
-				"instance_field_regex": types.StringType,
-				"timestamp_format":     types.StringType,
-				"client_id":            types.StringType,
-				"client_secret":        types.StringType,
-				"additional_fields":    types.ListType{ElemType: types.StringType},
-				"component_name_rule":  types.StringType,
+				"host":                    types.StringType,
+				"sysparm_query":           types.StringType,
+				"proxy":                   types.StringType,
+				"servicenow_user":         types.StringType,
+				"servicenow_password":     types.StringType,
+				"instance_field":          types.StringType,
+				"instance_field_regex":    types.StringType,
+				"timestamp_format":        types.StringType,
+				"client_id":               types.StringType,
+				"client_secret":           types.StringType,
+				"additional_fields":       types.ListType{ElemType: types.StringType},
+				"component_name_rule":     types.StringType,
+				"service_now_import_flag": types.BoolType,
 			})
 		}
 	} else {
 		// No ServiceNow settings in config - explicitly set to null
 		plan.ProjectServiceNowSettings = types.ObjectNull(map[string]attr.Type{
-			"host":                 types.StringType,
-			"sysparm_query":        types.StringType,
-			"proxy":                types.StringType,
-			"servicenow_user":      types.StringType,
-			"servicenow_password":  types.StringType,
-			"instance_field":       types.StringType,
-			"instance_field_regex": types.StringType,
-			"timestamp_format":     types.StringType,
-			"client_id":            types.StringType,
-			"client_secret":        types.StringType,
-			"additional_fields":    types.ListType{ElemType: types.StringType},
-			"component_name_rule":  types.StringType,
+			"host":                    types.StringType,
+			"sysparm_query":           types.StringType,
+			"proxy":                   types.StringType,
+			"servicenow_user":         types.StringType,
+			"servicenow_password":     types.StringType,
+			"instance_field":          types.StringType,
+			"instance_field_regex":    types.StringType,
+			"timestamp_format":        types.StringType,
+			"client_id":               types.StringType,
+			"client_secret":           types.StringType,
+			"additional_fields":       types.ListType{ElemType: types.StringType},
+			"component_name_rule":     types.StringType,
+			"service_now_import_flag": types.BoolType,
 		})
 	}
 
@@ -3308,6 +3348,28 @@ func (r *projectResource) Update(ctx context.Context, req resource.UpdateRequest
 				"dampening_field_setting": types.BoolType,
 			},
 		})
+	}
+
+	// Process mode setting via dedicated API
+	if !config.Mode.IsNull() && !config.Mode.IsUnknown() {
+		modeVal := int(config.Mode.ValueInt64())
+		err := r.client.SetProjectMode(plan.ProjectName.ValueString(), modeVal)
+		if err != nil {
+			resp.Diagnostics.AddError(
+				"Error setting project mode",
+				fmt.Sprintf("Could not set project mode: %s", err.Error()),
+			)
+			return
+		}
+		plan.Mode = config.Mode
+	} else {
+		// Read current mode from API
+		mode, err := r.client.GetProjectMode(plan.ProjectName.ValueString())
+		if err != nil {
+			tflog.Warn(ctx, "Could not read project mode", map[string]any{"error": err.Error()})
+		} else {
+			plan.Mode = types.Int64Value(int64(mode))
+		}
 	}
 
 	// Preserve config-only fields that don't come from API
