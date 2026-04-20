@@ -286,7 +286,15 @@ resource "insightfinder_project" "loki_logs" {
   - `summary_setting` (Boolean, Required) Whether to include this key in the summary statistics. When `true`, the key's values will be aggregated in summary reports.
   - `metafield_setting` (Boolean, Required) Whether to include this key in the metafield statistics. When `true`, the key's values will be tracked as metafield data for enhanced log analysis.
   - `dampening_field_setting` (Boolean, Required) Whether to include this key in the dampening field list. When `true`, the key is used to control alert dampening logic — alerts with the same value for this field will be grouped and suppressed during the dampening window.
-- `mode` (Number, Optional, Computed) Process mode for the project. Set and read via the `/api/v1/logdedicatedmode` API. Maps to the `processMode` field in the API response.
+- `mode` (Number, Optional, Computed) Process mode for the project. Controls which RabbitMQ processing queue the project's data is routed to. Set and read via the `/api/v1/logdedicatedmode` API. Maps to the `processMode` field in the API response. Default: `0` (LIVE).
+
+  | Value | Name | Queue Suffix | Description |
+  |-------|------|--------------|-------------|
+  | `0` | `LIVE` | *(default queue)* | Default. Standard real-time processing queue |
+  | `1` | `HISTORICAL` | `-historical` | Historical/backfill data processing — use when ingesting past data to avoid competing with live traffic |
+  | `2` | `UPDATE` | `-update` | Re-processing of existing data |
+  | `3` | `AW` | `-aw` | AI Watchtower dedicated queue |
+  | `4` | `DEDICATED` | `-dedicated` | Isolated worker queue — use for log-heavy projects to prevent starving other projects on the shared queue |
 
 See full schema in the [complete example](https://github.com/insightfinder/terraform-provider-insightfinder/tree/main/examples/resources/insightfinder_project).
 
