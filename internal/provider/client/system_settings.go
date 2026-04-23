@@ -11,21 +11,21 @@ import (
 
 // GlobalKBSetting represents the global knowledge base settings for a system
 type GlobalKBSetting struct {
-	SystemID                       string                   `json:"systemId,omitempty"`
-	EnableGlobalKnowledgeBase      bool                     `json:"enableGlobalKnowledgeBase"`
-	CompositeValidThreshold        int64                    `json:"compositeValidThreshold"`
-	TimelineTopK                   int64                    `json:"timelineTopK"`
-	EnableIgnoreInstancePrediction bool                     `json:"enableIgnoreInstancePrediction"`
-	PredictionSource               int64                    `json:"predictionSource"`
-	ShareSystemType                int64                    `json:"shareSystemType"`
-	ActionExecutionTime            int64                    `json:"actionExecutionTime"`
-	AutoFixValidationWindow        int64                    `json:"autoFixValidationWindow"`
-	FilterSelfToSelf               bool                     `json:"filterSelfToSelf"`
-	RuleSourceType                 int64                    `json:"ruleSourceType"`
+	SystemID                       string `json:"systemId,omitempty"`
+	EnableGlobalKnowledgeBase      bool   `json:"enableGlobalKnowledgeBase"`
+	CompositeValidThreshold        int64  `json:"compositeValidThreshold"`
+	TimelineTopK                   int64  `json:"timelineTopK"`
+	EnableIgnoreInstancePrediction bool   `json:"enableIgnoreInstancePrediction"`
+	PredictionSource               int64  `json:"predictionSource"`
+	ShareSystemType                int64  `json:"shareSystemType"`
+	ActionExecutionTime            int64  `json:"actionExecutionTime"`
+	AutoFixValidationWindow        int64  `json:"autoFixValidationWindow"`
+	FilterSelfToSelf               bool   `json:"filterSelfToSelf"`
+	RuleSourceType                 int64  `json:"ruleSourceType"`
 	// SatelliteSystemSet is returned by the GET API (read format)
-	SatelliteSystemSet  []SatelliteSystemSetEntry `json:"satelliteSystemSet,omitempty"`
+	SatelliteSystemSet []SatelliteSystemSetEntry `json:"satelliteSystemSet,omitempty"`
 	// SatelliteSystemList is sent in the POST API (write format)
-	SatelliteSystemList []SatelliteSystem         `json:"satelliteSystemList,omitempty"`
+	SatelliteSystemList []SatelliteSystem `json:"satelliteSystemList,omitempty"`
 }
 
 // SatelliteSystemSetEntry represents one entry in the GET satelliteSystemSet array
@@ -61,14 +61,14 @@ func SatelliteSystemSetToList(set []SatelliteSystemSetEntry) []SatelliteSystem {
 
 // IncidentPredictionSetting represents incident prediction settings for a system
 type IncidentPredictionSetting struct {
-	SystemID                     string  `json:"systemId,omitempty"`
-	RuleActiveThreshold          float64 `json:"ruleActiveThreshold"`
-	RuleInactiveThreshold        float64 `json:"ruleInactiveThreshold"`
-	RuleActiveCondition          int64   `json:"ruleActiveCondition"`
-	FalsePositiveTolerance       int64   `json:"falsePositiveTolerance"`
-	KBTrainingLength             int64   `json:"kbTrainingLength"`
-	Tolerance                    float64 `json:"tolerance"`
-	EnableInsensitiveRuleMatching bool   `json:"enableInsensitiveRuleMatching"`
+	SystemID                      string  `json:"systemId,omitempty"`
+	RuleActiveThreshold           float64 `json:"ruleActiveThreshold"`
+	RuleInactiveThreshold         float64 `json:"ruleInactiveThreshold"`
+	RuleActiveCondition           int64   `json:"ruleActiveCondition"`
+	FalsePositiveTolerance        int64   `json:"falsePositiveTolerance"`
+	KBTrainingLength              int64   `json:"kbTrainingLength"`
+	Tolerance                     float64 `json:"tolerance"`
+	EnableInsensitiveRuleMatching bool    `json:"enableInsensitiveRuleMatching"`
 }
 
 // HealthViewKey represents the key structure in health view settings
@@ -83,38 +83,38 @@ type HealthViewKey struct {
 
 // HealthViewSetting represents the health view / notifications settings for a system
 type HealthViewSetting struct {
-	Key                                   HealthViewKey          `json:"key"`
-	Order                                 int64                  `json:"order"`
-	HideFlag                              bool                   `json:"hideFlag"`
-	AggregationInterval                   int64                  `json:"aggregationInterval"`
-	PredictionEmail                       string                 `json:"predictionEmail"`
-	AlertHealthScore                      float64                `json:"alertHealthScore"`
-	LastAlertTimestamp                    int64                  `json:"lastAlertTimestamp"`
-	EnableSplunkExport                    bool                   `json:"enableSplunkExport"`
-	MetricTotal99Percentile               float64                `json:"metricTotal99Percentile"`
-	LogTotal99Percentile                  float64                `json:"logTotal99Percentile"`
-	SplunkExportTimestamp                 int64                  `json:"splunkExportTimestamp"`
-	AlertFrequency                        int64                  `json:"alertFrequency"`
-	EmailDampeningPeriod                  int64                  `json:"emailDampeningPeriod"`
-	AlertsEmailDampeningPeriod            int64                  `json:"alertsEmailDampeningPeriod"`
-	PredictionEmailDampeningPeriod        int64                  `json:"predictionEmailDampeningPeriod"`
-	EnableSystemDownEmailAlert            bool                   `json:"enableSystemDownEmailAlert"`
-	OnlySendWithRCA                       bool                   `json:"onlySendWithRCA"`
-	EnableIncidentPredictionEmailAlert    bool                   `json:"enableIncidentPredictionEmailAlert"`
-	EnableIncidentDetectionEmailAlert     bool                   `json:"enableIncidentDetectionEmailAlert"`
-	EnableAlertsEmail                     bool                   `json:"enableAlertsEmail"`
-	EnableHealthEmailAlert                bool                   `json:"enableHealthEmailAlert"`
-	AlertEmail                            string                 `json:"alertEmail"`
-	HealthAlertEmail                      string                 `json:"healthAlertEmail"`
-	IncidentDetectionEmail                string                 `json:"incidentDetectionEmail"`
-	EnableRootCauseEmailAlert             bool                   `json:"enableRootCauseEmailAlert"`
-	RootCauseEmail                        string                 `json:"rootCauseEmail"`
-	IncidentCountThreshold                map[string]int64             `json:"incidentCountThreshold,omitempty"`
-	AssignmentMap                         map[string]any               `json:"assignmentMap"`
-	IncidentDampeningWindow               int64                        `json:"incidentDampeningWindow"`
-	ProjectLevelDampeningWindows          []ProjectLevelDampeningWindow `json:"projectLevelDampeningWindows"`
-	SystemID                              string                       `json:"systemId,omitempty"`
-	ID                                    string                       `json:"id,omitempty"`
+	Key                                HealthViewKey                 `json:"key"`
+	Order                              int64                         `json:"order"`
+	HideFlag                           bool                          `json:"hideFlag"`
+	AggregationInterval                int64                         `json:"aggregationInterval"`
+	PredictionEmail                    string                        `json:"predictionEmail"`
+	AlertHealthScore                   float64                       `json:"alertHealthScore"`
+	LastAlertTimestamp                 int64                         `json:"lastAlertTimestamp"`
+	EnableSplunkExport                 bool                          `json:"enableSplunkExport"`
+	MetricTotal99Percentile            float64                       `json:"metricTotal99Percentile"`
+	LogTotal99Percentile               float64                       `json:"logTotal99Percentile"`
+	SplunkExportTimestamp              int64                         `json:"splunkExportTimestamp"`
+	AlertFrequency                     int64                         `json:"alertFrequency"`
+	EmailDampeningPeriod               int64                         `json:"emailDampeningPeriod"`
+	AlertsEmailDampeningPeriod         int64                         `json:"alertsEmailDampeningPeriod"`
+	PredictionEmailDampeningPeriod     int64                         `json:"predictionEmailDampeningPeriod"`
+	EnableSystemDownEmailAlert         bool                          `json:"enableSystemDownEmailAlert"`
+	OnlySendWithRCA                    bool                          `json:"onlySendWithRCA"`
+	EnableIncidentPredictionEmailAlert bool                          `json:"enableIncidentPredictionEmailAlert"`
+	EnableIncidentDetectionEmailAlert  bool                          `json:"enableIncidentDetectionEmailAlert"`
+	EnableAlertsEmail                  bool                          `json:"enableAlertsEmail"`
+	EnableHealthEmailAlert             bool                          `json:"enableHealthEmailAlert"`
+	AlertEmail                         string                        `json:"alertEmail"`
+	HealthAlertEmail                   string                        `json:"healthAlertEmail"`
+	IncidentDetectionEmail             string                        `json:"incidentDetectionEmail"`
+	EnableRootCauseEmailAlert          bool                          `json:"enableRootCauseEmailAlert"`
+	RootCauseEmail                     string                        `json:"rootCauseEmail"`
+	IncidentCountThreshold             map[string]int64              `json:"incidentCountThreshold,omitempty"`
+	AssignmentMap                      map[string]any                `json:"assignmentMap"`
+	IncidentDampeningWindow            int64                         `json:"incidentDampeningWindow"`
+	ProjectLevelDampeningWindows       []ProjectLevelDampeningWindow `json:"projectLevelDampeningWindows"`
+	SystemID                           string                        `json:"systemId,omitempty"`
+	ID                                 string                        `json:"id,omitempty"`
 }
 
 // ProjectLevelDampeningWindow represents a project-level dampening window entry
@@ -437,6 +437,222 @@ func (c *Client) SetInstanceDownSetting(setting *InstanceDownSetting) error {
 				return fmt.Errorf("failed to set instance down setting for project %s (key: %s)", setting.ProjectName, key)
 			}
 		}
+	}
+
+	return nil
+}
+
+// MiscellaneousSettings holds the miscellaneous system framework settings
+type MiscellaneousSettings struct {
+	LongTerm                             bool  `json:"longTerm"`
+	ShouldAutoShare                      bool  `json:"shouldAutoShare"`
+	RootCauseReverseEntryFilterThreshold int64 `json:"rootCauseReverseEntryFilterThreshold"`
+	EnableCompositeTimeline              bool  `json:"enableCompositeTimeline"`
+}
+
+// SystemFrameworkSetting holds the fields updated via the systemFrameworkSetting operation
+type SystemFrameworkSetting struct {
+	ShouldAutoShare                      bool  `json:"shouldAutoShare"`
+	RootCauseReverseEntryFilterThreshold int64 `json:"rootCauseReverseEntryFilterThreshold"`
+	EnableCompositeTimeline              bool  `json:"enableCompositeTimeline"`
+}
+
+// systemFrameworkRawEntry is the internal parse format for each element of ownSystemArr
+type systemFrameworkRawEntry struct {
+	SystemKey struct {
+		UserName        string `json:"userName"`
+		SystemName      string `json:"systemName"`
+		EnvironmentName string `json:"environmentName"`
+	} `json:"systemKey"`
+	Order         int64  `json:"order"`
+	HideFlag      bool   `json:"hideFlag"`
+	LongTerm      bool   `json:"longTerm"`
+	SystemSetting string `json:"systemSetting"`
+}
+
+// systemSettingInner is the inner JSON string stored in the systemSetting field of systemFrameworkRawEntry
+type systemSettingInner struct {
+	ShouldAutoShare                      bool  `json:"shouldAutoShare"`
+	RootCauseReverseEntryFilterThreshold int64 `json:"rootCauseReverseEntryFilterThreshold"`
+	EnableCompositeTimeline              bool  `json:"enableCompositeTimeline"`
+}
+
+// getSystemFrameworkEntry fetches the raw system framework entry for a specific system
+func (c *Client) getSystemFrameworkEntry(systemID string) (*systemFrameworkRawEntry, error) {
+	params := url.Values{}
+	params.Add("customerName", c.Username)
+	params.Add("needDetail", "false")
+	params.Add("tzOffset", "-18000000")
+
+	path := fmt.Sprintf("/api/external/v1/systemframework?%s", params.Encode())
+	body, statusCode, err := c.DoRequest("GET", path, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	if statusCode == 404 || statusCode == 204 {
+		return nil, nil
+	}
+
+	if statusCode != 200 {
+		return nil, fmt.Errorf("failed to get system framework: HTTP %d - %s", statusCode, string(body))
+	}
+
+	var response struct {
+		OwnSystemArr []string `json:"ownSystemArr"`
+	}
+	if err := json.Unmarshal(body, &response); err != nil {
+		return nil, fmt.Errorf("failed to parse system framework response: %w", err)
+	}
+
+	for _, entryStr := range response.OwnSystemArr {
+		var entry systemFrameworkRawEntry
+		if err := json.Unmarshal([]byte(entryStr), &entry); err != nil {
+			continue
+		}
+		if entry.SystemKey.SystemName == systemID {
+			return &entry, nil
+		}
+	}
+
+	return nil, nil
+}
+
+// GetMiscellaneousSettings retrieves the miscellaneous system framework settings for a specific system
+func (c *Client) GetMiscellaneousSettings(systemID string) (*MiscellaneousSettings, error) {
+	entry, err := c.getSystemFrameworkEntry(systemID)
+	if err != nil {
+		return nil, err
+	}
+	if entry == nil {
+		return nil, nil
+	}
+
+	result := &MiscellaneousSettings{
+		LongTerm: entry.LongTerm,
+	}
+
+	if entry.SystemSetting != "" {
+		var inner systemSettingInner
+		if err := json.Unmarshal([]byte(entry.SystemSetting), &inner); err == nil {
+			result.ShouldAutoShare = inner.ShouldAutoShare
+			result.RootCauseReverseEntryFilterThreshold = inner.RootCauseReverseEntryFilterThreshold
+			result.EnableCompositeTimeline = inner.EnableCompositeTimeline
+		}
+	}
+
+	return result, nil
+}
+
+// SetLongTermSetting updates the longTerm flag for a system, preserving the current order value.
+func (c *Client) SetLongTermSetting(systemID string, longTerm bool) error {
+	currentOrder := int64(0)
+	entry, err := c.getSystemFrameworkEntry(systemID)
+	if err == nil && entry != nil {
+		currentOrder = entry.Order
+	}
+
+	type configEntry struct {
+		SystemName      string `json:"systemName"`
+		EnvironmentName string `json:"environmentName"`
+		Order           int64  `json:"order"`
+		LongTerm        bool   `json:"longTerm"`
+	}
+
+	config := []configEntry{{
+		SystemName:      systemID,
+		EnvironmentName: "All",
+		Order:           currentOrder,
+		LongTerm:        longTerm,
+	}}
+
+	configJSON, err := json.Marshal(config)
+	if err != nil {
+		return fmt.Errorf("failed to marshal config: %w", err)
+	}
+
+	params := url.Values{}
+	params.Set("operation", "hideOrOrderOrLongTerm")
+	params.Set("customerName", c.Username)
+	params.Set("config", string(configJSON))
+	params.Set("systemName", systemID)
+
+	path := fmt.Sprintf("/api/external/v1/systemframework?%s", params.Encode())
+	body, statusCode, err := c.DoRequest("POST", path, nil)
+	if err != nil {
+		return err
+	}
+
+	if statusCode != 200 {
+		return fmt.Errorf("failed to set longTerm setting: HTTP %d - %s", statusCode, string(body))
+	}
+
+	var response map[string]any
+	if err := json.Unmarshal(body, &response); err != nil {
+		return nil
+	}
+
+	if success, ok := response["success"].(bool); ok && !success {
+		if msg, ok := response["message"].(string); ok {
+			return fmt.Errorf("failed to set longTerm setting: %s", msg)
+		}
+		return fmt.Errorf("failed to set longTerm setting")
+	}
+
+	return nil
+}
+
+// SetSystemFrameworkSetting updates shouldAutoShare, rootCauseReverseEntryFilterThreshold, and enableCompositeTimeline for a system
+func (c *Client) SetSystemFrameworkSetting(systemID string, settings *SystemFrameworkSetting) error {
+	type systemKeyType struct {
+		UserName        string `json:"userName"`
+		SystemName      string `json:"systemName"`
+		EnvironmentName string `json:"environmentName"`
+	}
+
+	systemKey := systemKeyType{
+		UserName:        c.Username,
+		SystemName:      systemID,
+		EnvironmentName: "All",
+	}
+
+	systemKeyJSON, err := json.Marshal(systemKey)
+	if err != nil {
+		return fmt.Errorf("failed to marshal systemKey: %w", err)
+	}
+
+	settingsJSON, err := json.Marshal(settings)
+	if err != nil {
+		return fmt.Errorf("failed to marshal systemFrameworkSetting: %w", err)
+	}
+
+	params := url.Values{}
+	params.Set("operation", "systemFrameworkSetting")
+	params.Set("systemKey", string(systemKeyJSON))
+	params.Set("systemFrameworkSetting", string(settingsJSON))
+	params.Set("systemName", systemID)
+	params.Set("customerName", c.Username)
+
+	path := fmt.Sprintf("/api/external/v1/systemframework?%s", params.Encode())
+	body, statusCode, err := c.DoRequest("POST", path, nil)
+	if err != nil {
+		return err
+	}
+
+	if statusCode != 200 {
+		return fmt.Errorf("failed to set system framework setting: HTTP %d - %s", statusCode, string(body))
+	}
+
+	var response map[string]any
+	if err := json.Unmarshal(body, &response); err != nil {
+		return nil
+	}
+
+	if success, ok := response["success"].(bool); ok && !success {
+		if msg, ok := response["message"].(string); ok {
+			return fmt.Errorf("failed to set system framework setting: %s", msg)
+		}
+		return fmt.Errorf("failed to set system framework setting")
 	}
 
 	return nil

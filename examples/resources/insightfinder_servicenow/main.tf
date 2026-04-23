@@ -70,11 +70,15 @@ resource "insightfinder_servicenow" "full" {
       enable_ticket_creation                    = true
       enable_ticket_update                      = true
       enable_incident_consolidation_info_update = false
+      enable_incident_resolve_update            = true
+      configuration_item                        = "My-Server-CI"
     }
     "another-project" = {
       enable_ticket_creation                    = false
       enable_ticket_update                      = false
       enable_incident_consolidation_info_update = true
+      enable_incident_resolve_update            = false
+      configuration_item                        = "Another-Server-CI"
     }
   }
 

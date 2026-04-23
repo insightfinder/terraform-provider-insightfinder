@@ -2,12 +2,12 @@
 page_title: "insightfinder_system_settings Resource - terraform-provider-insightfinder"
 subcategory: ""
 description: |-
-  Manages knowledge base and notification settings for an InsightFinder system.
+  Manages knowledge base, notification, and miscellaneous settings for an InsightFinder system.
 ---
 
 # insightfinder_system_settings (Resource)
 
-Manages knowledge base and notification/alert settings for an InsightFinder system. Both `knowledgebase_settings` and `notifications_settings` are optional — you can configure one or both blocks independently.
+Manages knowledge base, notification/alert, and miscellaneous system framework settings for an InsightFinder system. All three blocks (`knowledgebase_settings`, `notifications_settings`, `miscellaneous_settings`) are optional — you can configure one or more independently.
 
 Deleting this resource removes it from Terraform state only; the underlying settings on the InsightFinder server are left unchanged.
 
@@ -98,6 +98,13 @@ resource "insightfinder_system_settings" "example" {
         instance_down_emails      = ["ops@example.com"]
       }
     ]
+  }
+
+  miscellaneous_settings = {
+    healthview_longterm                       = false
+    should_auto_share                         = true
+    rootcause_reverse_entry_filter_threshold  = 99
+    enable_composite_timeline                 = true
   }
 }
 ```
@@ -218,6 +225,21 @@ resource "insightfinder_system_settings" "notifications_extended" {
 }
 ```
 
+### Miscellaneous Settings Only
+
+```terraform
+resource "insightfinder_system_settings" "misc_only" {
+  system_name = "my-production-system"
+
+  miscellaneous_settings = {
+    healthview_longterm                      = false
+    should_auto_share                        = true
+    rootcause_reverse_entry_filter_threshold = 99
+    enable_composite_timeline                = true
+  }
+}
+```
+
 ### Knowledge Base Only
 
 ```terraform
@@ -298,6 +320,7 @@ resource "insightfinder_system_settings" "with_satellite" {
 
 - `knowledgebase_settings` (Attributes) Knowledge base and incident prediction settings for the system. See [knowledgebase_settings](#nested-schema-for-knowledgebase_settings) below.
 - `notifications_settings` (Attributes) Notification and alert email settings for the system. See [notifications_settings](#nested-schema-for-notifications_settings) below.
+- `miscellaneous_settings` (Attributes) Miscellaneous system framework settings. See [miscellaneous_settings](#nested-schema-for-miscellaneous_settings) below.
 
 ### Read-Only
 
@@ -452,6 +475,19 @@ A set of project-pair dampening window rules stored in the health view setting. 
 
 ---
 
+### Nested Schema for `miscellaneous_settings`
+
+Configures miscellaneous system framework settings via `/api/external/v1/systemframework`. All attributes are Optional and Computed.
+
+| Attribute | Type | Description |
+|-----------|------|-------------|
+| `healthview_longterm` | Boolean | Enable long-term storage mode for the system health view. Written via `operation=hideOrOrderOrLongTerm`; the current system order is read first to avoid overwriting it. |
+| `should_auto_share` | Boolean | Enable automatic sharing of system data with linked systems. |
+| `rootcause_reverse_entry_filter_threshold` | Number | Threshold (0–100) for root cause reverse entry filtering. |
+| `enable_composite_timeline` | Boolean | Enable the composite timeline view for the system. |
+
+---
+
 ## Import
 
 `insightfinder_system_settings` resources can be imported using the system name:
@@ -464,9 +500,9 @@ After import, run `terraform plan` to review which computed fields will be popul
 
 ## Notes
 
-- **Partial configuration**: Both `knowledgebase_settings` and `notifications_settings` are independently optional. Omitting a block means those settings are not managed by Terraform.
+- **Partial configuration**: All three blocks (`knowledgebase_settings`, `notifications_settings`, `miscellaneous_settings`) are independently optional. Omitting a block means those settings are not managed by Terraform.
 - **Delete behavior**: Removing this resource from Terraform state does not change the settings on the InsightFinder server. The settings persist and must be manually reset if needed.
 - **`satellite_system_set`**: Must be provided as a JSON-encoded string using `jsonencode(...)`. The value is semantically compared during plan/apply to avoid spurious diffs caused by JSON key ordering.
 - **`incident_count_threshold` and `assignment_map`**: Must be provided as JSON-encoded strings using `jsonencode(...)`. These fields are stored as serialized JSON in Terraform state and compared semantically to avoid key-ordering diffs.
 - **`project_level_dampening_windows`**: Optional and Computed list. When omitted, the server value is preserved in state. When set (even to `[]`), the declared list replaces any existing rules on the server. `source_customer` and `target_customer` default to the provider username when not specified.
-- **API endpoints**: `knowledgebase_settings` maps to two separate API calls — `SetGlobalKBSetting` and `SetIncidentPredictionSetting`. `notifications_settings` maps to `SetHealthViewSetting`.
+- **API endpoints**: `knowledgebase_settings` maps to two separate API calls — `SetGlobalKBSetting` and `SetIncidentPredictionSetting`. `notifications_settings` maps to `SetHealthViewSetting`. `miscellaneous_settings` maps to two calls on `/api/external/v1/systemframework` — `operation=hideOrOrderOrLongTerm` for `healthview_longterm`, and `operation=systemFrameworkSetting` for the remaining three fields. All four fields are read via a single `GET /api/external/v1/systemframework` call.

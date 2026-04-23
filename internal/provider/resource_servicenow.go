@@ -42,9 +42,11 @@ type servicenowResource struct {
 
 // projectConfigModel maps per-project ServiceNow ticket settings.
 type projectConfigModel struct {
-	EnableTicketCreation                  types.Bool `tfsdk:"enable_ticket_creation"`
-	EnableTicketUpdate                    types.Bool `tfsdk:"enable_ticket_update"`
-	EnableIncidentConsolidationInfoUpdate types.Bool `tfsdk:"enable_incident_consolidation_info_update"`
+	EnableTicketCreation                  types.Bool   `tfsdk:"enable_ticket_creation"`
+	EnableTicketUpdate                    types.Bool   `tfsdk:"enable_ticket_update"`
+	EnableIncidentConsolidationInfoUpdate types.Bool   `tfsdk:"enable_incident_consolidation_info_update"`
+	EnableIncidentResolveUpdate           types.Bool   `tfsdk:"enable_incident_resolve_update"`
+	ConfigurationItem                     types.String `tfsdk:"configuration_item"`
 }
 
 // servicenowResourceModel maps the resource schema data.
@@ -201,6 +203,16 @@ func (r *servicenowResource) Schema(_ context.Context, _ resource.SchemaRequest,
 							Optional:    true,
 							Computed:    true,
 							Default:     booldefault.StaticBool(false),
+						},
+						"enable_incident_resolve_update": schema.BoolAttribute{
+							Description: "Whether to enable incident resolve updates for this project.",
+							Optional:    true,
+							Computed:    true,
+							Default:     booldefault.StaticBool(false),
+						},
+						"configuration_item": schema.StringAttribute{
+							Description: "ServiceNow configuration item (CMDB CI) for this specific project, overrides the top-level configuration_item.",
+							Optional:    true,
 						},
 					},
 				},
@@ -767,6 +779,8 @@ func projectConfigAttrTypes() attr.Type {
 			"enable_ticket_creation":                    types.BoolType,
 			"enable_ticket_update":                      types.BoolType,
 			"enable_incident_consolidation_info_update": types.BoolType,
+			"enable_incident_resolve_update":            types.BoolType,
+			"configuration_item":                        types.StringType,
 		},
 	}
 }
@@ -788,6 +802,8 @@ func projectConfigsFromTF(ctx context.Context, m types.Map) (map[string]client.S
 			EnableTicketCreation:                  pc.EnableTicketCreation.ValueBool(),
 			EnableTicketUpdate:                    pc.EnableTicketUpdate.ValueBool(),
 			EnableIncidentConsolidationInfoUpdate: pc.EnableIncidentConsolidationInfoUpdate.ValueBool(),
+			EnableIncidentResolveUpdate:           pc.EnableIncidentResolveUpdate.ValueBool(),
+			ConfigurationItem:                     pc.ConfigurationItem.ValueString(),
 		}
 	}
 	return result, nil
@@ -799,13 +815,21 @@ func projectConfigsToTF(_ context.Context, configs map[string]client.ServiceNowP
 		"enable_ticket_creation":                    types.BoolType,
 		"enable_ticket_update":                      types.BoolType,
 		"enable_incident_consolidation_info_update": types.BoolType,
+		"enable_incident_resolve_update":            types.BoolType,
+		"configuration_item":                        types.StringType,
 	}
 	elements := make(map[string]attr.Value, len(configs))
 	for projectName, pc := range configs {
+		configItem := types.StringNull()
+		if pc.ConfigurationItem != "" {
+			configItem = types.StringValue(pc.ConfigurationItem)
+		}
 		obj, d := types.ObjectValue(attrTypes, map[string]attr.Value{
 			"enable_ticket_creation":                    types.BoolValue(pc.EnableTicketCreation),
 			"enable_ticket_update":                      types.BoolValue(pc.EnableTicketUpdate),
 			"enable_incident_consolidation_info_update": types.BoolValue(pc.EnableIncidentConsolidationInfoUpdate),
+			"enable_incident_resolve_update":            types.BoolValue(pc.EnableIncidentResolveUpdate),
+			"configuration_item":                        configItem,
 		})
 		if d.HasError() {
 			return types.MapNull(types.ObjectType{AttrTypes: attrTypes}), d

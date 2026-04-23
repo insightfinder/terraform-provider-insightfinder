@@ -12,9 +12,11 @@ import (
 
 // ServiceNowProjectConfig represents per-project ServiceNow ticket configuration
 type ServiceNowProjectConfig struct {
-	EnableTicketCreation                  bool `json:"enableTicketCreation"`
-	EnableTicketUpdate                    bool `json:"enableTicketUpdate"`
-	EnableIncidentConsolidationInfoUpdate bool `json:"enableIncidentConsolidationInfoUpdate"`
+	EnableTicketCreation                  bool   `json:"enableTicketCreation"`
+	EnableTicketUpdate                    bool   `json:"enableTicketUpdate"`
+	EnableIncidentConsolidationInfoUpdate bool   `json:"enableIncidentConsolidationInfoUpdate"`
+	EnableIncidentResolveUpdate           bool   `json:"enableIncidentResolveUpdate"`
+	ConfigurationItem                     string `json:"configurationItem,omitempty"`
 }
 
 // ServiceNowConfig represents ServiceNow integration configuration
@@ -66,6 +68,12 @@ func parseProjectConfigs(raw map[string]interface{}) map[string]ServiceNowProjec
 		}
 		if b, ok := pcMap["enableIncidentConsolidationInfoUpdate"].(bool); ok {
 			pc.EnableIncidentConsolidationInfoUpdate = b
+		}
+		if b, ok := pcMap["enableIncidentResolveUpdate"].(bool); ok {
+			pc.EnableIncidentResolveUpdate = b
+		}
+		if s, ok := pcMap["configurationItem"].(string); ok {
+			pc.ConfigurationItem = s
 		}
 		result[projectName] = pc
 	}
