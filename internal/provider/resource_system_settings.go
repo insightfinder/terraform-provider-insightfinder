@@ -46,6 +46,15 @@ type systemSettingsResourceModel struct {
 	SystemName            types.String                `tfsdk:"system_name"`
 	KnowledgebaseSettings *knowledgebaseSettingsModel `tfsdk:"knowledgebase_settings"`
 	NotificationsSettings *notificationsSettingsModel `tfsdk:"notifications_settings"`
+	MiscellaneousSettings *miscellaneousSettingsModel `tfsdk:"miscellaneous_settings"`
+}
+
+// miscellaneousSettingsModel holds miscellaneous system framework settings
+type miscellaneousSettingsModel struct {
+	HealthviewLongterm                   types.Bool  `tfsdk:"healthview_longterm"`
+	ShouldAutoShare                      types.Bool  `tfsdk:"should_auto_share"`
+	RootcauseReverseEntryFilterThreshold types.Int64 `tfsdk:"rootcause_reverse_entry_filter_threshold"`
+	EnableCompositeTimeline              types.Bool  `tfsdk:"enable_composite_timeline"`
 }
 
 // knowledgebaseSettingsModel holds both global KB and incident prediction settings
@@ -662,6 +671,44 @@ func (r *systemSettingsResource) Schema(_ context.Context, _ resource.SchemaRequ
 					},
 				},
 			},
+			"miscellaneous_settings": schema.SingleNestedAttribute{
+				Description: "Miscellaneous system framework settings.",
+				Optional:    true,
+				Attributes: map[string]schema.Attribute{
+					"healthview_longterm": schema.BoolAttribute{
+						Description: "Enable long-term storage mode for the system health view.",
+						Optional:    true,
+						Computed:    true,
+						PlanModifiers: []planmodifier.Bool{
+							boolplanmodifier.UseStateForUnknown(),
+						},
+					},
+					"should_auto_share": schema.BoolAttribute{
+						Description: "Enable automatic sharing of system data.",
+						Optional:    true,
+						Computed:    true,
+						PlanModifiers: []planmodifier.Bool{
+							boolplanmodifier.UseStateForUnknown(),
+						},
+					},
+					"rootcause_reverse_entry_filter_threshold": schema.Int64Attribute{
+						Description: "Threshold for root cause reverse entry filter (0-100).",
+						Optional:    true,
+						Computed:    true,
+						PlanModifiers: []planmodifier.Int64{
+							int64planmodifier.UseStateForUnknown(),
+						},
+					},
+					"enable_composite_timeline": schema.BoolAttribute{
+						Description: "Enable composite timeline view for the system.",
+						Optional:    true,
+						Computed:    true,
+						PlanModifiers: []planmodifier.Bool{
+							boolplanmodifier.UseStateForUnknown(),
+						},
+					},
+				},
+			},
 		},
 	}
 }
@@ -724,6 +771,13 @@ func (r *systemSettingsResource) Create(ctx context.Context, req resource.Create
 	if plan.NotificationsSettings != nil {
 		if err := r.applyNotificationsSettings(ctx, systemID, plan.NotificationsSettings); err != nil {
 			resp.Diagnostics.AddError("Error Setting Notifications Settings", err.Error())
+			return
+		}
+	}
+
+	if plan.MiscellaneousSettings != nil {
+		if err := r.applyMiscellaneousSettings(ctx, systemID, plan.MiscellaneousSettings); err != nil {
+			resp.Diagnostics.AddError("Error Setting Miscellaneous Settings", err.Error())
 			return
 		}
 	}
@@ -795,6 +849,13 @@ func (r *systemSettingsResource) Update(ctx context.Context, req resource.Update
 	if plan.NotificationsSettings != nil {
 		if err := r.applyNotificationsSettings(ctx, systemID, plan.NotificationsSettings); err != nil {
 			resp.Diagnostics.AddError("Error Updating Notifications Settings", err.Error())
+			return
+		}
+	}
+
+	if plan.MiscellaneousSettings != nil {
+		if err := r.applyMiscellaneousSettings(ctx, systemID, plan.MiscellaneousSettings); err != nil {
+			resp.Diagnostics.AddError("Error Updating Miscellaneous Settings", err.Error())
 			return
 		}
 	}
@@ -988,6 +1049,24 @@ func (r *systemSettingsResource) applyNotificationsSettings(_ context.Context, s
 	return nil
 }
 
+// applyMiscellaneousSettings writes miscellaneous system framework settings to the API
+func (r *systemSettingsResource) applyMiscellaneousSettings(_ context.Context, systemID string, m *miscellaneousSettingsModel) error {
+	if err := r.client.SetLongTermSetting(systemID, m.HealthviewLongterm.ValueBool()); err != nil {
+		return fmt.Errorf("failed to set longTerm setting: %w", err)
+	}
+
+	fwSettings := &client.SystemFrameworkSetting{
+		ShouldAutoShare:                      m.ShouldAutoShare.ValueBool(),
+		RootCauseReverseEntryFilterThreshold: m.RootcauseReverseEntryFilterThreshold.ValueInt64(),
+		EnableCompositeTimeline:              m.EnableCompositeTimeline.ValueBool(),
+	}
+	if err := r.client.SetSystemFrameworkSetting(systemID, fwSettings); err != nil {
+		return fmt.Errorf("failed to set system framework setting: %w", err)
+	}
+
+	return nil
+}
+
 // readIntoModel reads the current state from the API and populates the model
 func (r *systemSettingsResource) readIntoModel(_ context.Context, systemID string, m *systemSettingsResourceModel) error {
 	if m.KnowledgebaseSettings != nil {
@@ -1173,6 +1252,19 @@ func (r *systemSettingsResource) readIntoModel(_ context.Context, systemID strin
 				}
 			}
 			m.NotificationsSettings.InstanceDownNotification = newList
+		}
+	}
+
+	if m.MiscellaneousSettings != nil {
+		miscSetting, err := r.client.GetMiscellaneousSettings(systemID)
+		if err != nil {
+			return fmt.Errorf("failed to read miscellaneous settings: %w", err)
+		}
+		if miscSetting != nil {
+			m.MiscellaneousSettings.HealthviewLongterm = types.BoolValue(miscSetting.LongTerm)
+			m.MiscellaneousSettings.ShouldAutoShare = types.BoolValue(miscSetting.ShouldAutoShare)
+			m.MiscellaneousSettings.RootcauseReverseEntryFilterThreshold = types.Int64Value(miscSetting.RootCauseReverseEntryFilterThreshold)
+			m.MiscellaneousSettings.EnableCompositeTimeline = types.BoolValue(miscSetting.EnableCompositeTimeline)
 		}
 	}
 

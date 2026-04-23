@@ -210,6 +210,13 @@ resource "insightfinder_system_settings" "full" {
       }
     ]
   }
+
+  miscellaneous_settings = {
+    healthview_longterm                      = false
+    should_auto_share                        = true
+    rootcause_reverse_entry_filter_threshold = 99
+    enable_composite_timeline                = true
+  }
 }
 
 variable "username" {

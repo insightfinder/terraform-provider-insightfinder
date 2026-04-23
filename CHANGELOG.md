@@ -5,6 +5,20 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.8.12] - 2026-04-23
+
+### Added
+- **insightfinder_servicenow**: Two new fields inside each `project_configs` entry, matching updated API fields:
+  - `enable_incident_resolve_update` (Boolean, Optional, Computed, default `false`) — controls whether ServiceNow incidents are updated when InsightFinder resolves the corresponding incident
+  - `configuration_item` (String, Optional) — per-project ServiceNow CMDB configuration item; overrides the top-level `configuration_item` when set for a specific project
+- **insightfinder_system_settings**: New `miscellaneous_settings` block — configures miscellaneous system framework settings via `/api/external/v1/systemframework`
+  - `healthview_longterm` (Boolean, Optional, Computed): Enable long-term storage mode for the system health view. Written via `operation=hideOrOrderOrLongTerm`; reads current order before posting to avoid overwriting it.
+  - `should_auto_share` (Boolean, Optional, Computed): Enable automatic sharing of system data
+  - `rootcause_reverse_entry_filter_threshold` (Number, Optional, Computed): Threshold (0–100) for root cause reverse entry filtering
+  - `enable_composite_timeline` (Boolean, Optional, Computed): Enable composite timeline view for the system
+  - The last three fields are written together via `operation=systemFrameworkSetting` and read from the `systemSetting` JSON sub-field in the GET response
+  - All four fields are read back from the `ownSystemArr` response of `GET /api/external/v1/systemframework`
+
 ## [1.8.11] - 2026-04-20
 
 ### Added
@@ -404,6 +418,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## Version History
 
+- **1.8.12** - Added `miscellaneous_settings` block to `insightfinder_system_settings`
+- **1.8.11** - Added `mode` attribute to `insightfinder_project`
 - **1.8.9** - Replaced flat `enable_ticket_creation`/`enable_ticket_update` with per-project `project_configs` map in `insightfinder_servicenow`
 - **1.8.8** - Added `service_now_import_flag` to `insightfinder_project` ServiceNow settings
 - **1.8.0** - Added `insightfinder_metric_project` resource; fixed `omitempty` zero-value bug in both metric and log project updates
@@ -415,4 +431,5 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 [1.8.0]: https://github.com/insightfinder/terraform-provider-insightfinder/releases/tag/v1.8.0
 [1.7.0]: https://github.com/insightfinder/terraform-provider-insightfinder/releases/tag/v1.7.0
 [1.0.0]: https://github.com/insightfinder/terraform-provider-insightfinder/releases/tag/v1.0.0
-[Unreleased]: https://github.com/insightfinder/terraform-provider-insightfinder/compare/v1.8.9...HEAD
+[1.8.12]: https://github.com/insightfinder/terraform-provider-insightfinder/releases/tag/v1.8.12
+[Unreleased]: https://github.com/insightfinder/terraform-provider-insightfinder/compare/v1.8.12...HEAD
