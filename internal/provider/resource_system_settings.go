@@ -107,6 +107,7 @@ type notificationsSettingsModel struct {
 	EnableRootCauseEmailAlert          types.Bool    `tfsdk:"enable_root_cause_email_alert"`
 	RootCauseEmail                     types.String  `tfsdk:"root_cause_email"`
 	IncidentDampeningWindow            types.Int64   `tfsdk:"incident_dampening_window"`
+	TicketOpenTime                     types.Int64   `tfsdk:"ticket_open_time"`
 	// New notification settings
 	SystemDownNotification       *systemDownNotificationModel       `tfsdk:"system_down_notification"`
 	DailyReportNotification      *insightsReportNotificationModel   `tfsdk:"daily_report_notification"`
@@ -515,6 +516,14 @@ func (r *systemSettingsResource) Schema(_ context.Context, _ resource.SchemaRequ
 					},
 					"incident_dampening_window": schema.Int64Attribute{
 						Description: "Dampening window for incident notifications in milliseconds.",
+						Optional:    true,
+						Computed:    true,
+						PlanModifiers: []planmodifier.Int64{
+							int64planmodifier.UseStateForUnknown(),
+						},
+					},
+					"ticket_open_time": schema.Int64Attribute{
+						Description: "Time window in milliseconds for keeping a ticket open.",
 						Optional:    true,
 						Computed:    true,
 						PlanModifiers: []planmodifier.Int64{
@@ -953,6 +962,7 @@ func (r *systemSettingsResource) applyNotificationsSettings(_ context.Context, s
 		EnableRootCauseEmailAlert:          m.EnableRootCauseEmailAlert.ValueBool(),
 		RootCauseEmail:                     m.RootCauseEmail.ValueString(),
 		IncidentDampeningWindow:            m.IncidentDampeningWindow.ValueInt64(),
+		TicketOpenTime:                     m.TicketOpenTime.ValueInt64(),
 	}
 
 	if v := m.IncidentCountThreshold.ValueString(); v != "" && v != "null" {
@@ -1182,6 +1192,7 @@ func (r *systemSettingsResource) readIntoModel(_ context.Context, systemID strin
 			m.NotificationsSettings.EnableRootCauseEmailAlert = types.BoolValue(hvSetting.EnableRootCauseEmailAlert)
 			m.NotificationsSettings.RootCauseEmail = types.StringValue(hvSetting.RootCauseEmail)
 			m.NotificationsSettings.IncidentDampeningWindow = types.Int64Value(hvSetting.IncidentDampeningWindow)
+			m.NotificationsSettings.TicketOpenTime = types.Int64Value(hvSetting.TicketOpenTime)
 
 			if m.NotificationsSettings.ProjectLevelDampeningWindows != nil {
 				newWindows := make([]projectLevelDampeningWindowModel, 0, len(hvSetting.ProjectLevelDampeningWindows))

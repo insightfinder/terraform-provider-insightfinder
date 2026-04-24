@@ -59,6 +59,7 @@ resource "insightfinder_system_settings" "with_notifications" {
     alerts_email_dampening_period          = 3600000
     prediction_email_dampening_period      = 3600000
     incident_dampening_window              = 59220000
+    ticket_open_time                       = 59940000
     order                                  = 0
     hide_flag                              = false
     enable_splunk_export                   = false
@@ -163,6 +164,7 @@ resource "insightfinder_system_settings" "full" {
     alerts_email_dampening_period          = 3600000
     prediction_email_dampening_period      = 3600000
     incident_dampening_window              = 59220000
+    ticket_open_time                       = 59940000
     order                                  = 0
     hide_flag                              = false
     enable_splunk_export                   = false
