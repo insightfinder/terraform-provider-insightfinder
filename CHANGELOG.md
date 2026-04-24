@@ -5,6 +5,11 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.8.13] - 2026-04-24
+
+### Added
+- **insightfinder_system_settings**: New `ticket_open_time` attribute inside `notifications_settings` (Number, Optional, Computed) — time window in milliseconds for keeping a ticket open. Maps to the `ticketOpenTime` field in the `/api/external/v2/healthviewsetting` API.
+
 ## [1.8.12] - 2026-04-23
 
 ### Added

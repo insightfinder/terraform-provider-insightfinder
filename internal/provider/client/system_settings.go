@@ -112,6 +112,7 @@ type HealthViewSetting struct {
 	IncidentCountThreshold             map[string]int64              `json:"incidentCountThreshold,omitempty"`
 	AssignmentMap                      map[string]any                `json:"assignmentMap"`
 	IncidentDampeningWindow            int64                         `json:"incidentDampeningWindow"`
+	TicketOpenTime                     int64                         `json:"ticketOpenTime"`
 	ProjectLevelDampeningWindows       []ProjectLevelDampeningWindow `json:"projectLevelDampeningWindows"`
 	SystemID                           string                        `json:"systemId,omitempty"`
 	ID                                 string                        `json:"id,omitempty"`
@@ -914,6 +915,7 @@ func (c *Client) SetHealthViewSetting(systemID string, updates *HealthViewSettin
 	current.EnableRootCauseEmailAlert = updates.EnableRootCauseEmailAlert
 	current.RootCauseEmail = updates.RootCauseEmail
 	current.IncidentDampeningWindow = updates.IncidentDampeningWindow
+	current.TicketOpenTime = updates.TicketOpenTime
 	current.ProjectLevelDampeningWindows = updates.ProjectLevelDampeningWindows
 	current.SystemID = systemID
 	current.ID = systemID

@@ -55,6 +55,7 @@ resource "insightfinder_system_settings" "example" {
     alerts_email_dampening_period      = 3600000
     prediction_email_dampening_period  = 3600000
     incident_dampening_window          = 59220000
+    ticket_open_time                   = 59940000
 
     enable_system_down_email_alert         = false
     only_send_with_rca                     = false
@@ -390,6 +391,7 @@ All attributes are Optional and Computed (server defaults are used when omitted)
 | `alerts_email_dampening_period` | Number | Dampening period for alert emails in milliseconds. |
 | `prediction_email_dampening_period` | Number | Dampening period for prediction emails in milliseconds. |
 | `incident_dampening_window` | Number | Dampening window for incident notification emails in milliseconds. |
+| `ticket_open_time` | Number | Time window in milliseconds for keeping a ticket open. |
 
 #### Email Alert Toggles
 
