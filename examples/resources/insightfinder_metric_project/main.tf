@@ -197,15 +197,17 @@ resource "insightfinder_metric_project" "with_metric_config" {
           is_kpi                                  = true
           is_flapping_result_only                 = false
           incident_duration_threshold             = 300000
-          detection_type                          = "Threshold"
+          detection_type                          = "positive"
+          c_value_override                        = null
+          high_c_value_override                   = null
           pattern_name_higher                     = "High CPU"
           pattern_name_lower                      = ""
-          metric_type                             = "Gauge"
+          metric_type                             = "CPU Utilization"
           fill_zero                               = false
-          rouge_value                             = ""
+          rouge_value                             = null
           enable_baseline_near_constance          = false
           compute_difference                      = false
-          anomaly_gap_tolerance_duration          = 0
+          anomaly_gap_tolerance_duration          = 60000
         }
       ]
     },

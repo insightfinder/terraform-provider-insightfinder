@@ -164,6 +164,8 @@ type metricAlertSettingModel struct {
 	IsFlappingResultOnly               types.Bool   `tfsdk:"is_flapping_result_only"`
 	IncidentDurationThreshold          types.Int64  `tfsdk:"incident_duration_threshold"`
 	DetectionType                      types.String `tfsdk:"detection_type"`
+	CValueOverride                     types.Int64  `tfsdk:"c_value_override"`
+	HighCValueOverride                 types.Int64  `tfsdk:"high_c_value_override"`
 	PatternNameHigher                  types.String `tfsdk:"pattern_name_higher"`
 	PatternNameLower                   types.String `tfsdk:"pattern_name_lower"`
 	MetricType                         types.String `tfsdk:"metric_type"`
@@ -213,6 +215,8 @@ func metricAlertSettingAttrTypes() map[string]attr.Type {
 		"is_flapping_result_only":                 types.BoolType,
 		"incident_duration_threshold":             types.Int64Type,
 		"detection_type":                          types.StringType,
+		"c_value_override":                        types.Int64Type,
+		"high_c_value_override":                   types.Int64Type,
 		"pattern_name_higher":                     types.StringType,
 		"pattern_name_lower":                      types.StringType,
 		"metric_type":                             types.StringType,
@@ -754,15 +758,39 @@ func (r *metricProjectResource) Schema(_ context.Context, _ resource.SchemaReque
 									"is_kpi":                                  schema.BoolAttribute{Description: "Whether this metric is a KPI.", Optional: true, Computed: true},
 									"is_flapping_result_only":                 schema.BoolAttribute{Description: "Whether to report flapping results only.", Optional: true, Computed: true},
 									"incident_duration_threshold":             schema.Int64Attribute{Description: "Minimum incident duration (ms) to trigger.", Optional: true, Computed: true},
-									"detection_type":                          schema.StringAttribute{Description: "Detection direction: 'positive', 'negative', or 'both'.", Optional: true, Computed: true},
-									"pattern_name_higher":                     schema.StringAttribute{Description: "Pattern name for higher anomalies.", Optional: true, Computed: true},
-									"pattern_name_lower":                      schema.StringAttribute{Description: "Pattern name for lower anomalies.", Optional: true, Computed: true},
-									"metric_type":                             schema.StringAttribute{Description: "Metric type classification (e.g., 'Unknown', 'CPU Utilization').", Optional: true, Computed: true},
-									"fill_zero":                               schema.BoolAttribute{Description: "Fill missing data with zero.", Optional: true, Computed: true},
-									"rouge_value":                             schema.StringAttribute{Description: "Rouge value as raw JSON string from API (e.g., '{\"l\":NaN,\"s\":NaN}'). Null to disable.", Optional: true, Computed: true},
-									"enable_baseline_near_constance":          schema.BoolAttribute{Description: "Enable baseline near constance detection.", Optional: true, Computed: true},
-									"compute_difference":                      schema.BoolAttribute{Description: "Compute difference for this metric.", Optional: true, Computed: true},
-									"anomaly_gap_tolerance_duration":          schema.Int64Attribute{Description: "Anomaly gap tolerance duration in milliseconds.", Optional: true, Computed: true},
+									"detection_type": schema.StringAttribute{
+										Description: "Detection direction: 'positive', 'negative', or 'both'.",
+										Optional:    true,
+										Computed:    true,
+										PlanModifiers: []planmodifier.String{
+											stringplanmodifier.UseStateForUnknown(),
+										},
+									},
+									"c_value_override": schema.Int64Attribute{
+										Description: "Override for the C value anomaly sensitivity. Null means use project default.",
+										Optional:    true,
+										Computed:    false,
+									},
+									"high_c_value_override": schema.Int64Attribute{
+										Description: "Override for the high-ratio C value anomaly sensitivity. Null means use project default.",
+										Optional:    true,
+										Computed:    false,
+									},
+									"pattern_name_higher": schema.StringAttribute{Description: "Pattern name for higher anomalies.", Optional: true, Computed: true},
+									"pattern_name_lower":  schema.StringAttribute{Description: "Pattern name for lower anomalies.", Optional: true, Computed: true},
+									"metric_type":         schema.StringAttribute{Description: "Metric type classification (e.g., 'Unknown', 'CPU Utilization').", Optional: true, Computed: true},
+									"fill_zero":           schema.BoolAttribute{Description: "Fill missing data with zero.", Optional: true, Computed: true},
+									"rouge_value": schema.StringAttribute{
+										Description: "Rouge value as raw JSON string from API (e.g., '{\"l\":NaN,\"s\":NaN}'). Null to disable.",
+										Optional:    true,
+										Computed:    true,
+										PlanModifiers: []planmodifier.String{
+											stringplanmodifier.UseStateForUnknown(),
+										},
+									},
+									"enable_baseline_near_constance": schema.BoolAttribute{Description: "Enable baseline near constance detection.", Optional: true, Computed: true},
+									"compute_difference":             schema.BoolAttribute{Description: "Compute difference for this metric.", Optional: true, Computed: true},
+									"anomaly_gap_tolerance_duration": schema.Int64Attribute{Description: "Anomaly gap tolerance duration in milliseconds.", Optional: true, Computed: true},
 								},
 							},
 						},
@@ -1459,7 +1487,7 @@ func (r *metricProjectResource) Create(ctx context.Context, req resource.CreateR
 			return
 		}
 		patternIdRule := int(plan.PatternIdGenerationRule.ValueInt64())
-		applyDiags := applyMetricConfigurations(ctx, r.client, plan.ProjectName.ValueString(), metricConfigs, patternIdRule)
+		applyDiags := applyMetricConfigurations(ctx, r.client, plan.ProjectName.ValueString(), metricConfigs, patternIdRule, plan.SamplingInterval.ValueInt64())
 		resp.Diagnostics.Append(applyDiags...)
 		if resp.Diagnostics.HasError() {
 			return
@@ -1471,12 +1499,12 @@ func (r *metricProjectResource) Create(ctx context.Context, req resource.CreateR
 		if resp.Diagnostics.HasError() {
 			return
 		}
-		listVal, d := types.ListValueFrom(ctx, types.ObjectType{AttrTypes: metricConfigurationAttrTypes()}, normalizedConfigs)
+		setVal, d := types.ListValueFrom(ctx, types.ObjectType{AttrTypes: metricConfigurationAttrTypes()}, normalizedConfigs)
 		resp.Diagnostics.Append(d...)
 		if resp.Diagnostics.HasError() {
 			return
 		}
-		plan.MetricConfigurations = listVal
+		plan.MetricConfigurations = setVal
 	} else {
 		plan.MetricConfigurations = types.ListNull(types.ObjectType{AttrTypes: metricConfigurationAttrTypes()})
 	}
@@ -1600,10 +1628,10 @@ func (r *metricProjectResource) Read(ctx context.Context, req resource.ReadReque
 			updatedConfigs, readDiags := readMetricConfigurationsFromAPI(ctx, r.client, state.ProjectName.ValueString(), existingConfigs)
 			resp.Diagnostics.Append(readDiags...)
 			if !resp.Diagnostics.HasError() && len(updatedConfigs) > 0 {
-				listVal, d := types.ListValueFrom(ctx, types.ObjectType{AttrTypes: metricConfigurationAttrTypes()}, updatedConfigs)
+				setVal, d := types.ListValueFrom(ctx, types.ObjectType{AttrTypes: metricConfigurationAttrTypes()}, updatedConfigs)
 				resp.Diagnostics.Append(d...)
 				if !resp.Diagnostics.HasError() {
-					state.MetricConfigurations = listVal
+					state.MetricConfigurations = setVal
 				}
 			}
 		}
@@ -1761,7 +1789,7 @@ func (r *metricProjectResource) Update(ctx context.Context, req resource.UpdateR
 			return
 		}
 		patternIdRule := int(plan.PatternIdGenerationRule.ValueInt64())
-		applyDiags := applyMetricConfigurations(ctx, r.client, plan.ProjectName.ValueString(), metricConfigs, patternIdRule)
+		applyDiags := applyMetricConfigurations(ctx, r.client, plan.ProjectName.ValueString(), metricConfigs, patternIdRule, plan.SamplingInterval.ValueInt64())
 		resp.Diagnostics.Append(applyDiags...)
 		if resp.Diagnostics.HasError() {
 			return
@@ -1773,12 +1801,12 @@ func (r *metricProjectResource) Update(ctx context.Context, req resource.UpdateR
 		if resp.Diagnostics.HasError() {
 			return
 		}
-		listVal, d := types.ListValueFrom(ctx, types.ObjectType{AttrTypes: metricConfigurationAttrTypes()}, normalizedConfigs)
+		setVal, d := types.ListValueFrom(ctx, types.ObjectType{AttrTypes: metricConfigurationAttrTypes()}, normalizedConfigs)
 		resp.Diagnostics.Append(d...)
 		if resp.Diagnostics.HasError() {
 			return
 		}
-		plan.MetricConfigurations = listVal
+		plan.MetricConfigurations = setVal
 	} else {
 		plan.MetricConfigurations = types.ListNull(types.ObjectType{AttrTypes: metricConfigurationAttrTypes()})
 	}
@@ -1847,6 +1875,16 @@ func buildMetricAlertSettingFromAPI(s client.MetricAlertSetting) metricAlertSett
 		ComputeDifference:                  types.BoolValue(s.ComputeDifference),
 		AnomalyGapToleranceDuration:        types.Int64Value(s.AnomalyGapToleranceDuration),
 	}
+	if s.CValueOverride != nil {
+		m.CValueOverride = types.Int64Value(*s.CValueOverride)
+	} else {
+		m.CValueOverride = types.Int64Null()
+	}
+	if s.HighCValueOverride != nil {
+		m.HighCValueOverride = types.Int64Value(*s.HighCValueOverride)
+	} else {
+		m.HighCValueOverride = types.Int64Null()
+	}
 	// Treat both nil pointer and the literal string "null" (returned by the API) as Terraform null.
 	if s.RougeValue == nil || *s.RougeValue == "null" {
 		m.RougeValue = types.StringNull()
@@ -1858,7 +1896,25 @@ func buildMetricAlertSettingFromAPI(s client.MetricAlertSetting) metricAlertSett
 
 // buildSingleMetricAlertSettingPost converts a metricAlertSettingModel to a client.MetricAlertSettingPost.
 // metricName is used for the SMetric field (not stored in the model itself).
-func buildSingleMetricAlertSettingPost(metricName string, s metricAlertSettingModel) client.MetricAlertSettingPost {
+// samplingIntervalS is the project sampling interval in seconds, used to convert the duration to a count.
+func buildSingleMetricAlertSettingPost(metricName string, s metricAlertSettingModel, samplingIntervalS int64) client.MetricAlertSettingPost {
+	detectionType := s.DetectionType.ValueString()
+	if detectionType == "" {
+		detectionType = "positive"
+	}
+
+	var anomalyCount int64 = 1
+	if samplingIntervalS > 0 {
+		durationMS := s.AnomalyGapToleranceDuration.ValueInt64()
+		samplingMS := samplingIntervalS * 1000
+		if samplingMS > 0 {
+			anomalyCount = durationMS / samplingMS
+		}
+	}
+	if anomalyCount < 1 {
+		anomalyCount = 1
+	}
+
 	return client.MetricAlertSettingPost{
 		SMetric:                            metricName,
 		ComponentName:                      s.ComponentName.ValueString(),
@@ -1881,7 +1937,7 @@ func buildSingleMetricAlertSettingPost(metricName string, s metricAlertSettingMo
 		IsKPI:                              s.IsKPI.ValueBool(),
 		IsFlappingResultOnly:               s.IsFlappingResultOnly.ValueBool(),
 		IncidentDurationThreshold:          s.IncidentDurationThreshold.ValueInt64(),
-		DetectionType:                      s.DetectionType.ValueString(),
+		DetectionType:                      detectionType,
 		PatternNameHigher:                  s.PatternNameHigher.ValueString(),
 		PatternNameLower:                   s.PatternNameLower.ValueString(),
 		MetricType:                         s.MetricType.ValueString(),
@@ -1889,7 +1945,9 @@ func buildSingleMetricAlertSettingPost(metricName string, s metricAlertSettingMo
 		RougeValue:                         client.ConvertRougeValueForPost(s.RougeValue.ValueString()),
 		EnableBaselineNearConstance:        s.EnableBaselineNearConstance.ValueBool(),
 		ComputeDifference:                  s.ComputeDifference.ValueBool(),
-		AnomalyGapToleranceDuration:        s.AnomalyGapToleranceDuration.ValueInt64(),
+		AnomalyGapToleranceDurationCount:   anomalyCount,
+		CValueOverride:                     nullableInt64Div60(s.CValueOverride),
+		HighCValueOverride:                 nullableInt64Div60(s.HighCValueOverride),
 	}
 }
 
@@ -1916,6 +1974,21 @@ func readMetricConfigurationsFromAPI(ctx context.Context, c *client.Client, proj
 	for _, existingCfg := range existingConfigs {
 		metricName := existingCfg.MetricName.ValueString()
 
+		// Build a lookup of existing alert settings by component name so we can
+		// preserve null for c_value_override / high_c_value_override when the user
+		// didn't specify them in config. Without this, a UI change that sets these
+		// on the API side would cause every metric in the set to appear changed
+		// (because the set element hash changes null → value for all entries).
+		existingSettingByComponent := make(map[string]metricAlertSettingModel)
+		if !existingCfg.MetricAlertSettings.IsNull() && !existingCfg.MetricAlertSettings.IsUnknown() {
+			var existingSettings []metricAlertSettingModel
+			if d := existingCfg.MetricAlertSettings.ElementsAs(ctx, &existingSettings, false); !d.HasError() {
+				for _, s := range existingSettings {
+					existingSettingByComponent[s.ComponentName.ValueString()] = s
+				}
+			}
+		}
+
 		// Use an explicit empty slice when the metric has no entries so the framework
 		// stores [] (empty list) in state rather than null. This prevents a perpetual
 		// diff where Terraform plans [] for a null Computed list attribute.
@@ -1938,9 +2011,13 @@ func readMetricConfigurationsFromAPI(ctx context.Context, c *client.Client, proj
 		if err != nil {
 			diags.AddWarning(fmt.Sprintf("Could not read metric settings for %s", metricName), err.Error())
 		} else if settingEntry != nil {
-			alertSettingModels = append(alertSettingModels, buildMetricAlertSettingFromAPI(settingEntry.GlobalSetting))
+			global := buildMetricAlertSettingFromAPI(settingEntry.GlobalSetting)
+			preserveConfiguredNulls(&global, existingSettingByComponent)
+			alertSettingModels = append(alertSettingModels, global)
 			for _, compSetting := range settingEntry.ComponentLevelSettingList {
-				alertSettingModels = append(alertSettingModels, buildMetricAlertSettingFromAPI(compSetting))
+				cm := buildMetricAlertSettingFromAPI(compSetting)
+				preserveConfiguredNulls(&cm, existingSettingByComponent)
+				alertSettingModels = append(alertSettingModels, cm)
 			}
 		}
 
@@ -1957,9 +2034,40 @@ func readMetricConfigurationsFromAPI(ctx context.Context, c *client.Client, proj
 	return result, diags
 }
 
-// applyMetricConfigurations pushes metric_configurations to the API for all metrics in planConfigs.
-func applyMetricConfigurations(ctx context.Context, c *client.Client, projectName string, planConfigs []metricConfigurationModel, patternIdRule int) diag.Diagnostics {
+// preserveConfiguredNulls checks the existing state for a metric alert setting and, for
+// fields where the prior state was null (user didn't configure them), resets the
+// freshly-read model back to null. This prevents perpetual diffs when the API returns
+// server-side defaults (e.g. detection_type="positive", rouge_value=NaN JSON) that were
+// never explicitly set by the user.
+func preserveConfiguredNulls(m *metricAlertSettingModel, existingByComponent map[string]metricAlertSettingModel) {
+	old, ok := existingByComponent[m.ComponentName.ValueString()]
+	if !ok {
+		return
+	}
+	if old.CValueOverride.IsNull() {
+		m.CValueOverride = types.Int64Null()
+	}
+	if old.HighCValueOverride.IsNull() {
+		m.HighCValueOverride = types.Int64Null()
+	}
+	// If prior state had no detection_type (null or empty string), restore that rather
+	// than storing the API's default "positive", which the provider sends for null config.
+	if old.DetectionType.IsNull() || old.DetectionType.ValueString() == "" {
+		m.DetectionType = old.DetectionType
+	}
+	// If prior state had null rouge_value, restore null rather than storing the API's
+	// default NaN JSON that the provider sends when rouge_value is null in config.
+	if old.RougeValue.IsNull() {
+		m.RougeValue = types.StringNull()
+	}
+}
+
+// applyMetricConfigurations pushes metric_configurations to the API.
+// All metric alert settings are batched into a single POST request.
+// Component escalation/ignored settings are still sent per-metric (separate endpoint).
+func applyMetricConfigurations(ctx context.Context, c *client.Client, projectName string, planConfigs []metricConfigurationModel, patternIdRule int, samplingIntervalS int64) diag.Diagnostics {
 	var diags diag.Diagnostics
+	var allPostData []client.MetricAlertSettingPost
 
 	for _, cfg := range planConfigs {
 		metricName := cfg.MetricName.ValueString()
@@ -1990,22 +2098,25 @@ func applyMetricConfigurations(ctx context.Context, c *client.Client, projectNam
 			var alertSettings []metricAlertSettingModel
 			d := cfg.MetricAlertSettings.ElementsAs(ctx, &alertSettings, false)
 			diags.Append(d...)
-			if !diags.HasError() && len(alertSettings) > 0 {
-				var postData []client.MetricAlertSettingPost
+			if !diags.HasError() {
 				for _, s := range alertSettings {
-					postData = append(postData, buildSingleMetricAlertSettingPost(metricName, s))
-				}
-				jsonBytes, err := json.Marshal(postData)
-				if err != nil {
-					diags.AddError(fmt.Sprintf("Error marshaling metric alert settings for %s", metricName), err.Error())
-					continue
-				}
-				if err := c.SetMetricSettings(projectName, patternIdRule, jsonBytes); err != nil {
-					diags.AddError(fmt.Sprintf("Error setting metric alert settings for %s", metricName), err.Error())
+					allPostData = append(allPostData, buildSingleMetricAlertSettingPost(metricName, s, samplingIntervalS))
 				}
 			}
 		}
 	}
+
+	if len(allPostData) > 0 {
+		jsonBytes, err := json.Marshal(allPostData)
+		if err != nil {
+			diags.AddError("Error marshaling metric alert settings", err.Error())
+			return diags
+		}
+		if err := c.SetMetricSettings(projectName, patternIdRule, jsonBytes); err != nil {
+			diags.AddError("Error setting metric alert settings", err.Error())
+		}
+	}
+
 	return diags
 }
 
@@ -2033,6 +2144,14 @@ func normalizeMetricConfigsForState(ctx context.Context, configs []metricConfigu
 }
 
 // splitByComma splits a string by comma. Extracted to avoid repetition in date parsing.
+func nullableInt64Div60(v types.Int64) *int64 {
+	if v.IsNull() || v.IsUnknown() {
+		return nil
+	}
+	val := v.ValueInt64() / 60
+	return &val
+}
+
 func splitByComma(s string) []string {
 	var parts []string
 	current := ""

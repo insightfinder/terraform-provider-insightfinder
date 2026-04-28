@@ -5,6 +5,20 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.8.14] - 2026-04-27
+
+### Fixed
+- **insightfinder_metric_project**: Metric alert settings are now sent as a single batched POST request instead of one request per metric, significantly reducing API call volume on projects with many metrics.
+
+### Changed
+- **insightfinder_metric_project**: Updated `metric_alert_settings` POST payload to match the format expected by the API:
+  - `anomalyGapToleranceDuration` (ms) is now sent as `anomalyGapToleranceDurationCount` (count = duration ÷ sampling interval), matching the web UI format.
+  - `detectionType` now defaults to `"positive"` when the configured value is empty.
+  - `cValueOverride` and `highCValueOverride` are now included in the POST payload (null when not set).
+
+### Added
+- **insightfinder_metric_project**: New `c_value_override` and `high_c_value_override` attributes inside `metric_alert_settings` (Int64, Optional, Computed) — per-metric overrides for anomaly sensitivity C values. Read from the GET API and written back on apply; null means the project-level default is used.
+
 ## [1.8.13] - 2026-04-24
 
 ### Added

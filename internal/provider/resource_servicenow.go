@@ -510,12 +510,14 @@ func (r *servicenowResource) Read(ctx context.Context, req resource.ReadRequest,
 	}
 	if config.ConfigurationItem != "" {
 		state.ConfigurationItem = types.StringValue(config.ConfigurationItem)
+	} else if !state.ConfigurationItem.IsNull() && !state.ConfigurationItem.IsUnknown() && state.ConfigurationItem.ValueString() == "" {
+		// Prior state was ""; API treats "" and null identically — preserve "" to avoid perpetual diff.
 	} else {
 		state.ConfigurationItem = types.StringNull()
 	}
 
 	if len(config.ProjectConfigs) > 0 {
-		projectConfigsMap, d := projectConfigsToTF(ctx, config.ProjectConfigs)
+		projectConfigsMap, d := projectConfigsToTF(ctx, config.ProjectConfigs, state.ProjectConfigs)
 		resp.Diagnostics.Append(d...)
 		if resp.Diagnostics.HasError() {
 			return
@@ -810,7 +812,9 @@ func projectConfigsFromTF(ctx context.Context, m types.Map) (map[string]client.S
 }
 
 // projectConfigsToTF converts a ServiceNowProjectConfig map into a Terraform types.Map.
-func projectConfigsToTF(_ context.Context, configs map[string]client.ServiceNowProjectConfig) (types.Map, diag.Diagnostics) {
+// priorConfigs is the prior state map used to preserve "" vs null for configuration_item
+// when the API returns an empty string (API treats "" and null identically).
+func projectConfigsToTF(ctx context.Context, configs map[string]client.ServiceNowProjectConfig, priorConfigs types.Map) (types.Map, diag.Diagnostics) {
 	attrTypes := map[string]attr.Type{
 		"enable_ticket_creation":                    types.BoolType,
 		"enable_ticket_update":                      types.BoolType,
@@ -818,11 +822,22 @@ func projectConfigsToTF(_ context.Context, configs map[string]client.ServiceNowP
 		"enable_incident_resolve_update":            types.BoolType,
 		"configuration_item":                        types.StringType,
 	}
+
+	var priorModels map[string]projectConfigModel
+	if !priorConfigs.IsNull() && !priorConfigs.IsUnknown() {
+		_ = priorConfigs.ElementsAs(ctx, &priorModels, false)
+	}
+
 	elements := make(map[string]attr.Value, len(configs))
 	for projectName, pc := range configs {
 		configItem := types.StringNull()
 		if pc.ConfigurationItem != "" {
 			configItem = types.StringValue(pc.ConfigurationItem)
+		} else if prior, ok := priorModels[projectName]; ok &&
+			!prior.ConfigurationItem.IsNull() && !prior.ConfigurationItem.IsUnknown() &&
+			prior.ConfigurationItem.ValueString() == "" {
+			// Prior state was ""; preserve it — API treats "" same as null.
+			configItem = types.StringValue("")
 		}
 		obj, d := types.ObjectValue(attrTypes, map[string]attr.Value{
 			"enable_ticket_creation":                    types.BoolValue(pc.EnableTicketCreation),
