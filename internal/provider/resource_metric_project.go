@@ -138,7 +138,7 @@ type metricProjectResourceModel struct {
 	HolidaySettings types.List `tfsdk:"holiday_settings"`
 
 	// Metric configurations (per-metric alert thresholds + component operations)
-	MetricConfigurations types.Set `tfsdk:"metric_configurations"`
+	MetricConfigurations types.List `tfsdk:"metric_configurations"`
 }
 
 // metricAlertSettingModel maps one entry in metric_alert_settings.
@@ -710,7 +710,7 @@ func (r *metricProjectResource) Schema(_ context.Context, _ resource.SchemaReque
 					},
 				},
 			},
-			"metric_configurations": schema.SetNestedAttribute{
+			"metric_configurations": schema.ListNestedAttribute{
 				Description: "Per-metric alert threshold settings and component escalation/ignored configurations.",
 				Optional:    true,
 				Computed:    true,
@@ -1477,14 +1477,14 @@ func (r *metricProjectResource) Create(ctx context.Context, req resource.CreateR
 		if resp.Diagnostics.HasError() {
 			return
 		}
-		setVal, d := types.SetValueFrom(ctx, types.ObjectType{AttrTypes: metricConfigurationAttrTypes()}, normalizedConfigs)
+		setVal, d := types.ListValueFrom(ctx, types.ObjectType{AttrTypes: metricConfigurationAttrTypes()}, normalizedConfigs)
 		resp.Diagnostics.Append(d...)
 		if resp.Diagnostics.HasError() {
 			return
 		}
 		plan.MetricConfigurations = setVal
 	} else {
-		plan.MetricConfigurations = types.SetNull(types.ObjectType{AttrTypes: metricConfigurationAttrTypes()})
+		plan.MetricConfigurations = types.ListNull(types.ObjectType{AttrTypes: metricConfigurationAttrTypes()})
 	}
 
 	plan.SystemName = config.SystemName
@@ -1606,7 +1606,7 @@ func (r *metricProjectResource) Read(ctx context.Context, req resource.ReadReque
 			updatedConfigs, readDiags := readMetricConfigurationsFromAPI(ctx, r.client, state.ProjectName.ValueString(), existingConfigs)
 			resp.Diagnostics.Append(readDiags...)
 			if !resp.Diagnostics.HasError() && len(updatedConfigs) > 0 {
-				setVal, d := types.SetValueFrom(ctx, types.ObjectType{AttrTypes: metricConfigurationAttrTypes()}, updatedConfigs)
+				setVal, d := types.ListValueFrom(ctx, types.ObjectType{AttrTypes: metricConfigurationAttrTypes()}, updatedConfigs)
 				resp.Diagnostics.Append(d...)
 				if !resp.Diagnostics.HasError() {
 					state.MetricConfigurations = setVal
@@ -1779,14 +1779,14 @@ func (r *metricProjectResource) Update(ctx context.Context, req resource.UpdateR
 		if resp.Diagnostics.HasError() {
 			return
 		}
-		setVal, d := types.SetValueFrom(ctx, types.ObjectType{AttrTypes: metricConfigurationAttrTypes()}, normalizedConfigs)
+		setVal, d := types.ListValueFrom(ctx, types.ObjectType{AttrTypes: metricConfigurationAttrTypes()}, normalizedConfigs)
 		resp.Diagnostics.Append(d...)
 		if resp.Diagnostics.HasError() {
 			return
 		}
 		plan.MetricConfigurations = setVal
 	} else {
-		plan.MetricConfigurations = types.SetNull(types.ObjectType{AttrTypes: metricConfigurationAttrTypes()})
+		plan.MetricConfigurations = types.ListNull(types.ObjectType{AttrTypes: metricConfigurationAttrTypes()})
 	}
 
 	plan.SystemName = config.SystemName
