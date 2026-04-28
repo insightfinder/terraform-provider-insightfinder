@@ -7,7 +7,9 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/url"
+	"os"
 	"strings"
+	"time"
 )
 
 // MetricProjectSettings represents the settings specific to a metric project
@@ -299,10 +301,30 @@ func (c *Client) SetMetricSettings(projectName string, patternIdGenerationRule i
 		"data": data,
 	}
 
-	body, statusCode, err := c.DoMultipartFormRequest("POST", "/api/external/v1/componentmetricupdate", fields, fileParts)
-	if err != nil {
-		return err
+	_ = os.WriteFile("/tmp/tf_metric_payload.json", data, 0644)
+
+	// Retry up to 5 times: the API returns 204 when the project was just created
+	// and the backend hasn't fully provisioned it yet.
+	var body []byte
+	var statusCode int
+	var err error
+	for attempt := 1; attempt <= 5; attempt++ {
+		body, statusCode, err = c.DoMultipartFormRequest("POST", "/api/external/v1/componentmetricupdate", fields, fileParts)
+		if err != nil {
+			return err
+		}
+		if statusCode != 204 {
+			break
+		}
+		time.Sleep(time.Duration(attempt) * 3 * time.Second)
 	}
+
+	// If still 204 after all retries, fall back to sending each entry individually.
+	if statusCode == 204 {
+		return c.setMetricSettingsOneByOne(projectName, patternIdGenerationRule, data)
+	}
+
+	_ = os.WriteFile("/tmp/tf_metric_response.json", body, 0644)
 	if statusCode != 200 {
 		return fmt.Errorf("failed to set metric settings: HTTP %d - %s", statusCode, string(body))
 	}
@@ -313,6 +335,40 @@ func (c *Client) SetMetricSettings(projectName string, patternIdGenerationRule i
 	}
 	if !response.Success {
 		return fmt.Errorf("failed to set metric settings: %s", response.Message)
+	}
+	return nil
+}
+
+// setMetricSettingsOneByOne sends each entry in data as a separate request.
+// Used as a fallback when the batch request keeps returning 204.
+func (c *Client) setMetricSettingsOneByOne(projectName string, patternIdGenerationRule int, data []byte) error {
+	var entries []json.RawMessage
+	if err := json.Unmarshal(data, &entries); err != nil {
+		return fmt.Errorf("failed to parse metric settings for one-by-one fallback: %w", err)
+	}
+
+	fields := map[string]string{
+		"projectName":             projectName + "@" + c.Username,
+		"patternIdGenerationRule": fmt.Sprintf("%d", patternIdGenerationRule),
+		"customerName":            c.Username,
+	}
+
+	for i, entry := range entries {
+		entryBytes, _ := json.Marshal([]json.RawMessage{entry})
+		body, statusCode, err := c.DoMultipartFormRequest("POST", "/api/external/v1/componentmetricupdate", fields, map[string][]byte{"data": entryBytes})
+		if err != nil {
+			return fmt.Errorf("failed to set metric setting [%d]: %w", i, err)
+		}
+		if statusCode != 200 {
+			return fmt.Errorf("failed to set metric setting [%d]: HTTP %d - %s", i, statusCode, string(body))
+		}
+		var response ProjectResponse
+		if err := json.Unmarshal(body, &response); err != nil {
+			continue
+		}
+		if !response.Success {
+			return fmt.Errorf("failed to set metric setting [%d]: %s", i, response.Message)
+		}
 	}
 	return nil
 }
@@ -461,9 +517,11 @@ func (c *Client) postMetricComponent(projectName, metricName, operation string, 
 // for the POST API, or null.
 // GET response delivers rougeValue as a JSON string like `{"l":NaN,"s":NaN}` (unquoted NaN).
 // This function normalizes that into valid JSON `{"l":"NaN","s":"NaN"}` for the POST body.
+var defaultRougeValue = json.RawMessage(`{"l":"NaN","s":"NaN"}`)
+
 func ConvertRougeValueForPost(storedVal string) json.RawMessage {
 	if storedVal == "" || storedVal == "null" {
-		return json.RawMessage("null")
+		return defaultRougeValue
 	}
 	// Normalize: replace unquoted NaN → "NaN" to make it valid JSON for parsing
 	normalized := strings.ReplaceAll(storedVal, ":NaN", `:"NaN"`)
@@ -474,7 +532,7 @@ func ConvertRougeValueForPost(storedVal string) json.RawMessage {
 		out, _ := json.Marshal(rv)
 		return json.RawMessage(out)
 	}
-	return json.RawMessage("null")
+	return defaultRougeValue
 }
 
 // UpdateMetricProject updates an existing metric project's configuration.
