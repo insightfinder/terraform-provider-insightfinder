@@ -153,6 +153,8 @@ type MetricAlertSetting struct {
 	IsFlappingResultOnly               bool    `json:"isFlappingResultOnly"`
 	IncidentDurationThreshold          int64   `json:"incidentDurationThreshold"`
 	DetectionType                      string  `json:"detectionType"`
+	CValueOverride                     *int64  `json:"cValueOverride"`
+	HighCValueOverride                 *int64  `json:"highCValueOverride"`
 	PatternNameHigher                  string  `json:"patternNameHigher"`
 	PatternNameLower                   string  `json:"patternNameLower"`
 	MetricType                         string  `json:"metricType"`
@@ -188,6 +190,8 @@ type MetricAlertSettingPost struct {
 	IsFlappingResultOnly               bool            `json:"isFlappingResultOnly"`
 	IncidentDurationThreshold          int64           `json:"incidentDurationThreshold"`
 	DetectionType                      string          `json:"detectionType"`
+	CValueOverride                     *int64          `json:"cValueOverride"`
+	HighCValueOverride                 *int64          `json:"highCValueOverride"`
 	PatternNameHigher                  string          `json:"patternNameHigher"`
 	PatternNameLower                   string          `json:"patternNameLower"`
 	MetricType                         string          `json:"metricType"`
@@ -195,7 +199,7 @@ type MetricAlertSettingPost struct {
 	RougeValue                         json.RawMessage `json:"rougeValue"` // injected verbatim: null or {l: "NaN",s: "NaN"}
 	EnableBaselineNearConstance        bool            `json:"enableBaselineNearConstance"`
 	ComputeDifference                  bool            `json:"computeDifference"`
-	AnomalyGapToleranceDuration        int64           `json:"anomalyGapToleranceDuration"`
+	AnomalyGapToleranceDurationCount   int64           `json:"anomalyGapToleranceDurationCount"`
 }
 
 // MetricSettingEntry is the per-metric object inside the metricSetting array from the GET response.

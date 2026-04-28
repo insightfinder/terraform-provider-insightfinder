@@ -176,15 +176,17 @@ resource "insightfinder_metric_project" "with_metric_config" {
           is_kpi                               = true
           is_flapping_result_only              = false
           incident_duration_threshold          = 300000
-          detection_type                       = "Threshold"
+          detection_type                       = "positive"
+          c_value_override                     = null
+          high_c_value_override                = null
           pattern_name_higher                  = "High CPU"
           pattern_name_lower                   = ""
-          metric_type                          = "Gauge"
+          metric_type                          = "CPU Utilization"
           fill_zero                            = false
-          rouge_value                          = ""
+          rouge_value                          = null
           enable_baseline_near_constance       = false
           compute_difference                   = false
-          anomaly_gap_tolerance_duration       = 0
+          anomaly_gap_tolerance_duration       = 60000
         }
       ]
     },
@@ -394,15 +396,17 @@ resource "insightfinder_metric_project" "alerted_metrics" {
     - `is_kpi` (Boolean) Mark this metric as a KPI metric.
     - `is_flapping_result_only` (Boolean) Only report flapping anomalies.
     - `incident_duration_threshold` (Number) Minimum incident duration in milliseconds before alerting.
-    - `detection_type` (String) Detection algorithm type (e.g., `Threshold`, `Baseline`).
+    - `detection_type` (String) Detection direction: `positive`, `negative`, or `both`. Defaults to `positive` when left empty.
+    - `c_value_override` (Number, Optional, Computed) Per-metric override for the C value anomaly sensitivity. When set, overrides the project-level `c_value` for this metric only. Null means use the project default.
+    - `high_c_value_override` (Number, Optional, Computed) Per-metric override for the high-ratio C value anomaly sensitivity. When set, overrides the project-level `high_ratio_c_value` for this metric only. Null means use the project default.
     - `pattern_name_higher` (String) Pattern name for values above threshold.
     - `pattern_name_lower` (String) Pattern name for values below threshold.
-    - `metric_type` (String) Metric data type (e.g., `Gauge`, `Counter`).
+    - `metric_type` (String) Metric data type (e.g., `Unknown`, `CPU Utilization`, `Network Utilization`).
     - `fill_zero` (Boolean) Fill missing data points with zero.
     - `rouge_value` (String) Raw rouge value string from the API (e.g., `{"l":NaN,"s":NaN}`). Set to empty string to clear.
     - `enable_baseline_near_constance` (Boolean) Enable near-constance baseline detection.
     - `compute_difference` (Boolean) Compute derivative (difference) of this metric before detection.
-    - `anomaly_gap_tolerance_duration` (Number) Duration in milliseconds to tolerate gaps in anomaly detection.
+    - `anomaly_gap_tolerance_duration` (Number) Anomaly gap tolerance in milliseconds. Internally converted to a count using the project `sampling_interval` before being sent to the API.
 
 ### Read-Only
 
