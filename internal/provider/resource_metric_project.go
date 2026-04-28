@@ -14,7 +14,6 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
-	"github.com/hashicorp/terraform-plugin-framework/resource/schema/int64planmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/types"
@@ -770,23 +769,17 @@ func (r *metricProjectResource) Schema(_ context.Context, _ resource.SchemaReque
 									"c_value_override": schema.Int64Attribute{
 										Description: "Override for the C value anomaly sensitivity. Null means use project default.",
 										Optional:    true,
-										Computed:    true,
-										PlanModifiers: []planmodifier.Int64{
-											int64planmodifier.UseStateForUnknown(),
-										},
+										Computed:    false,
 									},
 									"high_c_value_override": schema.Int64Attribute{
 										Description: "Override for the high-ratio C value anomaly sensitivity. Null means use project default.",
 										Optional:    true,
-										Computed:    true,
-										PlanModifiers: []planmodifier.Int64{
-											int64planmodifier.UseStateForUnknown(),
-										},
+										Computed:    false,
 									},
-									"pattern_name_higher":                     schema.StringAttribute{Description: "Pattern name for higher anomalies.", Optional: true, Computed: true},
-									"pattern_name_lower":                      schema.StringAttribute{Description: "Pattern name for lower anomalies.", Optional: true, Computed: true},
-									"metric_type":                             schema.StringAttribute{Description: "Metric type classification (e.g., 'Unknown', 'CPU Utilization').", Optional: true, Computed: true},
-									"fill_zero":                               schema.BoolAttribute{Description: "Fill missing data with zero.", Optional: true, Computed: true},
+									"pattern_name_higher": schema.StringAttribute{Description: "Pattern name for higher anomalies.", Optional: true, Computed: true},
+									"pattern_name_lower":  schema.StringAttribute{Description: "Pattern name for lower anomalies.", Optional: true, Computed: true},
+									"metric_type":         schema.StringAttribute{Description: "Metric type classification (e.g., 'Unknown', 'CPU Utilization').", Optional: true, Computed: true},
+									"fill_zero":           schema.BoolAttribute{Description: "Fill missing data with zero.", Optional: true, Computed: true},
 									"rouge_value": schema.StringAttribute{
 										Description: "Rouge value as raw JSON string from API (e.g., '{\"l\":NaN,\"s\":NaN}'). Null to disable.",
 										Optional:    true,
@@ -795,9 +788,9 @@ func (r *metricProjectResource) Schema(_ context.Context, _ resource.SchemaReque
 											stringplanmodifier.UseStateForUnknown(),
 										},
 									},
-									"enable_baseline_near_constance":          schema.BoolAttribute{Description: "Enable baseline near constance detection.", Optional: true, Computed: true},
-									"compute_difference":                      schema.BoolAttribute{Description: "Compute difference for this metric.", Optional: true, Computed: true},
-									"anomaly_gap_tolerance_duration":          schema.Int64Attribute{Description: "Anomaly gap tolerance duration in milliseconds.", Optional: true, Computed: true},
+									"enable_baseline_near_constance": schema.BoolAttribute{Description: "Enable baseline near constance detection.", Optional: true, Computed: true},
+									"compute_difference":             schema.BoolAttribute{Description: "Compute difference for this metric.", Optional: true, Computed: true},
+									"anomaly_gap_tolerance_duration": schema.Int64Attribute{Description: "Anomaly gap tolerance duration in milliseconds.", Optional: true, Computed: true},
 								},
 							},
 						},
