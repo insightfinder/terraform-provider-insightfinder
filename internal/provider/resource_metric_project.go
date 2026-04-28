@@ -138,7 +138,7 @@ type metricProjectResourceModel struct {
 	HolidaySettings types.List `tfsdk:"holiday_settings"`
 
 	// Metric configurations (per-metric alert thresholds + component operations)
-	MetricConfigurations types.List `tfsdk:"metric_configurations"`
+	MetricConfigurations types.Set `tfsdk:"metric_configurations"`
 }
 
 // metricAlertSettingModel maps one entry in metric_alert_settings.
@@ -710,7 +710,7 @@ func (r *metricProjectResource) Schema(_ context.Context, _ resource.SchemaReque
 					},
 				},
 			},
-			"metric_configurations": schema.ListNestedAttribute{
+			"metric_configurations": schema.SetNestedAttribute{
 				Description: "Per-metric alert threshold settings and component escalation/ignored configurations.",
 				Optional:    true,
 				Computed:    true,
@@ -1477,14 +1477,14 @@ func (r *metricProjectResource) Create(ctx context.Context, req resource.CreateR
 		if resp.Diagnostics.HasError() {
 			return
 		}
-		listVal, d := types.ListValueFrom(ctx, types.ObjectType{AttrTypes: metricConfigurationAttrTypes()}, normalizedConfigs)
+		setVal, d := types.SetValueFrom(ctx, types.ObjectType{AttrTypes: metricConfigurationAttrTypes()}, normalizedConfigs)
 		resp.Diagnostics.Append(d...)
 		if resp.Diagnostics.HasError() {
 			return
 		}
-		plan.MetricConfigurations = listVal
+		plan.MetricConfigurations = setVal
 	} else {
-		plan.MetricConfigurations = types.ListNull(types.ObjectType{AttrTypes: metricConfigurationAttrTypes()})
+		plan.MetricConfigurations = types.SetNull(types.ObjectType{AttrTypes: metricConfigurationAttrTypes()})
 	}
 
 	plan.SystemName = config.SystemName
@@ -1606,10 +1606,10 @@ func (r *metricProjectResource) Read(ctx context.Context, req resource.ReadReque
 			updatedConfigs, readDiags := readMetricConfigurationsFromAPI(ctx, r.client, state.ProjectName.ValueString(), existingConfigs)
 			resp.Diagnostics.Append(readDiags...)
 			if !resp.Diagnostics.HasError() && len(updatedConfigs) > 0 {
-				listVal, d := types.ListValueFrom(ctx, types.ObjectType{AttrTypes: metricConfigurationAttrTypes()}, updatedConfigs)
+				setVal, d := types.SetValueFrom(ctx, types.ObjectType{AttrTypes: metricConfigurationAttrTypes()}, updatedConfigs)
 				resp.Diagnostics.Append(d...)
 				if !resp.Diagnostics.HasError() {
-					state.MetricConfigurations = listVal
+					state.MetricConfigurations = setVal
 				}
 			}
 		}
@@ -1779,14 +1779,14 @@ func (r *metricProjectResource) Update(ctx context.Context, req resource.UpdateR
 		if resp.Diagnostics.HasError() {
 			return
 		}
-		listVal, d := types.ListValueFrom(ctx, types.ObjectType{AttrTypes: metricConfigurationAttrTypes()}, normalizedConfigs)
+		setVal, d := types.SetValueFrom(ctx, types.ObjectType{AttrTypes: metricConfigurationAttrTypes()}, normalizedConfigs)
 		resp.Diagnostics.Append(d...)
 		if resp.Diagnostics.HasError() {
 			return
 		}
-		plan.MetricConfigurations = listVal
+		plan.MetricConfigurations = setVal
 	} else {
-		plan.MetricConfigurations = types.ListNull(types.ObjectType{AttrTypes: metricConfigurationAttrTypes()})
+		plan.MetricConfigurations = types.SetNull(types.ObjectType{AttrTypes: metricConfigurationAttrTypes()})
 	}
 
 	plan.SystemName = config.SystemName
@@ -1916,8 +1916,6 @@ func buildSingleMetricAlertSettingPost(metricName string, s metricAlertSettingMo
 		IsFlappingResultOnly:               s.IsFlappingResultOnly.ValueBool(),
 		IncidentDurationThreshold:          s.IncidentDurationThreshold.ValueInt64(),
 		DetectionType:                      detectionType,
-		CValueOverride:                     nullableInt64(s.CValueOverride),
-		HighCValueOverride:                 nullableInt64(s.HighCValueOverride),
 		PatternNameHigher:                  s.PatternNameHigher.ValueString(),
 		PatternNameLower:                   s.PatternNameLower.ValueString(),
 		MetricType:                         s.MetricType.ValueString(),
@@ -1926,6 +1924,8 @@ func buildSingleMetricAlertSettingPost(metricName string, s metricAlertSettingMo
 		EnableBaselineNearConstance:        s.EnableBaselineNearConstance.ValueBool(),
 		ComputeDifference:                  s.ComputeDifference.ValueBool(),
 		AnomalyGapToleranceDurationCount:   anomalyCount,
+		CValueOverride:                     nullableInt64Div60(s.CValueOverride),
+		HighCValueOverride:                 nullableInt64Div60(s.HighCValueOverride),
 	}
 }
 
@@ -1981,7 +1981,7 @@ func readMetricConfigurationsFromAPI(ctx context.Context, c *client.Client, proj
 		}
 
 		alertSettingsListVal, d := types.ListValueFrom(ctx, types.ObjectType{AttrTypes: metricAlertSettingAttrTypes()}, alertSettingModels)
-		diags.Append(d...)
+			diags.Append(d...)
 
 		result = append(result, metricConfigurationModel{
 			MetricName:                 types.StringValue(metricName),
@@ -2075,11 +2075,11 @@ func normalizeMetricConfigsForState(ctx context.Context, configs []metricConfigu
 }
 
 // splitByComma splits a string by comma. Extracted to avoid repetition in date parsing.
-func nullableInt64(v types.Int64) *int64 {
+func nullableInt64Div60(v types.Int64) *int64 {
 	if v.IsNull() || v.IsUnknown() {
 		return nil
 	}
-	val := v.ValueInt64()
+	val := v.ValueInt64() / 60
 	return &val
 }
 

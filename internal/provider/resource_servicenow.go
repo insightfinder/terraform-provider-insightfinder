@@ -23,6 +23,24 @@ import (
 	"github.com/insightfinder/terraform-provider-insightfinder/internal/provider/client"
 )
 
+// nullIfEmptyModifier is a plan modifier that converts an explicit empty string
+// value to null. This prevents perpetual diffs for string fields where the API
+// treats "" and "not set" identically: the user can write "" in config and the
+// provider will match the null that Read returns from the API.
+type nullIfEmptyModifier struct{}
+
+func (m nullIfEmptyModifier) Description(_ context.Context) string {
+	return "Treats empty string as null."
+}
+func (m nullIfEmptyModifier) MarkdownDescription(_ context.Context) string {
+	return "Treats empty string as null."
+}
+func (m nullIfEmptyModifier) PlanModifyString(_ context.Context, req planmodifier.StringRequest, resp *planmodifier.StringResponse) {
+	if !req.PlanValue.IsNull() && !req.PlanValue.IsUnknown() && req.PlanValue.ValueString() == "" {
+		resp.PlanValue = types.StringNull()
+	}
+}
+
 // Ensure the implementation satisfies the expected interfaces.
 var (
 	_ resource.Resource                = &servicenowResource{}
@@ -178,8 +196,9 @@ func (r *servicenowResource) Schema(_ context.Context, _ resource.SchemaRequest,
 				Optional:    true,
 			},
 			"configuration_item": schema.StringAttribute{
-				Description: "ServiceNow configuration item (CMDB CI) to associate with created tickets.",
-				Optional:    true,
+				Description:   "ServiceNow configuration item (CMDB CI) to associate with created tickets.",
+				Optional:      true,
+				PlanModifiers: []planmodifier.String{nullIfEmptyModifier{}},
 			},
 			"project_configs": schema.MapNestedAttribute{
 				Description: "Per-project ServiceNow ticket configuration.",
@@ -211,8 +230,9 @@ func (r *servicenowResource) Schema(_ context.Context, _ resource.SchemaRequest,
 							Default:     booldefault.StaticBool(false),
 						},
 						"configuration_item": schema.StringAttribute{
-							Description: "ServiceNow configuration item (CMDB CI) for this specific project, overrides the top-level configuration_item.",
-							Optional:    true,
+							Description:   "ServiceNow configuration item (CMDB CI) for this specific project, overrides the top-level configuration_item.",
+							Optional:      true,
+							PlanModifiers: []planmodifier.String{nullIfEmptyModifier{}},
 						},
 					},
 				},

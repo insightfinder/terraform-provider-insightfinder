@@ -468,12 +468,10 @@ func ConvertRougeValueForPost(storedVal string) json.RawMessage {
 	// Normalize: replace unquoted NaN → "NaN" to make it valid JSON for parsing
 	normalized := strings.ReplaceAll(storedVal, ":NaN", `:"NaN"`)
 	normalized = strings.ReplaceAll(normalized, ": NaN", `:"NaN"`)
-	var rv map[string]string
+	// Use interface{} so numeric values (e.g. 3.0) and string "NaN" are both handled correctly.
+	var rv map[string]interface{}
 	if err := json.Unmarshal([]byte(normalized), &rv); err == nil {
-		l := rv["l"]
-		s := rv["s"]
-		// Produce valid JSON with quoted keys so json.Marshal accepts the RawMessage.
-		out, _ := json.Marshal(map[string]string{"l": l, "s": s})
+		out, _ := json.Marshal(rv)
 		return json.RawMessage(out)
 	}
 	return json.RawMessage("null")
