@@ -1952,6 +1952,21 @@ func readMetricConfigurationsFromAPI(ctx context.Context, c *client.Client, proj
 	for _, existingCfg := range existingConfigs {
 		metricName := existingCfg.MetricName.ValueString()
 
+		// Build a lookup of existing alert settings by component name so we can
+		// preserve null for c_value_override / high_c_value_override when the user
+		// didn't specify them in config. Without this, a UI change that sets these
+		// on the API side would cause every metric in the set to appear changed
+		// (because the set element hash changes null → value for all entries).
+		existingSettingByComponent := make(map[string]metricAlertSettingModel)
+		if !existingCfg.MetricAlertSettings.IsNull() && !existingCfg.MetricAlertSettings.IsUnknown() {
+			var existingSettings []metricAlertSettingModel
+			if d := existingCfg.MetricAlertSettings.ElementsAs(ctx, &existingSettings, false); !d.HasError() {
+				for _, s := range existingSettings {
+					existingSettingByComponent[s.ComponentName.ValueString()] = s
+				}
+			}
+		}
+
 		// Use an explicit empty slice when the metric has no entries so the framework
 		// stores [] (empty list) in state rather than null. This prevents a perpetual
 		// diff where Terraform plans [] for a null Computed list attribute.
@@ -1976,12 +1991,14 @@ func readMetricConfigurationsFromAPI(ctx context.Context, c *client.Client, proj
 		} else if settingEntry != nil {
 			alertSettingModels = append(alertSettingModels, buildMetricAlertSettingFromAPI(settingEntry.GlobalSetting))
 			for _, compSetting := range settingEntry.ComponentLevelSettingList {
-				alertSettingModels = append(alertSettingModels, buildMetricAlertSettingFromAPI(compSetting))
+				cm := buildMetricAlertSettingFromAPI(compSetting)
+				preserveCValueNulls(&cm, existingSettingByComponent)
+				alertSettingModels = append(alertSettingModels, cm)
 			}
 		}
 
 		alertSettingsListVal, d := types.ListValueFrom(ctx, types.ObjectType{AttrTypes: metricAlertSettingAttrTypes()}, alertSettingModels)
-			diags.Append(d...)
+		diags.Append(d...)
 
 		result = append(result, metricConfigurationModel{
 			MetricName:                 types.StringValue(metricName),
@@ -1991,6 +2008,23 @@ func readMetricConfigurationsFromAPI(ctx context.Context, c *client.Client, proj
 		})
 	}
 	return result, diags
+}
+
+// preserveCValueNulls checks the existing state for a metric alert setting and, if the
+// prior state had null for c_value_override / high_c_value_override (user didn't configure
+// them), resets the freshly-read model back to null. This prevents set-element hash
+// changes from propagating to all metrics when only one was changed externally.
+func preserveCValueNulls(m *metricAlertSettingModel, existingByComponent map[string]metricAlertSettingModel) {
+	old, ok := existingByComponent[m.ComponentName.ValueString()]
+	if !ok {
+		return
+	}
+	if old.CValueOverride.IsNull() {
+		m.CValueOverride = types.Int64Null()
+	}
+	if old.HighCValueOverride.IsNull() {
+		m.HighCValueOverride = types.Int64Null()
+	}
 }
 
 // applyMetricConfigurations pushes metric_configurations to the API.
