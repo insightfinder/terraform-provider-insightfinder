@@ -14,6 +14,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema/int64planmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/types"
@@ -758,14 +759,42 @@ func (r *metricProjectResource) Schema(_ context.Context, _ resource.SchemaReque
 									"is_kpi":                                  schema.BoolAttribute{Description: "Whether this metric is a KPI.", Optional: true, Computed: true},
 									"is_flapping_result_only":                 schema.BoolAttribute{Description: "Whether to report flapping results only.", Optional: true, Computed: true},
 									"incident_duration_threshold":             schema.Int64Attribute{Description: "Minimum incident duration (ms) to trigger.", Optional: true, Computed: true},
-									"detection_type":                          schema.StringAttribute{Description: "Detection direction: 'positive', 'negative', or 'both'.", Optional: true, Computed: true},
-									"c_value_override":                        schema.Int64Attribute{Description: "Override for the C value anomaly sensitivity. Null means use project default.", Optional: true, Computed: true},
-									"high_c_value_override":                   schema.Int64Attribute{Description: "Override for the high-ratio C value anomaly sensitivity. Null means use project default.", Optional: true, Computed: true},
+									"detection_type": schema.StringAttribute{
+										Description: "Detection direction: 'positive', 'negative', or 'both'.",
+										Optional:    true,
+										Computed:    true,
+										PlanModifiers: []planmodifier.String{
+											stringplanmodifier.UseStateForUnknown(),
+										},
+									},
+									"c_value_override": schema.Int64Attribute{
+										Description: "Override for the C value anomaly sensitivity. Null means use project default.",
+										Optional:    true,
+										Computed:    true,
+										PlanModifiers: []planmodifier.Int64{
+											int64planmodifier.UseStateForUnknown(),
+										},
+									},
+									"high_c_value_override": schema.Int64Attribute{
+										Description: "Override for the high-ratio C value anomaly sensitivity. Null means use project default.",
+										Optional:    true,
+										Computed:    true,
+										PlanModifiers: []planmodifier.Int64{
+											int64planmodifier.UseStateForUnknown(),
+										},
+									},
 									"pattern_name_higher":                     schema.StringAttribute{Description: "Pattern name for higher anomalies.", Optional: true, Computed: true},
 									"pattern_name_lower":                      schema.StringAttribute{Description: "Pattern name for lower anomalies.", Optional: true, Computed: true},
 									"metric_type":                             schema.StringAttribute{Description: "Metric type classification (e.g., 'Unknown', 'CPU Utilization').", Optional: true, Computed: true},
 									"fill_zero":                               schema.BoolAttribute{Description: "Fill missing data with zero.", Optional: true, Computed: true},
-									"rouge_value":                             schema.StringAttribute{Description: "Rouge value as raw JSON string from API (e.g., '{\"l\":NaN,\"s\":NaN}'). Null to disable.", Optional: true, Computed: true},
+									"rouge_value": schema.StringAttribute{
+										Description: "Rouge value as raw JSON string from API (e.g., '{\"l\":NaN,\"s\":NaN}'). Null to disable.",
+										Optional:    true,
+										Computed:    true,
+										PlanModifiers: []planmodifier.String{
+											stringplanmodifier.UseStateForUnknown(),
+										},
+									},
 									"enable_baseline_near_constance":          schema.BoolAttribute{Description: "Enable baseline near constance detection.", Optional: true, Computed: true},
 									"compute_difference":                      schema.BoolAttribute{Description: "Compute difference for this metric.", Optional: true, Computed: true},
 									"anomaly_gap_tolerance_duration":          schema.Int64Attribute{Description: "Anomaly gap tolerance duration in milliseconds.", Optional: true, Computed: true},
@@ -1989,10 +2018,12 @@ func readMetricConfigurationsFromAPI(ctx context.Context, c *client.Client, proj
 		if err != nil {
 			diags.AddWarning(fmt.Sprintf("Could not read metric settings for %s", metricName), err.Error())
 		} else if settingEntry != nil {
-			alertSettingModels = append(alertSettingModels, buildMetricAlertSettingFromAPI(settingEntry.GlobalSetting))
+			global := buildMetricAlertSettingFromAPI(settingEntry.GlobalSetting)
+			preserveConfiguredNulls(&global, existingSettingByComponent)
+			alertSettingModels = append(alertSettingModels, global)
 			for _, compSetting := range settingEntry.ComponentLevelSettingList {
 				cm := buildMetricAlertSettingFromAPI(compSetting)
-				preserveCValueNulls(&cm, existingSettingByComponent)
+				preserveConfiguredNulls(&cm, existingSettingByComponent)
 				alertSettingModels = append(alertSettingModels, cm)
 			}
 		}
@@ -2010,11 +2041,12 @@ func readMetricConfigurationsFromAPI(ctx context.Context, c *client.Client, proj
 	return result, diags
 }
 
-// preserveCValueNulls checks the existing state for a metric alert setting and, if the
-// prior state had null for c_value_override / high_c_value_override (user didn't configure
-// them), resets the freshly-read model back to null. This prevents set-element hash
-// changes from propagating to all metrics when only one was changed externally.
-func preserveCValueNulls(m *metricAlertSettingModel, existingByComponent map[string]metricAlertSettingModel) {
+// preserveConfiguredNulls checks the existing state for a metric alert setting and, for
+// fields where the prior state was null (user didn't configure them), resets the
+// freshly-read model back to null. This prevents perpetual diffs when the API returns
+// server-side defaults (e.g. detection_type="positive", rouge_value=NaN JSON) that were
+// never explicitly set by the user.
+func preserveConfiguredNulls(m *metricAlertSettingModel, existingByComponent map[string]metricAlertSettingModel) {
 	old, ok := existingByComponent[m.ComponentName.ValueString()]
 	if !ok {
 		return
@@ -2024,6 +2056,16 @@ func preserveCValueNulls(m *metricAlertSettingModel, existingByComponent map[str
 	}
 	if old.HighCValueOverride.IsNull() {
 		m.HighCValueOverride = types.Int64Null()
+	}
+	// If prior state had no detection_type (null or empty string), restore that rather
+	// than storing the API's default "positive", which the provider sends for null config.
+	if old.DetectionType.IsNull() || old.DetectionType.ValueString() == "" {
+		m.DetectionType = old.DetectionType
+	}
+	// If prior state had null rouge_value, restore null rather than storing the API's
+	// default NaN JSON that the provider sends when rouge_value is null in config.
+	if old.RougeValue.IsNull() {
+		m.RougeValue = types.StringNull()
 	}
 }
 
