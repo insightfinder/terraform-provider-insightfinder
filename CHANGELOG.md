@@ -5,6 +5,13 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.8.15] - 2026-04-30
+
+### Added
+- **insightfinder_project**: Two new optional attributes inside each `json_key_settings` entry:
+  - `notification_setting` (Boolean, Optional) — when `true`, the key is included in the `notificationSetting` map sent to the API with `selected: true`
+  - `notification_setting_display_name` (String, Optional) — display name for the notification setting entry; defaults to the `json_key` value when not set
+
 ## [1.8.14] - 2026-04-27
 
 ### Fixed

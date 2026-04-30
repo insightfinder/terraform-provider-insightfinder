@@ -161,11 +161,13 @@ resource "insightfinder_project" "json_logs" {
       dampening_field_setting = true
     },
     {
-      json_key                = "user"
-      type                    = "JSONArray"
-      summary_setting         = false
-      metafield_setting       = false
-      dampening_field_setting = false
+      json_key                          = "user"
+      type                              = "JSONArray"
+      summary_setting                   = false
+      metafield_setting                 = false
+      dampening_field_setting           = false
+      notification_setting              = true
+      notification_setting_display_name = "User Field"
     }
   ]
 }

@@ -280,12 +280,14 @@ resource "insightfinder_project" "loki_logs" {
   - `name` (String, Required) Name of the holiday (must be unique within the project)
   - `start_date` (String, Required) Start date of the holiday in MM-DD format (e.g., `12-25`)
   - `end_date` (String, Required) End date of the holiday in MM-DD format (e.g., `12-26`)
-- `json_key_settings` (List of Objects) List of JSON key settings for extracting custom fields from JSON-structured logs. Manages which JSON keys are available for analysis and which should be included in summary, metafield, and dampening field statistics.
+- `json_key_settings` (List of Objects) List of JSON key settings for extracting custom fields from JSON-structured logs. Manages which JSON keys are available for analysis and which should be included in summary, metafield, dampening field, and notification statistics.
   - `json_key` (String, Required) The JSON key name to extract from logs
   - `type` (String, Required) The data type of the JSON value (e.g., `string`, `number`, `JSONArray`)
   - `summary_setting` (Boolean, Required) Whether to include this key in the summary statistics. When `true`, the key's values will be aggregated in summary reports.
   - `metafield_setting` (Boolean, Required) Whether to include this key in the metafield statistics. When `true`, the key's values will be tracked as metafield data for enhanced log analysis.
   - `dampening_field_setting` (Boolean, Required) Whether to include this key in the dampening field list. When `true`, the key is used to control alert dampening logic — alerts with the same value for this field will be grouped and suppressed during the dampening window.
+  - `notification_setting` (Boolean, Optional) Whether to include this key in the notification settings. When `true`, the key is sent in the `notificationSetting` map with `selected: true`.
+  - `notification_setting_display_name` (String, Optional) Display name for this key in notification settings. Defaults to the `json_key` value when not specified.
 - `mode` (Number, Optional, Computed) Process mode for the project. Controls which RabbitMQ processing queue the project's data is routed to. Set and read via the `/api/v1/logdedicatedmode` API. Maps to the `processMode` field in the API response. Default: `0` (LIVE).
 
   | Value | Name | Queue Suffix | Description |

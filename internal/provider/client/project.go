@@ -482,11 +482,18 @@ func (c *Client) GetJsonKeyTypes(projectName string) ([]JsonKeyType, error) {
 	return jsonKeys, nil
 }
 
+// NotificationSettingEntry represents a single entry in the notificationSetting map
+type NotificationSettingEntry struct {
+	Selected    bool   `json:"selected"`
+	DisplayName string `json:"displayName"`
+}
+
 // JsonKeySummarySettings represents the response from logsummarysettings API
 type JsonKeySummarySettings struct {
-	SummarySetting        []string `json:"summarySetting"`
-	MetaFieldSetting      []string `json:"metaFieldSetting"`
-	DampeningFieldSetting []string `json:"dampeningFieldSetting"`
+	SummarySetting        []string                            `json:"summarySetting"`
+	MetaFieldSetting      []string                            `json:"metaFieldSetting"`
+	DampeningFieldSetting []string                            `json:"dampeningFieldSetting"`
+	NotificationSetting   map[string]NotificationSettingEntry `json:"notificationSetting"`
 }
 
 // GetJsonKeySummarySettings retrieves which JSON keys have summary and metafield settings enabled
@@ -548,15 +555,16 @@ func (c *Client) UpdateJsonKeyTypes(projectName string, jsonKeys []JsonKeyType) 
 	return nil
 }
 
-// UpdateJsonKeySummarySettings updates which JSON keys have summary settings, metafield settings, and dampening field settings enabled
-func (c *Client) UpdateJsonKeySummarySettings(projectName string, summaryKeys []string, metafieldKeys []string, dampeningFieldKeys []string) error {
+// UpdateJsonKeySummarySettings updates which JSON keys have summary settings, metafield settings, dampening field settings, and notification settings enabled
+func (c *Client) UpdateJsonKeySummarySettings(projectName string, summaryKeys []string, metafieldKeys []string, dampeningFieldKeys []string, notificationSettings map[string]NotificationSettingEntry) error {
 	projectQualifiedName := fmt.Sprintf("%s@%s", projectName, c.Username)
 	path := fmt.Sprintf("/api/external/v1/logsummarysettings?projectName=%s", url.QueryEscape(projectQualifiedName))
 
-	payload := map[string][]string{
+	payload := map[string]interface{}{
 		"summarySetting":        summaryKeys,
 		"metaFieldSetting":      metafieldKeys,
 		"dampeningFieldSetting": dampeningFieldKeys,
+		"notificationSetting":   notificationSettings,
 	}
 
 	body, statusCode, err := c.DoRequest("POST", path, payload)

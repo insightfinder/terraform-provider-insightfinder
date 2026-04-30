@@ -176,11 +176,13 @@ type holidaySettingModel struct {
 }
 
 type jsonKeySettingModel struct {
-	JsonKey               types.String `tfsdk:"json_key"`
-	Type                  types.String `tfsdk:"type"`
-	SummarySetting        types.Bool   `tfsdk:"summary_setting"`
-	MetafieldSetting      types.Bool   `tfsdk:"metafield_setting"`
-	DampeningfieldSetting types.Bool   `tfsdk:"dampening_field_setting"`
+	JsonKey                        types.String `tfsdk:"json_key"`
+	Type                           types.String `tfsdk:"type"`
+	SummarySetting                 types.Bool   `tfsdk:"summary_setting"`
+	MetafieldSetting               types.Bool   `tfsdk:"metafield_setting"`
+	DampeningfieldSetting          types.Bool   `tfsdk:"dampening_field_setting"`
+	NotificationSetting            types.Bool   `tfsdk:"notification_setting"`
+	NotificationSettingDisplayName types.String `tfsdk:"notification_setting_display_name"`
 }
 
 type projectCreationConfigModel struct {
@@ -894,6 +896,14 @@ func (r *projectResource) Schema(_ context.Context, _ resource.SchemaRequest, re
 						"dampening_field_setting": schema.BoolAttribute{
 							Description: "Whether to include this key in the dampening field settings",
 							Required:    true,
+						},
+						"notification_setting": schema.BoolAttribute{
+							Description: "Whether to include this key in the notification settings",
+							Optional:    true,
+						},
+						"notification_setting_display_name": schema.StringAttribute{
+							Description: "Display name for the notification setting entry",
+							Optional:    true,
 						},
 					},
 				},
@@ -2071,6 +2081,7 @@ func (r *projectResource) Create(ctx context.Context, req resource.CreateRequest
 		var summaryKeys []string
 		var metafieldKeys []string
 		var dampeningFieldKeys []string
+		notificationSettings := make(map[string]client.NotificationSettingEntry)
 
 		for _, jsonKeySetting := range configJsonKeys {
 			jsonKeyType := client.JsonKeyType{
@@ -2095,6 +2106,18 @@ func (r *projectResource) Create(ctx context.Context, req resource.CreateRequest
 			if jsonKeySetting.DampeningfieldSetting.ValueBool() {
 				dampeningFieldKeys = append(dampeningFieldKeys, jsonKeySetting.JsonKey.ValueString())
 			}
+
+			// Track which keys have notification settings enabled
+			if !jsonKeySetting.NotificationSetting.IsNull() && !jsonKeySetting.NotificationSetting.IsUnknown() && jsonKeySetting.NotificationSetting.ValueBool() {
+				displayName := jsonKeySetting.JsonKey.ValueString()
+				if !jsonKeySetting.NotificationSettingDisplayName.IsNull() && !jsonKeySetting.NotificationSettingDisplayName.IsUnknown() && jsonKeySetting.NotificationSettingDisplayName.ValueString() != "" {
+					displayName = jsonKeySetting.NotificationSettingDisplayName.ValueString()
+				}
+				notificationSettings[jsonKeySetting.JsonKey.ValueString()] = client.NotificationSettingEntry{
+					Selected:    true,
+					DisplayName: displayName,
+				}
+			}
 		}
 
 		// Update JSON key types
@@ -2109,8 +2132,8 @@ func (r *projectResource) Create(ctx context.Context, req resource.CreateRequest
 			}
 		}
 
-		// Update summary, metafield, and dampening field settings
-		err := r.client.UpdateJsonKeySummarySettings(plan.ProjectName.ValueString(), summaryKeys, metafieldKeys, dampeningFieldKeys)
+		// Update summary, metafield, dampening field, and notification settings
+		err := r.client.UpdateJsonKeySummarySettings(plan.ProjectName.ValueString(), summaryKeys, metafieldKeys, dampeningFieldKeys, notificationSettings)
 		if err != nil {
 			resp.Diagnostics.AddError(
 				"Error updating JSON key summary and metafield settings",
@@ -2125,11 +2148,13 @@ func (r *projectResource) Create(ctx context.Context, req resource.CreateRequest
 		// No JSON key settings in config - set to null
 		plan.JsonKeySettings = types.SetNull(types.ObjectType{
 			AttrTypes: map[string]attr.Type{
-				"json_key":                types.StringType,
-				"type":                    types.StringType,
-				"summary_setting":         types.BoolType,
-				"metafield_setting":       types.BoolType,
-				"dampening_field_setting": types.BoolType,
+				"json_key":                          types.StringType,
+				"type":                              types.StringType,
+				"summary_setting":                   types.BoolType,
+				"metafield_setting":                 types.BoolType,
+				"dampening_field_setting":           types.BoolType,
+				"notification_setting":              types.BoolType,
+				"notification_setting_display_name": types.StringType,
 			},
 		})
 	}
@@ -2588,24 +2613,33 @@ func (r *projectResource) Read(ctx context.Context, req resource.ReadRequest, re
 		// Build the set of JSON key settings from API response
 		var jsonKeySettings []jsonKeySettingModel
 		for _, jsonKey := range jsonKeyTypes {
-			jsonKeySettings = append(jsonKeySettings, jsonKeySettingModel{
-				JsonKey:               types.StringValue(jsonKey.JsonKey),
-				Type:                  types.StringValue(jsonKey.Type),
-				SummarySetting:        types.BoolValue(summarySet[jsonKey.JsonKey]),
-				MetafieldSetting:      types.BoolValue(metafieldSet[jsonKey.JsonKey]),
-				DampeningfieldSetting: types.BoolValue(dampeningFieldSet[jsonKey.JsonKey]),
-			})
+			setting := jsonKeySettingModel{
+				JsonKey:                        types.StringValue(jsonKey.JsonKey),
+				Type:                           types.StringValue(jsonKey.Type),
+				SummarySetting:                 types.BoolValue(summarySet[jsonKey.JsonKey]),
+				MetafieldSetting:               types.BoolValue(metafieldSet[jsonKey.JsonKey]),
+				DampeningfieldSetting:          types.BoolValue(dampeningFieldSet[jsonKey.JsonKey]),
+				NotificationSetting:            types.BoolNull(),
+				NotificationSettingDisplayName: types.StringNull(),
+			}
+			if entry, ok := summarySettingsResp.NotificationSetting[jsonKey.JsonKey]; ok && entry.Selected {
+				setting.NotificationSetting = types.BoolValue(true)
+				setting.NotificationSettingDisplayName = types.StringValue(entry.DisplayName)
+			}
+			jsonKeySettings = append(jsonKeySettings, setting)
 		}
 
 		// Convert to types.Set
 		if len(jsonKeySettings) > 0 {
 			setValue, diags := types.SetValueFrom(ctx, types.ObjectType{
 				AttrTypes: map[string]attr.Type{
-					"json_key":                types.StringType,
-					"type":                    types.StringType,
-					"summary_setting":         types.BoolType,
-					"metafield_setting":       types.BoolType,
-					"dampening_field_setting": types.BoolType,
+					"json_key":                          types.StringType,
+					"type":                              types.StringType,
+					"summary_setting":                   types.BoolType,
+					"metafield_setting":                 types.BoolType,
+					"dampening_field_setting":           types.BoolType,
+					"notification_setting":              types.BoolType,
+					"notification_setting_display_name": types.StringType,
 				},
 			}, jsonKeySettings)
 			resp.Diagnostics.Append(diags...)
@@ -2615,22 +2649,26 @@ func (r *projectResource) Read(ctx context.Context, req resource.ReadRequest, re
 		} else {
 			state.JsonKeySettings = types.SetNull(types.ObjectType{
 				AttrTypes: map[string]attr.Type{
-					"json_key":                types.StringType,
-					"type":                    types.StringType,
-					"summary_setting":         types.BoolType,
-					"metafield_setting":       types.BoolType,
-					"dampening_field_setting": types.BoolType,
+					"json_key":                          types.StringType,
+					"type":                              types.StringType,
+					"summary_setting":                   types.BoolType,
+					"metafield_setting":                 types.BoolType,
+					"dampening_field_setting":           types.BoolType,
+					"notification_setting":              types.BoolType,
+					"notification_setting_display_name": types.StringType,
 				},
 			})
 		}
 	} else {
 		state.JsonKeySettings = types.SetNull(types.ObjectType{
 			AttrTypes: map[string]attr.Type{
-				"json_key":                types.StringType,
-				"type":                    types.StringType,
-				"summary_setting":         types.BoolType,
-				"metafield_setting":       types.BoolType,
-				"dampening_field_setting": types.BoolType,
+				"json_key":                          types.StringType,
+				"type":                              types.StringType,
+				"summary_setting":                   types.BoolType,
+				"metafield_setting":                 types.BoolType,
+				"dampening_field_setting":           types.BoolType,
+				"notification_setting":              types.BoolType,
+				"notification_setting_display_name": types.StringType,
 			},
 		})
 	}
@@ -3288,6 +3326,7 @@ func (r *projectResource) Update(ctx context.Context, req resource.UpdateRequest
 		var summaryKeys []string
 		var metafieldKeys []string
 		var dampeningFieldKeys []string
+		notificationSettings := make(map[string]client.NotificationSettingEntry)
 
 		for _, jsonKeySetting := range configJsonKeys {
 			jsonKeyType := client.JsonKeyType{
@@ -3312,6 +3351,18 @@ func (r *projectResource) Update(ctx context.Context, req resource.UpdateRequest
 			if jsonKeySetting.DampeningfieldSetting.ValueBool() {
 				dampeningFieldKeys = append(dampeningFieldKeys, jsonKeySetting.JsonKey.ValueString())
 			}
+
+			// Track which keys have notification settings enabled
+			if !jsonKeySetting.NotificationSetting.IsNull() && !jsonKeySetting.NotificationSetting.IsUnknown() && jsonKeySetting.NotificationSetting.ValueBool() {
+				displayName := jsonKeySetting.JsonKey.ValueString()
+				if !jsonKeySetting.NotificationSettingDisplayName.IsNull() && !jsonKeySetting.NotificationSettingDisplayName.IsUnknown() && jsonKeySetting.NotificationSettingDisplayName.ValueString() != "" {
+					displayName = jsonKeySetting.NotificationSettingDisplayName.ValueString()
+				}
+				notificationSettings[jsonKeySetting.JsonKey.ValueString()] = client.NotificationSettingEntry{
+					Selected:    true,
+					DisplayName: displayName,
+				}
+			}
 		}
 
 		// Update JSON key types
@@ -3326,8 +3377,8 @@ func (r *projectResource) Update(ctx context.Context, req resource.UpdateRequest
 			}
 		}
 
-		// Update summary, metafield, and dampening field settings
-		err := r.client.UpdateJsonKeySummarySettings(plan.ProjectName.ValueString(), summaryKeys, metafieldKeys, dampeningFieldKeys)
+		// Update summary, metafield, dampening field, and notification settings
+		err := r.client.UpdateJsonKeySummarySettings(plan.ProjectName.ValueString(), summaryKeys, metafieldKeys, dampeningFieldKeys, notificationSettings)
 		if err != nil {
 			resp.Diagnostics.AddError(
 				"Error updating JSON key summary and metafield settings",
@@ -3341,11 +3392,13 @@ func (r *projectResource) Update(ctx context.Context, req resource.UpdateRequest
 		// No JSON key settings in config - set to null
 		plan.JsonKeySettings = types.SetNull(types.ObjectType{
 			AttrTypes: map[string]attr.Type{
-				"json_key":                types.StringType,
-				"type":                    types.StringType,
-				"summary_setting":         types.BoolType,
-				"metafield_setting":       types.BoolType,
-				"dampening_field_setting": types.BoolType,
+				"json_key":                          types.StringType,
+				"type":                              types.StringType,
+				"summary_setting":                   types.BoolType,
+				"metafield_setting":                 types.BoolType,
+				"dampening_field_setting":           types.BoolType,
+				"notification_setting":              types.BoolType,
+				"notification_setting_display_name": types.StringType,
 			},
 		})
 	}
