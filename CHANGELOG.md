@@ -5,6 +5,11 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.8.16] - 2026-05-04
+
+### Added
+- **insightfinder_metric_project**: New `enable_component_level_detection` attribute (Boolean, Optional, Computed) — enables component-level anomaly detection for metric projects. Maps to the `enableComponentLevelDetection` field in the project settings API.
+
 ## [1.8.15] - 2026-04-30
 
 ### Added

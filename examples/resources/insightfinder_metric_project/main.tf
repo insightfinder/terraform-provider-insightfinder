@@ -62,6 +62,7 @@ resource "insightfinder_metric_project" "tuned_metrics" {
   enable_period_anomaly_filter             = false
   enable_ubl_detect                        = true
   enable_cumulative_detect                 = true
+  enable_component_level_detection         = true
   filter_by_anomaly_in_baseline_generation = false
   anomaly_dampening                        = 50400000
   anomaly_gap_tolerance_count              = 1

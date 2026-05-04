@@ -107,6 +107,7 @@ type metricProjectResourceModel struct {
 	EnablePeriodAnomalyFilter           types.Bool    `tfsdk:"enable_period_anomaly_filter"`
 	EnableUBLDetect                     types.Bool    `tfsdk:"enable_ubl_detect"`
 	EnableCumulativeDetect              types.Bool    `tfsdk:"enable_cumulative_detect"`
+	EnableComponentLevelDetection       types.Bool    `tfsdk:"enable_component_level_detection"`
 	PredictionTrainingDataLength        types.Int64   `tfsdk:"prediction_training_data_length"`
 	PredictionCorrelationSensitivity    types.Float64 `tfsdk:"prediction_correlation_sensitivity"`
 	EnableKPIPrediction                 types.Bool    `tfsdk:"enable_kpi_prediction"`
@@ -568,6 +569,11 @@ func (r *metricProjectResource) Schema(_ context.Context, _ resource.SchemaReque
 				Optional:    true,
 				Computed:    true,
 			},
+			"enable_component_level_detection": schema.BoolAttribute{
+				Description: "Enable component level detection.",
+				Optional:    true,
+				Computed:    true,
+			},
 			"prediction_training_data_length": schema.Int64Attribute{
 				Description: "Length of training data used for prediction.",
 				Optional:    true,
@@ -1011,6 +1017,9 @@ func populateMetricSettings(plan *metricProjectResourceModel) map[string]interfa
 	if !plan.EnableCumulativeDetect.IsNull() {
 		s["enableCumulativeDetect"] = plan.EnableCumulativeDetect.ValueBool()
 	}
+	if !plan.EnableComponentLevelDetection.IsNull() {
+		s["enableComponentLevelDetection"] = plan.EnableComponentLevelDetection.ValueBool()
+	}
 	if !plan.PredictionTrainingDataLength.IsNull() {
 		s["predictionTrainingDataLength"] = int(plan.PredictionTrainingDataLength.ValueInt64())
 	}
@@ -1229,6 +1238,7 @@ func populateMetricStateFromSettings(m *metricProjectResourceModel, settings map
 	m.EnablePeriodAnomalyFilter = getBool("enablePeriodAnomalyFilter")
 	m.EnableUBLDetect = getBool("enableUBLDetect")
 	m.EnableCumulativeDetect = getBool("enableCumulativeDetect")
+	m.EnableComponentLevelDetection = getBool("enableComponentLevelDetection")
 	m.PredictionTrainingDataLength = getInt64("predictionTrainingDataLength")
 	m.PredictionCorrelationSensitivity = getFloat64("predictionCorrelationSensitivity")
 	m.EnableKPIPrediction = getBool("enableKPIPrediction")
@@ -1343,6 +1353,7 @@ func preserveMetricConfigValues(plan *metricProjectResourceModel, config *metric
 	preserveBool(&plan.EnablePeriodAnomalyFilter, &config.EnablePeriodAnomalyFilter)
 	preserveBool(&plan.EnableUBLDetect, &config.EnableUBLDetect)
 	preserveBool(&plan.EnableCumulativeDetect, &config.EnableCumulativeDetect)
+	preserveBool(&plan.EnableComponentLevelDetection, &config.EnableComponentLevelDetection)
 	preserveInt(&plan.PredictionTrainingDataLength, &config.PredictionTrainingDataLength)
 	preserveFloat(&plan.PredictionCorrelationSensitivity, &config.PredictionCorrelationSensitivity)
 	preserveBool(&plan.EnableKPIPrediction, &config.EnableKPIPrediction)

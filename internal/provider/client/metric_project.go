@@ -29,6 +29,7 @@ type MetricProjectSettings struct {
 	EnablePeriodAnomalyFilter           bool    `json:"enablePeriodAnomalyFilter,omitempty"`
 	EnableUBLDetect                     bool    `json:"enableUBLDetect,omitempty"`
 	EnableCumulativeDetect              bool    `json:"enableCumulativeDetect,omitempty"`
+	EnableComponentLevelDetection       bool    `json:"enableComponentLevelDetection,omitempty"`
 	ModelSpan                           int     `json:"modelSpan,omitempty"`
 	EnableMetricDataPrediction          bool    `json:"enableMetricDataPrediction,omitempty"`
 	EnableBaselineDetectionDoubleVerify bool    `json:"enableBaselineDetectionDoubleVerify,omitempty"`
