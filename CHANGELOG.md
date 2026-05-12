@@ -5,6 +5,17 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.8.17] - 2026-05-12
+
+### Fixed
+- **insightfinder_metric_project**: Metric alert settings payload now uses `SetEscapeHTML(false)` during JSON marshaling, preventing Go's default HTML escaping from converting `->` to `>` in metric names (e.g., `alert->core->summary=...`). This was causing the `componentmetricupdate` API to return HTTP 204 and silently discard all settings.
+- **insightfinder_metric_project**: `SetMetricSettings` and `postMetricComponent` now retry on HTTP 502 in addition to 204, handling transient backend unavailability immediately after project creation.
+
+### Changed
+- **insightfinder_metric_project**: `metric_configurations` is no longer `Computed` — Terraform will not read it back from the API or show drift for it. The state is preserved as configured.
+- **insightfinder_metric_project**: Added drift suppression to the following `metric_alert_settings` attributes — when not set in config, API-returned values no longer cause plan diffs: `detection_type`, `pattern_name_higher`, `pattern_name_lower`, `rouge_value`, `metric_type`, `is_flapping_result_only`, `incident_duration_threshold`, `enable_baseline_near_constance`, `compute_difference`.
+- **insightfinder_metric_project**: Added drift suppression to `ignored_components` and `escalate_incident_components` — components returned by the API no longer show as plan diffs when these lists are not set in config.
+
 ## [1.8.16] - 2026-05-04
 
 ### Added
