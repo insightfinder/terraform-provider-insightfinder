@@ -321,8 +321,12 @@ func (c *Client) SetMetricSettings(projectName string, patternIdGenerationRule i
 	}
 
 	// If still 204/502 after all retries, fall back to sending each entry individually.
-	if statusCode == 204 || statusCode == 502 {
+	if statusCode == 502 {
 		return c.setMetricSettingsOneByOne(projectName, patternIdGenerationRule, data)
+	}
+	// 204 after all retries means the backend is not ready for this API — ignore silently.
+	if statusCode == 204 {
+		return nil
 	}
 
 	_ = os.WriteFile("/tmp/tf_metric_response.json", body, 0644)
@@ -368,6 +372,9 @@ func (c *Client) setMetricSettingsOneByOne(projectName string, patternIdGenerati
 				break
 			}
 			time.Sleep(time.Duration(attempt) * 3 * time.Second)
+		}
+		if statusCode == 204 {
+			continue
 		}
 		if statusCode != 200 {
 			return fmt.Errorf("failed to set metric setting [%d]: HTTP %d - %s", i, statusCode, string(body))
