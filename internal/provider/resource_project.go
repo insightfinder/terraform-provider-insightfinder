@@ -10,6 +10,7 @@ import (
 	"fmt"
 
 	"github.com/hashicorp/terraform-plugin-framework/attr"
+	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
@@ -166,6 +167,7 @@ type projectResourceModel struct {
 	JsonKeySettings           types.Set    `tfsdk:"json_key_settings"`
 	ProjectServiceNowSettings types.Object `tfsdk:"project_servicenow_settings"`
 	HolidaySettings           types.Set    `tfsdk:"holiday_settings"`
+	L2MSettings               types.Set    `tfsdk:"l2m_settings"`
 	Mode                      types.Int64  `tfsdk:"mode"`
 }
 
@@ -207,6 +209,102 @@ type projectServiceNowSettingsModel struct {
 	AdditionalFields     types.List   `tfsdk:"additional_fields"`
 	ComponentNameRule    types.String `tfsdk:"component_name_rule"`
 	ServiceNowImportFlag types.Bool   `tfsdk:"service_now_import_flag"`
+}
+
+type l2mDerivedValueModel struct {
+	BaseValue     types.String `tfsdk:"base_value"`
+	ActualValue   types.String `tfsdk:"actual_value"`
+	Operation     types.Int64  `tfsdk:"operation"`
+	MappingIDList types.List   `tfsdk:"mapping_id_list"`
+}
+
+type l2mRegexParserModel struct {
+	MetricNameRegex     types.String `tfsdk:"metric_name_regex"`
+	MetricValueRegex    types.String `tfsdk:"metric_value_regex"`
+	BaseValueKey        types.String `tfsdk:"base_value_key"`
+	InstanceNameRegex   types.String `tfsdk:"instance_name_regex"`
+	ContainerNameRegex  types.String `tfsdk:"container_name_regex"`
+	TimestampRegex      types.String `tfsdk:"timestamp_regex"`
+	TimestampFormat     types.String `tfsdk:"timestamp_format"`
+	DataFilter          types.String `tfsdk:"data_filter"`
+	Operation           types.Int64  `tfsdk:"operation"`
+	AggregationMode     types.Int64  `tfsdk:"aggregation_mode"`
+	MetricName          types.String `tfsdk:"metric_name"`
+	GroupingByComponent types.Bool   `tfsdk:"grouping_by_component"`
+	AggregationPeriod   types.Int64  `tfsdk:"aggregation_period"`
+	ContainerType       types.Int64  `tfsdk:"container_type"`
+}
+
+type l2mJsonParserModel struct {
+	MetricValueKey       types.String `tfsdk:"metric_value_key"`
+	BaseValueKey         types.String `tfsdk:"base_value_key"`
+	InstanceNameKey      types.String `tfsdk:"instance_name_key"`
+	ContainerNameKey     types.String `tfsdk:"container_name_key"`
+	TimestampKey         types.String `tfsdk:"timestamp_key"`
+	TimestampFormat      types.String `tfsdk:"timestamp_format"`
+	Operation            types.Int64  `tfsdk:"operation"`
+	AdditionalMetricName types.String `tfsdk:"additional_metric_name"`
+	AggregationMode      types.Int64  `tfsdk:"aggregation_mode"`
+	GroupingByComponent  types.Bool   `tfsdk:"grouping_by_component"`
+	AggregationPeriod    types.Int64  `tfsdk:"aggregation_period"`
+	ContainerType        types.Int64  `tfsdk:"container_type"`
+	DerivedValueModel    types.Object `tfsdk:"derived_value_model"`
+}
+
+type l2mSettingModel struct {
+	MetricProjectName types.String `tfsdk:"metric_project_name"`
+	JsonFlag          types.Bool   `tfsdk:"json_flag"`
+	EnableMapping     types.Bool   `tfsdk:"enable_mapping"`
+	Regexs            types.List   `tfsdk:"regexs"`
+	JsonParsers       types.List   `tfsdk:"json_parsers"`
+}
+
+var l2mDerivedValueAttrTypes = map[string]attr.Type{
+	"base_value":      types.StringType,
+	"actual_value":    types.StringType,
+	"operation":       types.Int64Type,
+	"mapping_id_list": types.ListType{ElemType: types.StringType},
+}
+
+var l2mRegexParserAttrTypes = map[string]attr.Type{
+	"metric_name_regex":     types.StringType,
+	"metric_value_regex":    types.StringType,
+	"base_value_key":        types.StringType,
+	"instance_name_regex":   types.StringType,
+	"container_name_regex":  types.StringType,
+	"timestamp_regex":       types.StringType,
+	"timestamp_format":      types.StringType,
+	"data_filter":           types.StringType,
+	"operation":             types.Int64Type,
+	"aggregation_mode":      types.Int64Type,
+	"metric_name":           types.StringType,
+	"grouping_by_component": types.BoolType,
+	"aggregation_period":    types.Int64Type,
+	"container_type":        types.Int64Type,
+}
+
+var l2mJsonParserAttrTypes = map[string]attr.Type{
+	"metric_value_key":       types.StringType,
+	"base_value_key":         types.StringType,
+	"instance_name_key":      types.StringType,
+	"container_name_key":     types.StringType,
+	"timestamp_key":          types.StringType,
+	"timestamp_format":       types.StringType,
+	"operation":              types.Int64Type,
+	"additional_metric_name": types.StringType,
+	"aggregation_mode":       types.Int64Type,
+	"grouping_by_component":  types.BoolType,
+	"aggregation_period":     types.Int64Type,
+	"container_type":         types.Int64Type,
+	"derived_value_model":    types.ObjectType{AttrTypes: l2mDerivedValueAttrTypes},
+}
+
+var l2mSettingAttrTypes = map[string]attr.Type{
+	"metric_project_name": types.StringType,
+	"json_flag":           types.BoolType,
+	"enable_mapping":      types.BoolType,
+	"regexs":              types.ListType{ElemType: types.ObjectType{AttrTypes: l2mRegexParserAttrTypes}},
+	"json_parsers":        types.ListType{ElemType: types.ObjectType{AttrTypes: l2mJsonParserAttrTypes}},
 }
 
 // Metadata returns the resource type name.
@@ -912,6 +1010,205 @@ func (r *projectResource) Schema(_ context.Context, _ resource.SchemaRequest, re
 				Description: "The process mode for the project (set via logdedicatedmode API).",
 				Optional:    true,
 				Computed:    true,
+			},
+			"l2m_settings": schema.SetNestedAttribute{
+				Description: "Log-to-metric settings. Each entry maps this log project to a target metric project.",
+				Optional:    true,
+				Computed:    true,
+				NestedObject: schema.NestedAttributeObject{
+					Attributes: map[string]schema.Attribute{
+						"metric_project_name": schema.StringAttribute{
+							Description: "Name of the target metric project.",
+							Required:    true,
+						},
+						"json_flag": schema.BoolAttribute{
+							Description: "Whether to use JSON parsers (true) or regex parsers (false).",
+							Optional:    true,
+							Computed:    true,
+						},
+						"enable_mapping": schema.BoolAttribute{
+							Description: "Whether to enable mapping.",
+							Optional:    true,
+							Computed:    true,
+						},
+						"regexs": schema.ListNestedAttribute{
+							Description: "Regex parsers. Used when json_flag is false.",
+							Optional:    true,
+							Computed:    true,
+							NestedObject: schema.NestedAttributeObject{
+								Attributes: map[string]schema.Attribute{
+									"metric_name_regex": schema.StringAttribute{
+										Description: "Regex to extract the metric name.",
+										Optional:    true,
+										Computed:    true,
+									},
+									"metric_value_regex": schema.StringAttribute{
+										Description: "Regex to extract the metric value.",
+										Optional:    true,
+										Computed:    true,
+									},
+									"base_value_key": schema.StringAttribute{
+										Description: "Key for the base value.",
+										Optional:    true,
+										Computed:    true,
+									},
+									"instance_name_regex": schema.StringAttribute{
+										Description: "Regex to extract the instance name.",
+										Optional:    true,
+										Computed:    true,
+									},
+									"container_name_regex": schema.StringAttribute{
+										Description: "Regex to extract the container name.",
+										Optional:    true,
+										Computed:    true,
+									},
+									"timestamp_regex": schema.StringAttribute{
+										Description: "Regex to extract the timestamp.",
+										Optional:    true,
+										Computed:    true,
+									},
+									"timestamp_format": schema.StringAttribute{
+										Description: "Format string for the extracted timestamp.",
+										Optional:    true,
+										Computed:    true,
+									},
+									"data_filter": schema.StringAttribute{
+										Description: "Data filter expression.",
+										Optional:    true,
+										Computed:    true,
+									},
+									"operation": schema.Int64Attribute{
+										Description: "Parser operation type.",
+										Optional:    true,
+										Computed:    true,
+									},
+									"aggregation_mode": schema.Int64Attribute{
+										Description: "Aggregation mode.",
+										Optional:    true,
+										Computed:    true,
+									},
+									"metric_name": schema.StringAttribute{
+										Description: "Metric name.",
+										Optional:    true,
+										Computed:    true,
+									},
+									"grouping_by_component": schema.BoolAttribute{
+										Description: "Whether to group by component.",
+										Optional:    true,
+										Computed:    true,
+									},
+									"aggregation_period": schema.Int64Attribute{
+										Description: "Aggregation period.",
+										Optional:    true,
+										Computed:    true,
+									},
+									"container_type": schema.Int64Attribute{
+										Description: "Container type.",
+										Optional:    true,
+										Computed:    true,
+									},
+								},
+							},
+						},
+						"json_parsers": schema.ListNestedAttribute{
+							Description: "JSON parsers. Used when json_flag is true.",
+							Optional:    true,
+							Computed:    true,
+							NestedObject: schema.NestedAttributeObject{
+								Attributes: map[string]schema.Attribute{
+									"metric_value_key": schema.StringAttribute{
+										Description: "JSON key path for the metric value.",
+										Optional:    true,
+										Computed:    true,
+									},
+									"base_value_key": schema.StringAttribute{
+										Description: "JSON key path for the base value.",
+										Optional:    true,
+										Computed:    true,
+									},
+									"instance_name_key": schema.StringAttribute{
+										Description: "JSON key path for the instance name.",
+										Optional:    true,
+										Computed:    true,
+									},
+									"container_name_key": schema.StringAttribute{
+										Description: "JSON key path for the container name.",
+										Optional:    true,
+										Computed:    true,
+									},
+									"timestamp_key": schema.StringAttribute{
+										Description: "JSON key path for the timestamp.",
+										Optional:    true,
+										Computed:    true,
+									},
+									"timestamp_format": schema.StringAttribute{
+										Description: "Format string for the extracted timestamp.",
+										Optional:    true,
+										Computed:    true,
+									},
+									"operation": schema.Int64Attribute{
+										Description: "Parser operation type.",
+										Optional:    true,
+										Computed:    true,
+									},
+									"additional_metric_name": schema.StringAttribute{
+										Description: "JSON key path for an additional metric name.",
+										Optional:    true,
+										Computed:    true,
+									},
+									"aggregation_mode": schema.Int64Attribute{
+										Description: "Aggregation mode.",
+										Optional:    true,
+										Computed:    true,
+									},
+									"grouping_by_component": schema.BoolAttribute{
+										Description: "Whether to group by component.",
+										Optional:    true,
+										Computed:    true,
+									},
+									"aggregation_period": schema.Int64Attribute{
+										Description: "Aggregation period.",
+										Optional:    true,
+										Computed:    true,
+									},
+									"container_type": schema.Int64Attribute{
+										Description: "Container type.",
+										Optional:    true,
+										Computed:    true,
+									},
+									"derived_value_model": schema.SingleNestedAttribute{
+										Description: "Derived value model configuration.",
+										Optional:    true,
+										Computed:    true,
+										Attributes: map[string]schema.Attribute{
+											"base_value": schema.StringAttribute{
+												Description: "Base value expression.",
+												Optional:    true,
+												Computed:    true,
+											},
+											"actual_value": schema.StringAttribute{
+												Description: "Actual value expression.",
+												Optional:    true,
+												Computed:    true,
+											},
+											"operation": schema.Int64Attribute{
+												Description: "Derived value operation type.",
+												Optional:    true,
+												Computed:    true,
+											},
+											"mapping_id_list": schema.ListAttribute{
+												Description: "List of mapping IDs.",
+												Optional:    true,
+												Computed:    true,
+												ElementType: types.StringType,
+											},
+										},
+									},
+								},
+							},
+						},
+					},
+				},
 			},
 		},
 	}
@@ -2159,6 +2456,37 @@ func (r *projectResource) Create(ctx context.Context, req resource.CreateRequest
 		})
 	}
 
+	// Process l2m_settings
+	if !config.L2MSettings.IsNull() && !config.L2MSettings.IsUnknown() {
+		var l2mSettings []l2mSettingModel
+		diags = config.L2MSettings.ElementsAs(ctx, &l2mSettings, false)
+		resp.Diagnostics.Append(diags...)
+		if resp.Diagnostics.HasError() {
+			return
+		}
+
+		tflog.Info(ctx, "Processing L2M settings", map[string]any{"count": len(l2mSettings)})
+
+		for _, setting := range l2mSettings {
+			clientSetting, d := l2mSettingModelToClient(ctx, setting)
+			resp.Diagnostics.Append(d...)
+			if resp.Diagnostics.HasError() {
+				return
+			}
+			if err := r.client.UpdateL2MSetting(plan.ProjectName.ValueString(), clientSetting); err != nil {
+				resp.Diagnostics.AddError(
+					"Error creating L2M setting",
+					fmt.Sprintf("Could not create L2M setting for '%s': %s", setting.MetricProjectName.ValueString(), err.Error()),
+				)
+				return
+			}
+		}
+
+		plan.L2MSettings = config.L2MSettings
+	} else {
+		plan.L2MSettings = types.SetNull(types.ObjectType{AttrTypes: l2mSettingAttrTypes})
+	}
+
 	// Process mode setting via dedicated API
 	if !config.Mode.IsNull() && !config.Mode.IsUnknown() {
 		modeVal := int(config.Mode.ValueInt64())
@@ -2671,6 +2999,29 @@ func (r *projectResource) Read(ctx context.Context, req resource.ReadRequest, re
 				"notification_setting_display_name": types.StringType,
 			},
 		})
+	}
+
+	// Read L2M settings from API
+	l2mSettingsFromAPI, err := r.client.GetL2MSettings(state.ProjectName.ValueString())
+	if err != nil {
+		tflog.Warn(ctx, "Could not read L2M settings", map[string]any{"error": err.Error()})
+	} else if len(l2mSettingsFromAPI) > 0 {
+		var l2mModels []l2mSettingModel
+		for _, apiSetting := range l2mSettingsFromAPI {
+			m, d := l2mSettingModelFromClient(ctx, apiSetting)
+			resp.Diagnostics.Append(d...)
+			if resp.Diagnostics.HasError() {
+				return
+			}
+			l2mModels = append(l2mModels, m)
+		}
+		setValue, d := types.SetValueFrom(ctx, types.ObjectType{AttrTypes: l2mSettingAttrTypes}, l2mModels)
+		resp.Diagnostics.Append(d...)
+		if !resp.Diagnostics.HasError() {
+			state.L2MSettings = setValue
+		}
+	} else {
+		state.L2MSettings = types.SetNull(types.ObjectType{AttrTypes: l2mSettingAttrTypes})
 	}
 
 	// Read mode from dedicated API
@@ -3403,6 +3754,67 @@ func (r *projectResource) Update(ctx context.Context, req resource.UpdateRequest
 		})
 	}
 
+	// Process l2m_settings
+	if !config.L2MSettings.IsNull() && !config.L2MSettings.IsUnknown() {
+		var configL2M []l2mSettingModel
+		diags = config.L2MSettings.ElementsAs(ctx, &configL2M, false)
+		resp.Diagnostics.Append(diags...)
+		if resp.Diagnostics.HasError() {
+			return
+		}
+
+		tflog.Info(ctx, "Processing L2M settings update", map[string]any{"count": len(configL2M)})
+
+		// Get current L2M settings from API to detect removed entries
+		currentL2M, err := r.client.GetL2MSettings(plan.ProjectName.ValueString())
+		if err != nil {
+			tflog.Warn(ctx, "Could not get current L2M settings", map[string]any{"error": err.Error()})
+			currentL2M = []client.L2MSetting{}
+		}
+
+		// Build map of configured metric project names
+		configNames := make(map[string]bool)
+		for _, s := range configL2M {
+			configNames[s.MetricProjectName.ValueString()] = true
+		}
+
+		// Clear entries that exist in API but were removed from config
+		for _, apiSetting := range currentL2M {
+			if !configNames[apiSetting.MetricProjectName] {
+				tflog.Info(ctx, "Clearing removed L2M setting", map[string]any{"metric_project": apiSetting.MetricProjectName})
+				falseVal := false
+				cleared := &client.L2MSetting{
+					MetricProjectName: apiSetting.MetricProjectName,
+					JsonFlag:          apiSetting.JsonFlag,
+					EnableMapping:     &falseVal,
+				}
+				if clearErr := r.client.UpdateL2MSetting(plan.ProjectName.ValueString(), cleared); clearErr != nil {
+					tflog.Warn(ctx, "Could not clear removed L2M setting", map[string]any{"error": clearErr.Error()})
+				}
+			}
+		}
+
+		// Apply configured entries
+		for _, setting := range configL2M {
+			clientSetting, d := l2mSettingModelToClient(ctx, setting)
+			resp.Diagnostics.Append(d...)
+			if resp.Diagnostics.HasError() {
+				return
+			}
+			if err := r.client.UpdateL2MSetting(plan.ProjectName.ValueString(), clientSetting); err != nil {
+				resp.Diagnostics.AddError(
+					"Error updating L2M setting",
+					fmt.Sprintf("Could not update L2M setting for '%s': %s", setting.MetricProjectName.ValueString(), err.Error()),
+				)
+				return
+			}
+		}
+
+		plan.L2MSettings = config.L2MSettings
+	} else {
+		plan.L2MSettings = types.SetNull(types.ObjectType{AttrTypes: l2mSettingAttrTypes})
+	}
+
 	// Process mode setting via dedicated API
 	if !config.Mode.IsNull() && !config.Mode.IsUnknown() {
 		modeVal := int(config.Mode.ValueInt64())
@@ -3653,4 +4065,211 @@ func convertLogLabelsToState(apiLabels map[string]string, existingState []logLab
 	}
 
 	return result
+}
+
+// l2mSettingModelToClient converts a Terraform l2mSettingModel to a client.L2MSetting.
+func l2mSettingModelToClient(ctx context.Context, m l2mSettingModel) (*client.L2MSetting, diag.Diagnostics) {
+	var diags diag.Diagnostics
+
+	setting := &client.L2MSetting{
+		MetricProjectName: m.MetricProjectName.ValueString(),
+		JsonFlag:          m.JsonFlag.ValueBoolPointer(),
+		EnableMapping:     m.EnableMapping.ValueBoolPointer(),
+	}
+
+	if !m.Regexs.IsNull() && !m.Regexs.IsUnknown() {
+		var regexModels []l2mRegexParserModel
+		diags.Append(m.Regexs.ElementsAs(ctx, &regexModels, false)...)
+		if diags.HasError() {
+			return nil, diags
+		}
+		for _, rm := range regexModels {
+			p := client.L2MRegexParser{
+				MetricNameRegex:     rm.MetricNameRegex.ValueStringPointer(),
+				MetricValueRegex:    rm.MetricValueRegex.ValueStringPointer(),
+				BaseValueKey:        rm.BaseValueKey.ValueStringPointer(),
+				InstanceNameRegex:   rm.InstanceNameRegex.ValueStringPointer(),
+				ContainerNameRegex:  rm.ContainerNameRegex.ValueStringPointer(),
+				TimestampRegex:      rm.TimestampRegex.ValueStringPointer(),
+				TimestampFormat:     rm.TimestampFormat.ValueStringPointer(),
+				DataFilter:          rm.DataFilter.ValueStringPointer(),
+				Operation:           l2mInt64ToIntPtr(rm.Operation),
+				AggregationMode:     l2mInt64ToIntPtr(rm.AggregationMode),
+				MetricName:          rm.MetricName.ValueStringPointer(),
+				GroupingByComponent: rm.GroupingByComponent.ValueBoolPointer(),
+				AggregationPeriod:   l2mInt64ToIntPtr(rm.AggregationPeriod),
+				ContainerType:       l2mInt64ToIntPtr(rm.ContainerType),
+			}
+			setting.Regexs = append(setting.Regexs, p)
+		}
+	}
+
+	if !m.JsonParsers.IsNull() && !m.JsonParsers.IsUnknown() {
+		var jsonModels []l2mJsonParserModel
+		diags.Append(m.JsonParsers.ElementsAs(ctx, &jsonModels, false)...)
+		if diags.HasError() {
+			return nil, diags
+		}
+		for _, jm := range jsonModels {
+			p := client.L2MJsonParser{
+				MetricValueKey:       jm.MetricValueKey.ValueStringPointer(),
+				BaseValueKey:         jm.BaseValueKey.ValueStringPointer(),
+				InstanceNameKey:      jm.InstanceNameKey.ValueStringPointer(),
+				ContainerNameKey:     jm.ContainerNameKey.ValueStringPointer(),
+				TimestampKey:         jm.TimestampKey.ValueStringPointer(),
+				TimestampFormat:      jm.TimestampFormat.ValueStringPointer(),
+				Operation:            l2mInt64ToIntPtr(jm.Operation),
+				AdditionalMetricName: jm.AdditionalMetricName.ValueStringPointer(),
+				AggregationMode:      l2mInt64ToIntPtr(jm.AggregationMode),
+				GroupingByComponent:  jm.GroupingByComponent.ValueBoolPointer(),
+				AggregationPeriod:    l2mInt64ToIntPtr(jm.AggregationPeriod),
+				ContainerType:        l2mInt64ToIntPtr(jm.ContainerType),
+			}
+			if !jm.DerivedValueModel.IsNull() && !jm.DerivedValueModel.IsUnknown() {
+				var dvm l2mDerivedValueModel
+				diags.Append(jm.DerivedValueModel.As(ctx, &dvm, basetypes.ObjectAsOptions{})...)
+				if diags.HasError() {
+					return nil, diags
+				}
+				var mappingIDs []string
+				if !dvm.MappingIDList.IsNull() && !dvm.MappingIDList.IsUnknown() {
+					diags.Append(dvm.MappingIDList.ElementsAs(ctx, &mappingIDs, false)...)
+					if diags.HasError() {
+						return nil, diags
+					}
+				}
+				p.DerivedValueModel = &client.L2MDerivedValueModel{
+					BaseValue:     dvm.BaseValue.ValueStringPointer(),
+					ActualValue:   dvm.ActualValue.ValueStringPointer(),
+					Operation:     l2mInt64ToIntPtr(dvm.Operation),
+					MappingIDList: mappingIDs,
+				}
+			}
+			setting.JsonParsers = append(setting.JsonParsers, p)
+		}
+	}
+
+	return setting, diags
+}
+
+// l2mSettingModelFromClient converts a client.L2MSetting to a Terraform l2mSettingModel.
+func l2mSettingModelFromClient(ctx context.Context, s client.L2MSetting) (l2mSettingModel, diag.Diagnostics) {
+	var diags diag.Diagnostics
+
+	// Convert regex parsers
+	regexList := types.ListNull(types.ObjectType{AttrTypes: l2mRegexParserAttrTypes})
+	if len(s.Regexs) > 0 {
+		var regexModels []l2mRegexParserModel
+		for _, r := range s.Regexs {
+			rm := l2mRegexParserModel{
+				MetricNameRegex:     l2mStrPtrToTF(r.MetricNameRegex),
+				MetricValueRegex:    l2mStrPtrToTF(r.MetricValueRegex),
+				BaseValueKey:        l2mStrPtrToTF(r.BaseValueKey),
+				InstanceNameRegex:   l2mStrPtrToTF(r.InstanceNameRegex),
+				ContainerNameRegex:  l2mStrPtrToTF(r.ContainerNameRegex),
+				TimestampRegex:      l2mStrPtrToTF(r.TimestampRegex),
+				TimestampFormat:     l2mStrPtrToTF(r.TimestampFormat),
+				DataFilter:          l2mStrPtrToTF(r.DataFilter),
+				Operation:           l2mIntPtrToTF(r.Operation),
+				AggregationMode:     l2mIntPtrToTF(r.AggregationMode),
+				MetricName:          l2mStrPtrToTF(r.MetricName),
+				GroupingByComponent: l2mBoolPtrToTF(r.GroupingByComponent),
+				AggregationPeriod:   l2mIntPtrToTF(r.AggregationPeriod),
+				ContainerType:       l2mIntPtrToTF(r.ContainerType),
+			}
+			regexModels = append(regexModels, rm)
+		}
+		lv, d := types.ListValueFrom(ctx, types.ObjectType{AttrTypes: l2mRegexParserAttrTypes}, regexModels)
+		diags.Append(d...)
+		if !diags.HasError() {
+			regexList = lv
+		}
+	}
+
+	// Convert JSON parsers
+	jsonList := types.ListNull(types.ObjectType{AttrTypes: l2mJsonParserAttrTypes})
+	if len(s.JsonParsers) > 0 {
+		var jsonModels []l2mJsonParserModel
+		for _, jp := range s.JsonParsers {
+			jm := l2mJsonParserModel{
+				MetricValueKey:       l2mStrPtrToTF(jp.MetricValueKey),
+				BaseValueKey:         l2mStrPtrToTF(jp.BaseValueKey),
+				InstanceNameKey:      l2mStrPtrToTF(jp.InstanceNameKey),
+				ContainerNameKey:     l2mStrPtrToTF(jp.ContainerNameKey),
+				TimestampKey:         l2mStrPtrToTF(jp.TimestampKey),
+				TimestampFormat:      l2mStrPtrToTF(jp.TimestampFormat),
+				Operation:            l2mIntPtrToTF(jp.Operation),
+				AdditionalMetricName: l2mStrPtrToTF(jp.AdditionalMetricName),
+				AggregationMode:      l2mIntPtrToTF(jp.AggregationMode),
+				GroupingByComponent:  l2mBoolPtrToTF(jp.GroupingByComponent),
+				AggregationPeriod:    l2mIntPtrToTF(jp.AggregationPeriod),
+				ContainerType:        l2mIntPtrToTF(jp.ContainerType),
+				DerivedValueModel:    types.ObjectNull(l2mDerivedValueAttrTypes),
+			}
+			if jp.DerivedValueModel != nil {
+				mappingIDs := jp.DerivedValueModel.MappingIDList
+				if mappingIDs == nil {
+					mappingIDs = []string{}
+				}
+				mappingList, d := types.ListValueFrom(ctx, types.StringType, mappingIDs)
+				diags.Append(d...)
+				if !diags.HasError() {
+					dvmModel := l2mDerivedValueModel{
+						BaseValue:     l2mStrPtrToTF(jp.DerivedValueModel.BaseValue),
+						ActualValue:   l2mStrPtrToTF(jp.DerivedValueModel.ActualValue),
+						Operation:     l2mIntPtrToTF(jp.DerivedValueModel.Operation),
+						MappingIDList: mappingList,
+					}
+					dvmObj, d := types.ObjectValueFrom(ctx, l2mDerivedValueAttrTypes, dvmModel)
+					diags.Append(d...)
+					if !diags.HasError() {
+						jm.DerivedValueModel = dvmObj
+					}
+				}
+			}
+			jsonModels = append(jsonModels, jm)
+		}
+		lv, d := types.ListValueFrom(ctx, types.ObjectType{AttrTypes: l2mJsonParserAttrTypes}, jsonModels)
+		diags.Append(d...)
+		if !diags.HasError() {
+			jsonList = lv
+		}
+	}
+
+	return l2mSettingModel{
+		MetricProjectName: types.StringValue(s.MetricProjectName),
+		JsonFlag:          l2mBoolPtrToTF(s.JsonFlag),
+		EnableMapping:     l2mBoolPtrToTF(s.EnableMapping),
+		Regexs:            regexList,
+		JsonParsers:       jsonList,
+	}, diags
+}
+
+func l2mInt64ToIntPtr(v types.Int64) *int {
+	if v.IsNull() || v.IsUnknown() {
+		return nil
+	}
+	i := int(v.ValueInt64())
+	return &i
+}
+
+func l2mStrPtrToTF(p *string) types.String {
+	if p == nil {
+		return types.StringNull()
+	}
+	return types.StringValue(*p)
+}
+
+func l2mIntPtrToTF(p *int) types.Int64 {
+	if p == nil {
+		return types.Int64Null()
+	}
+	return types.Int64Value(int64(*p))
+}
+
+func l2mBoolPtrToTF(p *bool) types.Bool {
+	if p == nil {
+		return types.BoolNull()
+	}
+	return types.BoolValue(*p)
 }
