@@ -4,6 +4,7 @@
 package provider
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -2118,11 +2119,14 @@ func applyMetricConfigurations(ctx context.Context, c *client.Client, projectNam
 	}
 
 	if len(allPostData) > 0 {
-		jsonBytes, err := json.Marshal(allPostData)
-		if err != nil {
+		var buf bytes.Buffer
+		enc := json.NewEncoder(&buf)
+		enc.SetEscapeHTML(false)
+		if err := enc.Encode(allPostData); err != nil {
 			diags.AddError("Error marshaling metric alert settings", err.Error())
 			return diags
 		}
+		jsonBytes := buf.Bytes()
 		if err := c.SetMetricSettings(projectName, patternIdRule, jsonBytes); err != nil {
 			diags.AddError("Error setting metric alert settings", err.Error())
 		}
