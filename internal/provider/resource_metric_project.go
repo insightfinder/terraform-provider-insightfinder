@@ -1926,6 +1926,8 @@ func (r *metricProjectResource) ImportState(ctx context.Context, req resource.Im
 }
 
 // buildMetricAlertSettingFromAPI converts a client.MetricAlertSetting to a metricAlertSettingModel.
+//
+//nolint:unused
 func buildMetricAlertSettingFromAPI(s client.MetricAlertSetting) metricAlertSettingModel {
 	m := metricAlertSettingModel{
 		ComponentName:                      types.StringValue(s.ComponentName),
@@ -2035,6 +2037,8 @@ func buildSingleMetricAlertSettingPost(metricName string, s metricAlertSettingMo
 
 // readMetricConfigurationsFromAPI reads current metric configuration state from the API
 // for all metrics listed in existingConfigs.
+//
+//nolint:unused
 func readMetricConfigurationsFromAPI(ctx context.Context, c *client.Client, projectName string, existingConfigs []metricConfigurationModel) ([]metricConfigurationModel, diag.Diagnostics) {
 	var diags diag.Diagnostics
 	if len(existingConfigs) == 0 {
@@ -2121,6 +2125,8 @@ func readMetricConfigurationsFromAPI(ctx context.Context, c *client.Client, proj
 // freshly-read model back to null. This prevents perpetual diffs when the API returns
 // server-side defaults (e.g. detection_type="positive", rouge_value=NaN JSON) that were
 // never explicitly set by the user.
+//
+//nolint:unused
 func preserveConfiguredNulls(m *metricAlertSettingModel, existingByComponent map[string]metricAlertSettingModel) {
 	old, ok := existingByComponent[m.ComponentName.ValueString()]
 	if !ok {
