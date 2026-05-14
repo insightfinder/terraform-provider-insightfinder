@@ -304,7 +304,7 @@ func (c *Client) SetMetricSettings(projectName string, patternIdGenerationRule i
 
 	_ = os.WriteFile("/tmp/tf_metric_payload.json", data, 0644)
 
-	// Retry up to 5 times: the API returns 204 when the project was just created
+	// Retry up to 5 times: the API returns 204 or 502 when the project was just created
 	// and the backend hasn't fully provisioned it yet.
 	var body []byte
 	var statusCode int
@@ -314,15 +314,19 @@ func (c *Client) SetMetricSettings(projectName string, patternIdGenerationRule i
 		if err != nil {
 			return err
 		}
-		if statusCode != 204 {
+		if statusCode != 204 && statusCode != 502 {
 			break
 		}
 		time.Sleep(time.Duration(attempt) * 3 * time.Second)
 	}
 
-	// If still 204 after all retries, fall back to sending each entry individually.
-	if statusCode == 204 {
+	// If still 204/502 after all retries, fall back to sending each entry individually.
+	if statusCode == 502 {
 		return c.setMetricSettingsOneByOne(projectName, patternIdGenerationRule, data)
+	}
+	// 204 after all retries means the backend is not ready for this API — ignore silently.
+	if statusCode == 204 {
+		return nil
 	}
 
 	_ = os.WriteFile("/tmp/tf_metric_response.json", body, 0644)
@@ -356,9 +360,21 @@ func (c *Client) setMetricSettingsOneByOne(projectName string, patternIdGenerati
 
 	for i, entry := range entries {
 		entryBytes, _ := json.Marshal([]json.RawMessage{entry})
-		body, statusCode, err := c.DoMultipartFormRequest("POST", "/api/external/v1/componentmetricupdate", fields, map[string][]byte{"data": entryBytes})
-		if err != nil {
-			return fmt.Errorf("failed to set metric setting [%d]: %w", i, err)
+		var body []byte
+		var statusCode int
+		var err error
+		for attempt := 1; attempt <= 5; attempt++ {
+			body, statusCode, err = c.DoMultipartFormRequest("POST", "/api/external/v1/componentmetricupdate", fields, map[string][]byte{"data": entryBytes})
+			if err != nil {
+				return fmt.Errorf("failed to set metric setting [%d]: %w", i, err)
+			}
+			if statusCode != 204 && statusCode != 502 {
+				break
+			}
+			time.Sleep(time.Duration(attempt) * 3 * time.Second)
+		}
+		if statusCode == 204 {
+			continue
 		}
 		if statusCode != 200 {
 			return fmt.Errorf("failed to set metric setting [%d]: HTTP %d - %s", i, statusCode, string(body))
@@ -496,9 +512,18 @@ func (c *Client) postMetricComponent(projectName, metricName, operation string, 
 		}
 	}
 
-	body, statusCode, err := c.DoFormRequest("POST", "/api/external/v1/metriccomponent", formData)
-	if err != nil {
-		return err
+	var body []byte
+	var statusCode int
+	var err error
+	for attempt := 1; attempt <= 5; attempt++ {
+		body, statusCode, err = c.DoFormRequest("POST", "/api/external/v1/metriccomponent", formData)
+		if err != nil {
+			return err
+		}
+		if statusCode != 502 {
+			break
+		}
+		time.Sleep(time.Duration(attempt) * 3 * time.Second)
 	}
 	if statusCode != 200 {
 		return fmt.Errorf("failed to set metric component (%s/%s): HTTP %d - %s", metricName, operation, statusCode, string(body))

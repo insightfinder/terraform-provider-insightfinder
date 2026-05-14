@@ -211,6 +211,71 @@ resource "insightfinder_project" "json_logs_example" {
   ]
 }
 ```
+### Project with Log-to-Metric Settings
+
+```terraform
+resource "insightfinder_project" "l2m_example" {
+  project_name = "my-log-project"
+  system_name  = "Production"
+
+  project_creation_config = {
+    data_type          = "Log"
+    instance_type      = "PrivateCloud"
+    project_cloud_type = "PrivateCloud"
+    insight_agent_type = "LogStreaming"
+  }
+
+  project_display_name = "My Log Project"
+  sampling_interval    = 600
+
+  # Regex-based log-to-metric conversion
+  l2m_settings = [
+    {
+      metric_project_name = "my-metric-project"
+      json_flag           = false
+      enable_mapping      = false
+      regexs = [
+        {
+          metric_name_regex    = "metric_name=(\\w+)"
+          metric_value_regex   = "value=([\\d.]+)"
+          instance_name_regex  = "host=([\\w.-]+)"
+          timestamp_regex      = "ts=([\\d]+)"
+          timestamp_format     = "epoch"
+          metric_name          = "response_time"
+          operation            = 0
+          aggregation_mode     = 2
+          aggregation_period   = 60
+          grouping_by_component = false
+        }
+      ]
+    },
+    {
+      metric_project_name = "my-json-metric-project"
+      json_flag           = true
+      enable_mapping      = false
+      json_parsers = [
+        {
+          metric_value_key     = "alert->core->value"
+          instance_name_key    = "alert->asset->asset_id"
+          timestamp_key        = "alert->timestamp"
+          timestamp_format     = "epoch"
+          operation            = 1
+          aggregation_mode     = 3
+          aggregation_period   = 60
+          grouping_by_component = true
+          derived_value_model = {
+            base_value      = "alert->asset->asset_id=v"
+            actual_value    = "alert->cloud->availability_zone=b"
+            operation       = 2
+            mapping_id_list = ["alert->asset->stream_type", "alert->asset->pid"]
+          }
+        }
+      ]
+    }
+  ]
+}
+```
+
 ### Project with Mode
 
 ```terraform
@@ -288,6 +353,44 @@ resource "insightfinder_project" "loki_logs" {
   - `dampening_field_setting` (Boolean, Required) Whether to include this key in the dampening field list. When `true`, the key is used to control alert dampening logic — alerts with the same value for this field will be grouped and suppressed during the dampening window.
   - `notification_setting` (Boolean, Optional) Whether to include this key in the notification settings. When `true`, the key is sent in the `notificationSetting` map with `selected: true`.
   - `notification_setting_display_name` (String, Optional) Display name for this key in notification settings. Defaults to the `json_key` value when not specified.
+- `l2m_settings` (Set of Objects, Optional) — Log-to-metric settings. Each entry defines how log data from this project is parsed and converted into metrics for a target metric project. Stored as a set so order does not matter.
+  - `metric_project_name` (String, Required) Name of the target metric project that receives the converted metrics
+  - `json_flag` (Boolean, Optional) When `true`, use JSON parsers; when `false` (default), use regex parsers
+  - `enable_mapping` (Boolean, Optional) Enable key mapping for derived value transformations
+  - `regexs` (List of Objects, Optional) Regex-based parser entries. Each supports:
+    - `metric_name_regex` (String, Optional) Regex to extract the metric name from log lines
+    - `metric_value_regex` (String, Optional) Regex to extract the metric value from log lines
+    - `base_value_key` (String, Optional) Base value key for derived calculations
+    - `instance_name_regex` (String, Optional) Regex to extract the instance name
+    - `container_name_regex` (String, Optional) Regex to extract the container name
+    - `timestamp_regex` (String, Optional) Regex to extract the timestamp
+    - `timestamp_format` (String, Optional) Format string for the extracted timestamp
+    - `data_filter` (String, Optional) Filter expression for log line selection
+    - `metric_name` (String, Optional) Static metric name override
+    - `operation` (Number, Optional) Aggregation operation type
+    - `aggregation_mode` (Number, Optional) Aggregation mode
+    - `aggregation_period` (Number, Optional) Aggregation period
+    - `container_type` (Number, Optional) Container type identifier
+    - `grouping_by_component` (Boolean, Optional) Whether to group metrics by component
+  - `json_parsers` (List of Objects, Optional) JSON-based parser entries. Each supports:
+    - `metric_value_key` (String, Optional) JSON path key for the metric value
+    - `base_value_key` (String, Optional) JSON path key for the base value
+    - `instance_name_key` (String, Optional) JSON path key for the instance name
+    - `container_name_key` (String, Optional) JSON path key for the container name
+    - `timestamp_key` (String, Optional) JSON path key for the timestamp
+    - `timestamp_format` (String, Optional) Format string for the timestamp value
+    - `additional_metric_name` (String, Optional) JSON path key for an additional metric name
+    - `operation` (Number, Optional) Aggregation operation type
+    - `aggregation_mode` (Number, Optional) Aggregation mode
+    - `aggregation_period` (Number, Optional) Aggregation period
+    - `container_type` (Number, Optional) Container type identifier
+    - `grouping_by_component` (Boolean, Optional) Whether to group metrics by component
+    - `derived_value_model` (Object, Optional) Derived value transformation model
+      - `base_value` (String, Optional) Base value expression (e.g., `alert->field=value`)
+      - `actual_value` (String, Optional) Actual value expression
+      - `operation` (Number, Optional) Derived value operation type
+      - `mapping_id_list` (List of String, Optional) List of JSON path keys used for mapping
+
 - `mode` (Number, Optional, Computed) Process mode for the project. Controls which RabbitMQ processing queue the project's data is routed to. Set and read via the `/api/v1/logdedicatedmode` API. Maps to the `processMode` field in the API response. Default: `0` (LIVE).
 
   | Value | Name | Queue Suffix | Description |

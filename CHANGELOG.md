@@ -5,6 +5,29 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.9.0] - 2026-05-12
+
+### Added
+- **insightfinder_project**: New `l2m_settings` attribute (Set of Objects, Optional) — configures log-to-metric (L2M) settings for a project, defining how log data is parsed and converted into metrics
+  - Each entry targets a named metric project (`metric_project_name`, String, Required)
+  - `json_flag` (Boolean, Optional) — when `true`, use JSON parsers; when `false`, use regex parsers
+  - `enable_mapping` (Boolean, Optional) — enable key mapping for derived values
+  - `regexs` (List of Objects, Optional) — regex-based parser entries; each supports: `metric_name_regex`, `metric_value_regex`, `base_value_key`, `instance_name_regex`, `container_name_regex`, `timestamp_regex`, `timestamp_format`, `data_filter`, `metric_name` (all String, Optional), `operation`, `aggregation_mode`, `aggregation_period`, `container_type` (all Number, Optional), `grouping_by_component` (Boolean, Optional)
+  - `json_parsers` (List of Objects, Optional) — JSON-based parser entries; each supports: `metric_value_key`, `base_value_key`, `instance_name_key`, `container_name_key`, `timestamp_key`, `timestamp_format`, `additional_metric_name` (all String, Optional), `operation`, `aggregation_mode`, `aggregation_period`, `container_type` (all Number, Optional), `grouping_by_component` (Boolean, Optional), and `derived_value_model` (Object, Optional) with `base_value`, `actual_value` (String), `operation` (Number), `mapping_id_list` (List of String)
+  - Stored as a **set** so order differences in the API response do not produce spurious plan diffs
+  - Managed via `GET/POST /api/external/v1/logtometricsetting`
+
+## [1.8.17] - 2026-05-12
+
+### Fixed
+- **insightfinder_metric_project**: Metric alert settings payload now uses `SetEscapeHTML(false)` during JSON marshaling, preventing Go's default HTML escaping from converting `->` to `>` in metric names (e.g., `alert->core->summary=...`). This was causing the `componentmetricupdate` API to return HTTP 204 and silently discard all settings.
+- **insightfinder_metric_project**: `SetMetricSettings` and `postMetricComponent` now retry on HTTP 502 in addition to 204, handling transient backend unavailability immediately after project creation.
+
+### Changed
+- **insightfinder_metric_project**: `metric_configurations` is no longer `Computed` — Terraform will not read it back from the API or show drift for it. The state is preserved as configured.
+- **insightfinder_metric_project**: Added drift suppression to the following `metric_alert_settings` attributes — when not set in config, API-returned values no longer cause plan diffs: `detection_type`, `pattern_name_higher`, `pattern_name_lower`, `rouge_value`, `metric_type`, `is_flapping_result_only`, `incident_duration_threshold`, `enable_baseline_near_constance`, `compute_difference`.
+- **insightfinder_metric_project**: Added drift suppression to `ignored_components` and `escalate_incident_components` — components returned by the API no longer show as plan diffs when these lists are not set in config.
+
 ## [1.8.16] - 2026-05-04
 
 ### Added
@@ -449,6 +472,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## Version History
 
+- **1.9.0** - Added `l2m_settings` (log-to-metric) attribute to `insightfinder_project`
 - **1.8.12** - Added `miscellaneous_settings` block to `insightfinder_system_settings`
 - **1.8.11** - Added `mode` attribute to `insightfinder_project`
 - **1.8.9** - Replaced flat `enable_ticket_creation`/`enable_ticket_update` with per-project `project_configs` map in `insightfinder_servicenow`
@@ -457,10 +481,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **1.7.0** - Added `dampening_field_setting` to `json_key_settings`; fixed system settings and email_setting generation in CLI tool
 - **1.0.0** - Initial release with core functionality
 
+[1.9.0]: https://github.com/insightfinder/terraform-provider-insightfinder/releases/tag/v1.9.0
 [1.8.9]: https://github.com/insightfinder/terraform-provider-insightfinder/releases/tag/v1.8.9
 [1.8.8]: https://github.com/insightfinder/terraform-provider-insightfinder/releases/tag/v1.8.8
 [1.8.0]: https://github.com/insightfinder/terraform-provider-insightfinder/releases/tag/v1.8.0
 [1.7.0]: https://github.com/insightfinder/terraform-provider-insightfinder/releases/tag/v1.7.0
 [1.0.0]: https://github.com/insightfinder/terraform-provider-insightfinder/releases/tag/v1.0.0
 [1.8.12]: https://github.com/insightfinder/terraform-provider-insightfinder/releases/tag/v1.8.12
-[Unreleased]: https://github.com/insightfinder/terraform-provider-insightfinder/compare/v1.8.12...HEAD
+[Unreleased]: https://github.com/insightfinder/terraform-provider-insightfinder/compare/v1.9.0...HEAD

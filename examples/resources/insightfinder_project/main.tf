@@ -2,7 +2,7 @@ terraform {
   required_providers {
     insightfinder = {
       source  = "insightfinder/insightfinder"
-      version = "~> 1.8"
+      version = "~> 1.9"
     }
   }
 }
@@ -188,6 +188,68 @@ resource "insightfinder_project" "loki_logs" {
   retention_time       = 90
 
   mode = 1
+}
+
+# Project with log-to-metric (L2M) settings
+resource "insightfinder_project" "l2m_log_project" {
+  project_name = "l2m-source-logs"
+  system_name  = "Production"
+
+  project_creation_config = {
+    data_type          = "Log"
+    instance_type      = "PrivateCloud"
+    project_cloud_type = "PrivateCloud"
+    insight_agent_type = "LogStreaming"
+  }
+
+  project_display_name = "L2M Source Logs"
+  sampling_interval    = 600
+  retention_time       = 90
+
+  l2m_settings = [
+    {
+      metric_project_name = "my-metric-project"
+      json_flag           = false
+      enable_mapping      = false
+      regexs = [
+        {
+          metric_name_regex     = "metric=(\\w+)"
+          metric_value_regex    = "value=([\\d.]+)"
+          instance_name_regex   = "host=([\\w.-]+)"
+          timestamp_regex       = "ts=([\\d]+)"
+          timestamp_format      = "epoch"
+          metric_name           = "response_time"
+          operation             = 0
+          aggregation_mode      = 2
+          aggregation_period    = 60
+          grouping_by_component = false
+        }
+      ]
+    },
+    {
+      metric_project_name = "my-json-metric-project"
+      json_flag           = true
+      enable_mapping      = false
+      json_parsers = [
+        {
+          metric_value_key      = "alert->core->summary"
+          instance_name_key     = "alert->asset->asset_id"
+          timestamp_key         = "alert->asset->asset_video_format"
+          timestamp_format      = "epoch"
+          operation             = 1
+          aggregation_mode      = 3
+          aggregation_period    = 60
+          grouping_by_component = true
+          derived_value_model = {
+            base_value      = "alert->asset->asset_id=v"
+            actual_value    = "alert->cloud->availability_zone=b"
+            operation       = 2
+            mapping_id_list = ["alert->asset->stream_type", "alert->asset->pid"]
+          }
+        }
+      ]
+    }
+  ]
 }
 
 variable "username" {

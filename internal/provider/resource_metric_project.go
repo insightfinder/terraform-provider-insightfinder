@@ -4,6 +4,7 @@
 package provider
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -27,6 +28,71 @@ var (
 	_ resource.ResourceWithConfigure   = &metricProjectResource{}
 	_ resource.ResourceWithImportState = &metricProjectResource{}
 )
+
+// useStateIfConfigNullModifier suppresses drift for a string attribute: if the
+// config does not set the field (null), the prior state value is kept so the
+// plan shows no change even when the API returns a different value.
+type useStateIfConfigNullModifier struct{ desc string }
+
+func (m useStateIfConfigNullModifier) Description(_ context.Context) string         { return m.desc }
+func (m useStateIfConfigNullModifier) MarkdownDescription(_ context.Context) string { return m.desc }
+func (m useStateIfConfigNullModifier) PlanModifyString(_ context.Context, req planmodifier.StringRequest, resp *planmodifier.StringResponse) {
+	if req.ConfigValue.IsNull() && !req.StateValue.IsNull() && !req.StateValue.IsUnknown() {
+		resp.PlanValue = req.StateValue
+	}
+}
+
+func ignoreStringDrift() planmodifier.String {
+	return useStateIfConfigNullModifier{desc: "Preserves state value when config is null, suppressing API drift."}
+}
+
+type useStateIfConfigNullBoolModifier struct{ desc string }
+
+func (m useStateIfConfigNullBoolModifier) Description(_ context.Context) string { return m.desc }
+func (m useStateIfConfigNullBoolModifier) MarkdownDescription(_ context.Context) string {
+	return m.desc
+}
+func (m useStateIfConfigNullBoolModifier) PlanModifyBool(_ context.Context, req planmodifier.BoolRequest, resp *planmodifier.BoolResponse) {
+	if req.ConfigValue.IsNull() && !req.StateValue.IsNull() && !req.StateValue.IsUnknown() {
+		resp.PlanValue = req.StateValue
+	}
+}
+
+func ignoreBoolDrift() planmodifier.Bool {
+	return useStateIfConfigNullBoolModifier{desc: "Preserves state value when config is null, suppressing API drift."}
+}
+
+type useStateIfConfigNullInt64Modifier struct{ desc string }
+
+func (m useStateIfConfigNullInt64Modifier) Description(_ context.Context) string { return m.desc }
+func (m useStateIfConfigNullInt64Modifier) MarkdownDescription(_ context.Context) string {
+	return m.desc
+}
+func (m useStateIfConfigNullInt64Modifier) PlanModifyInt64(_ context.Context, req planmodifier.Int64Request, resp *planmodifier.Int64Response) {
+	if req.ConfigValue.IsNull() && !req.StateValue.IsNull() && !req.StateValue.IsUnknown() {
+		resp.PlanValue = req.StateValue
+	}
+}
+
+func ignoreInt64Drift() planmodifier.Int64 {
+	return useStateIfConfigNullInt64Modifier{desc: "Preserves state value when config is null, suppressing API drift."}
+}
+
+type useStateIfConfigNullListModifier struct{ desc string }
+
+func (m useStateIfConfigNullListModifier) Description(_ context.Context) string { return m.desc }
+func (m useStateIfConfigNullListModifier) MarkdownDescription(_ context.Context) string {
+	return m.desc
+}
+func (m useStateIfConfigNullListModifier) PlanModifyList(_ context.Context, req planmodifier.ListRequest, resp *planmodifier.ListResponse) {
+	if req.ConfigValue.IsNull() && !req.StateValue.IsNull() && !req.StateValue.IsUnknown() {
+		resp.PlanValue = req.StateValue
+	}
+}
+
+func ignoreListDrift() planmodifier.List {
+	return useStateIfConfigNullListModifier{desc: "Preserves state value when config is null, suppressing API drift."}
+}
 
 func NewMetricProjectResource() resource.Resource {
 	return &metricProjectResource{}
@@ -719,7 +785,7 @@ func (r *metricProjectResource) Schema(_ context.Context, _ resource.SchemaReque
 			"metric_configurations": schema.ListNestedAttribute{
 				Description: "Per-metric alert threshold settings and component escalation/ignored configurations.",
 				Optional:    true,
-				Computed:    true,
+				Computed:    false,
 				NestedObject: schema.NestedAttributeObject{
 					Attributes: map[string]schema.Attribute{
 						"metric_name": schema.StringAttribute{
@@ -727,16 +793,18 @@ func (r *metricProjectResource) Schema(_ context.Context, _ resource.SchemaReque
 							Required:    true,
 						},
 						"escalate_incident_components": schema.ListAttribute{
-							Description: "Components for which incidents are escalated. Use ['Global_<hash>'] to select all.",
-							ElementType: types.StringType,
-							Optional:    true,
-							Computed:    true,
+							Description:   "Components for which incidents are escalated. Use ['Global_<hash>'] to select all.",
+							ElementType:   types.StringType,
+							Optional:      true,
+							Computed:      true,
+							PlanModifiers: []planmodifier.List{ignoreListDrift()},
 						},
 						"ignored_components": schema.ListAttribute{
-							Description: "Components that are ignored for this metric. Use ['Global_<hash>'] to select all.",
-							ElementType: types.StringType,
-							Optional:    true,
-							Computed:    true,
+							Description:   "Components that are ignored for this metric. Use ['Global_<hash>'] to select all.",
+							ElementType:   types.StringType,
+							Optional:      true,
+							Computed:      true,
+							PlanModifiers: []planmodifier.List{ignoreListDrift()},
 						},
 						"metric_alert_settings": schema.ListNestedAttribute{
 							Description: "Alert threshold settings per component for this metric.",
@@ -762,14 +830,15 @@ func (r *metricProjectResource) Schema(_ context.Context, _ resource.SchemaReque
 									"incident_no_alert_lower_bound_negative":  schema.StringAttribute{Description: "Incident no-alert lower bound negative.", Optional: true, Computed: true},
 									"incident_no_alert_upper_bound_negative":  schema.StringAttribute{Description: "Incident no-alert upper bound negative.", Optional: true, Computed: true},
 									"is_kpi":                                  schema.BoolAttribute{Description: "Whether this metric is a KPI.", Optional: true, Computed: true},
-									"is_flapping_result_only":                 schema.BoolAttribute{Description: "Whether to report flapping results only.", Optional: true, Computed: true},
-									"incident_duration_threshold":             schema.Int64Attribute{Description: "Minimum incident duration (ms) to trigger.", Optional: true, Computed: true},
+									"is_flapping_result_only":                 schema.BoolAttribute{Description: "Whether to report flapping results only.", Optional: true, Computed: true, PlanModifiers: []planmodifier.Bool{ignoreBoolDrift()}},
+									"incident_duration_threshold":             schema.Int64Attribute{Description: "Minimum incident duration (ms) to trigger.", Optional: true, Computed: true, PlanModifiers: []planmodifier.Int64{ignoreInt64Drift()}},
 									"detection_type": schema.StringAttribute{
 										Description: "Detection direction: 'positive', 'negative', or 'both'.",
 										Optional:    true,
 										Computed:    true,
 										PlanModifiers: []planmodifier.String{
 											stringplanmodifier.UseStateForUnknown(),
+											ignoreStringDrift(),
 										},
 									},
 									"c_value_override": schema.Int64Attribute{
@@ -782,9 +851,9 @@ func (r *metricProjectResource) Schema(_ context.Context, _ resource.SchemaReque
 										Optional:    true,
 										Computed:    false,
 									},
-									"pattern_name_higher": schema.StringAttribute{Description: "Pattern name for higher anomalies.", Optional: true, Computed: true},
-									"pattern_name_lower":  schema.StringAttribute{Description: "Pattern name for lower anomalies.", Optional: true, Computed: true},
-									"metric_type":         schema.StringAttribute{Description: "Metric type classification (e.g., 'Unknown', 'CPU Utilization').", Optional: true, Computed: true},
+									"pattern_name_higher": schema.StringAttribute{Description: "Pattern name for higher anomalies.", Optional: true, Computed: true, PlanModifiers: []planmodifier.String{ignoreStringDrift()}},
+									"pattern_name_lower":  schema.StringAttribute{Description: "Pattern name for lower anomalies.", Optional: true, Computed: true, PlanModifiers: []planmodifier.String{ignoreStringDrift()}},
+									"metric_type":         schema.StringAttribute{Description: "Metric type classification (e.g., 'Unknown', 'CPU Utilization').", Optional: true, Computed: true, PlanModifiers: []planmodifier.String{ignoreStringDrift()}},
 									"fill_zero":           schema.BoolAttribute{Description: "Fill missing data with zero.", Optional: true, Computed: true},
 									"rouge_value": schema.StringAttribute{
 										Description: "Rouge value as raw JSON string from API (e.g., '{\"l\":NaN,\"s\":NaN}'). Null to disable.",
@@ -792,10 +861,11 @@ func (r *metricProjectResource) Schema(_ context.Context, _ resource.SchemaReque
 										Computed:    true,
 										PlanModifiers: []planmodifier.String{
 											stringplanmodifier.UseStateForUnknown(),
+											ignoreStringDrift(),
 										},
 									},
-									"enable_baseline_near_constance": schema.BoolAttribute{Description: "Enable baseline near constance detection.", Optional: true, Computed: true},
-									"compute_difference":             schema.BoolAttribute{Description: "Compute difference for this metric.", Optional: true, Computed: true},
+									"enable_baseline_near_constance": schema.BoolAttribute{Description: "Enable baseline near constance detection.", Optional: true, Computed: true, PlanModifiers: []planmodifier.Bool{ignoreBoolDrift()}},
+									"compute_difference":             schema.BoolAttribute{Description: "Compute difference for this metric.", Optional: true, Computed: true, PlanModifiers: []planmodifier.Bool{ignoreBoolDrift()}},
 									"anomaly_gap_tolerance_duration": schema.Int64Attribute{Description: "Anomaly gap tolerance duration in milliseconds.", Optional: true, Computed: true},
 								},
 							},
@@ -1631,22 +1701,23 @@ func (r *metricProjectResource) Read(ctx context.Context, req resource.ReadReque
 	}
 
 	// Read metric_configurations from API (only for metrics already tracked in state)
-	if !state.MetricConfigurations.IsNull() && !state.MetricConfigurations.IsUnknown() {
-		var existingConfigs []metricConfigurationModel
-		diags = state.MetricConfigurations.ElementsAs(ctx, &existingConfigs, false)
-		resp.Diagnostics.Append(diags...)
-		if !resp.Diagnostics.HasError() {
-			updatedConfigs, readDiags := readMetricConfigurationsFromAPI(ctx, r.client, state.ProjectName.ValueString(), existingConfigs)
-			resp.Diagnostics.Append(readDiags...)
-			if !resp.Diagnostics.HasError() && len(updatedConfigs) > 0 {
-				setVal, d := types.ListValueFrom(ctx, types.ObjectType{AttrTypes: metricConfigurationAttrTypes()}, updatedConfigs)
-				resp.Diagnostics.Append(d...)
-				if !resp.Diagnostics.HasError() {
-					state.MetricConfigurations = setVal
-				}
-			}
-		}
-	}
+	// Disabled: metric_configurations is no longer Computed, so we preserve state as-is.
+	// if !state.MetricConfigurations.IsNull() && !state.MetricConfigurations.IsUnknown() {
+	// 	var existingConfigs []metricConfigurationModel
+	// 	diags = state.MetricConfigurations.ElementsAs(ctx, &existingConfigs, false)
+	// 	resp.Diagnostics.Append(diags...)
+	// 	if !resp.Diagnostics.HasError() {
+	// 		updatedConfigs, readDiags := readMetricConfigurationsFromAPI(ctx, r.client, state.ProjectName.ValueString(), existingConfigs)
+	// 		resp.Diagnostics.Append(readDiags...)
+	// 		if !resp.Diagnostics.HasError() && len(updatedConfigs) > 0 {
+	// 			setVal, d := types.ListValueFrom(ctx, types.ObjectType{AttrTypes: metricConfigurationAttrTypes()}, updatedConfigs)
+	// 			resp.Diagnostics.Append(d...)
+	// 			if !resp.Diagnostics.HasError() {
+	// 				state.MetricConfigurations = setVal
+	// 			}
+	// 		}
+	// 	}
+	// }
 
 	diags = resp.State.Set(ctx, &state)
 	resp.Diagnostics.Append(diags...)
@@ -1855,6 +1926,8 @@ func (r *metricProjectResource) ImportState(ctx context.Context, req resource.Im
 }
 
 // buildMetricAlertSettingFromAPI converts a client.MetricAlertSetting to a metricAlertSettingModel.
+//
+//nolint:unused
 func buildMetricAlertSettingFromAPI(s client.MetricAlertSetting) metricAlertSettingModel {
 	m := metricAlertSettingModel{
 		ComponentName:                      types.StringValue(s.ComponentName),
@@ -1964,6 +2037,8 @@ func buildSingleMetricAlertSettingPost(metricName string, s metricAlertSettingMo
 
 // readMetricConfigurationsFromAPI reads current metric configuration state from the API
 // for all metrics listed in existingConfigs.
+//
+//nolint:unused
 func readMetricConfigurationsFromAPI(ctx context.Context, c *client.Client, projectName string, existingConfigs []metricConfigurationModel) ([]metricConfigurationModel, diag.Diagnostics) {
 	var diags diag.Diagnostics
 	if len(existingConfigs) == 0 {
@@ -2050,6 +2125,8 @@ func readMetricConfigurationsFromAPI(ctx context.Context, c *client.Client, proj
 // freshly-read model back to null. This prevents perpetual diffs when the API returns
 // server-side defaults (e.g. detection_type="positive", rouge_value=NaN JSON) that were
 // never explicitly set by the user.
+//
+//nolint:unused
 func preserveConfiguredNulls(m *metricAlertSettingModel, existingByComponent map[string]metricAlertSettingModel) {
 	old, ok := existingByComponent[m.ComponentName.ValueString()]
 	if !ok {
@@ -2118,11 +2195,14 @@ func applyMetricConfigurations(ctx context.Context, c *client.Client, projectNam
 	}
 
 	if len(allPostData) > 0 {
-		jsonBytes, err := json.Marshal(allPostData)
-		if err != nil {
+		var buf bytes.Buffer
+		enc := json.NewEncoder(&buf)
+		enc.SetEscapeHTML(false)
+		if err := enc.Encode(allPostData); err != nil {
 			diags.AddError("Error marshaling metric alert settings", err.Error())
 			return diags
 		}
+		jsonBytes := buf.Bytes()
 		if err := c.SetMetricSettings(projectName, patternIdRule, jsonBytes); err != nil {
 			diags.AddError("Error setting metric alert settings", err.Error())
 		}
