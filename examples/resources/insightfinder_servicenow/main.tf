@@ -3,36 +3,33 @@
 
 # Basic Authentication
 resource "insightfinder_servicenow" "basic" {
-  account          = "admin"
-  service_host     = "https://dev12345.service-now.com/"
-  password         = var.servicenow_password
-  dampening_period = 3600000
-  system_names     = ["Production"]
-  options          = ["Root Cause"]
-  content_option   = ["SUMMARY"]
-  auth_type        = "basic"
+  account      = "admin"
+  service_host = "https://dev12345.service-now.com/"
+  password     = var.servicenow_password
+  system_names = ["Production"]
+  options      = ["Root Cause"]
+  content_option = ["SUMMARY"]
+  auth_type    = "basic"
 }
 
 # OAuth Authentication
 resource "insightfinder_servicenow" "oauth" {
-  account          = "admin"
-  service_host     = "https://dev12345.service-now.com/"
-  password         = var.servicenow_password
-  dampening_period = 7200000
-  app_id           = var.servicenow_app_id
-  app_key          = var.servicenow_app_key
-  system_names     = ["Production", "Staging"]
-  options          = ["Root Cause", "Prediction"]
-  content_option   = ["SUMMARY", "DESCRIPTION"]
-  auth_type        = "oauth"
+  account      = "admin"
+  service_host = "https://dev12345.service-now.com/"
+  password     = var.servicenow_password
+  app_id       = var.servicenow_app_id
+  app_key      = var.servicenow_app_key
+  system_names = ["Production", "Staging"]
+  options      = ["Root Cause", "Prediction"]
+  content_option = ["SUMMARY", "DESCRIPTION"]
+  auth_type    = "oauth"
 }
 
 # Full configuration with all optional fields
 resource "insightfinder_servicenow" "full" {
-  account          = "serviceaccount"
-  service_host     = "https://company.service-now.com/"
-  password         = var.servicenow_password
-  dampening_period = 3600000
+  account      = "serviceaccount"
+  service_host = "https://company.service-now.com/"
+  password     = var.servicenow_password
   system_names = [
     "Production-US-East",
     "Production-US-West",
@@ -63,6 +60,9 @@ resource "insightfinder_servicenow" "full" {
 
   # Associate created tickets with a CMDB configuration item
   configuration_item = "My-Server-CI"
+
+  # Associate tickets with a ServiceNow department
+  department_id = "9c777c281bd335906f2ca797b04bcb9e"
 
   # Per-project ticket configuration
   project_configs = {

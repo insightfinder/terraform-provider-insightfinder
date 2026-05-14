@@ -207,8 +207,23 @@ resource "insightfinder_project" "json_logs_example" {
       summary_setting         = false
       metafield_setting       = false
       dampening_field_setting = false
+    },
+    {
+      json_key                                      = "service"
+      type                                          = "string"
+      summary_setting                               = true
+      metafield_setting                             = false
+      dampening_field_setting                       = false
+      notification_setting                          = true
+      notification_setting_display_name             = "Service"
+      service_now_notification_setting              = true
+      service_now_notification_setting_display_name = "Service (ServiceNow)"
     }
   ]
+
+  # ServiceNow notification format strings
+  service_now_short_description_format = "Alert: {service} anomaly detected"
+  service_now_description_format       = "Detailed description: {service} reported anomaly at {timestamp}"
 }
 ```
 ### Project with Log-to-Metric Settings
@@ -353,6 +368,10 @@ resource "insightfinder_project" "loki_logs" {
   - `dampening_field_setting` (Boolean, Required) Whether to include this key in the dampening field list. When `true`, the key is used to control alert dampening logic — alerts with the same value for this field will be grouped and suppressed during the dampening window.
   - `notification_setting` (Boolean, Optional) Whether to include this key in the notification settings. When `true`, the key is sent in the `notificationSetting` map with `selected: true`.
   - `notification_setting_display_name` (String, Optional) Display name for this key in notification settings. Defaults to the `json_key` value when not specified.
+  - `service_now_notification_setting` (Boolean, Optional) Whether to include this key in the ServiceNow notification settings. When `true`, the key is sent in the `serviceNowNotificationSetting` map with `selected: true`.
+  - `service_now_notification_setting_display_name` (String, Optional) Display name for this key in ServiceNow notification settings. Defaults to the `json_key` value when not specified.
+- `service_now_short_description_format` (String, Optional) Short description format string for ServiceNow notifications. Maps to `serviceNowNotificationAdditionalSetting.shortDescriptionFormat`.
+- `service_now_description_format` (String, Optional) Description format string for ServiceNow notifications. Maps to `serviceNowNotificationAdditionalSetting.descriptionFormat`.
 - `l2m_settings` (Set of Objects, Optional) — Log-to-metric settings. Each entry defines how log data from this project is parsed and converted into metrics for a target metric project. Stored as a set so order does not matter.
   - `metric_project_name` (String, Required) Name of the target metric project that receives the converted metrics
   - `json_flag` (Boolean, Optional) When `true`, use JSON parsers; when `false` (default), use regex parsers
