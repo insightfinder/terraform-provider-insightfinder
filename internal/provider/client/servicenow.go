@@ -25,7 +25,6 @@ type ServiceNowConfig struct {
 	ServiceHost                string                             `json:"service_host"`
 	Password                   string                             `json:"password"`
 	Proxy                      string                             `json:"proxy,omitempty"`
-	DampeningPeriod            int                                `json:"dampening_period"`
 	AppID                      string                             `json:"app_id,omitempty"`
 	AppKey                     string                             `json:"app_key,omitempty"`
 	AuthType                   string                             `json:"auth_type,omitempty"`
@@ -40,6 +39,7 @@ type ServiceNowConfig struct {
 	TicketCreatedBySourceKey   string                             `json:"ticket_created_by_source_key,omitempty"`
 	TicketCreatedBySourceValue string                             `json:"ticket_created_by_source_value,omitempty"`
 	ConfigurationItem          string                             `json:"configuration_item,omitempty"`
+	DepartmentID               string                             `json:"department_id,omitempty"`
 	ProjectConfigs             map[string]ServiceNowProjectConfig `json:"project_configs,omitempty"`
 	TableMapping               [][]string                         `json:"table_mapping,omitempty"`
 }
@@ -140,9 +140,6 @@ func (c *Client) GetServiceNowConfig(account, serviceHost, username string) (*Se
 	if pwd, ok := entry["password"].(string); ok {
 		config.Password = pwd
 	}
-	if dampening, ok := entry["dampeningPeriod"].(float64); ok {
-		config.DampeningPeriod = int(dampening)
-	}
 	if appID, ok := entry["appId"].(string); ok {
 		config.AppID = appID
 	}
@@ -232,6 +229,9 @@ func (c *Client) GetServiceNowConfig(account, serviceHost, username string) (*Se
 					config.ConfigurationItem = v
 				}
 			}
+			if v, ok := configs["departmentId"].(string); ok {
+				config.DepartmentID = v
+			}
 			// Fall back to projectConfigs from configs JSON if not found at root level
 			if config.ProjectConfigs == nil {
 				if pcRaw, ok := configs["projectConfigs"].(map[string]interface{}); ok {
@@ -302,7 +302,6 @@ func (c *Client) CreateOrUpdateServiceNowConfig(config *ServiceNowConfig, userna
 	formData.Set("proxy", config.Proxy)
 	formData.Set("account", config.Account)
 	formData.Set("password", config.Password)
-	formData.Set("dampeningPeriod", fmt.Sprintf("%d", config.DampeningPeriod))
 	formData.Set("appId", config.AppID)
 	formData.Set("appKey", config.AppKey)
 	formData.Set("auth_type", config.AuthType)
@@ -333,6 +332,9 @@ func (c *Client) CreateOrUpdateServiceNowConfig(config *ServiceNowConfig, userna
 		}
 		if config.ConfigurationItem != "" {
 			formData.Set("configurationItem", config.ConfigurationItem)
+		}
+		if config.DepartmentID != "" {
+			formData.Set("departmentId", config.DepartmentID)
 		}
 		if len(config.ProjectConfigs) > 0 {
 			projectConfigsJSON, err := json.Marshal(config.ProjectConfigs)

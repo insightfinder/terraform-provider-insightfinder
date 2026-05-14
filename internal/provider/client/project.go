@@ -488,12 +488,20 @@ type NotificationSettingEntry struct {
 	DisplayName string `json:"displayName"`
 }
 
+// ServiceNowNotificationAdditionalSetting holds the ServiceNow notification format strings
+type ServiceNowNotificationAdditionalSetting struct {
+	ShortDescriptionFormat string `json:"shortDescriptionFormat"`
+	DescriptionFormat      string `json:"descriptionFormat"`
+}
+
 // JsonKeySummarySettings represents the response from logsummarysettings API
 type JsonKeySummarySettings struct {
-	SummarySetting        []string                            `json:"summarySetting"`
-	MetaFieldSetting      []string                            `json:"metaFieldSetting"`
-	DampeningFieldSetting []string                            `json:"dampeningFieldSetting"`
-	NotificationSetting   map[string]NotificationSettingEntry `json:"notificationSetting"`
+	SummarySetting                          []string                                 `json:"summarySetting"`
+	MetaFieldSetting                        []string                                 `json:"metaFieldSetting"`
+	DampeningFieldSetting                   []string                                 `json:"dampeningFieldSetting"`
+	NotificationSetting                     map[string]NotificationSettingEntry      `json:"notificationSetting"`
+	ServiceNowNotificationSetting           map[string]NotificationSettingEntry      `json:"serviceNowNotificationSetting"`
+	ServiceNowNotificationAdditionalSetting *ServiceNowNotificationAdditionalSetting `json:"serviceNowNotificationAdditionalSetting"`
 }
 
 // GetJsonKeySummarySettings retrieves which JSON keys have summary and metafield settings enabled
@@ -556,15 +564,25 @@ func (c *Client) UpdateJsonKeyTypes(projectName string, jsonKeys []JsonKeyType) 
 }
 
 // UpdateJsonKeySummarySettings updates which JSON keys have summary settings, metafield settings, dampening field settings, and notification settings enabled
-func (c *Client) UpdateJsonKeySummarySettings(projectName string, summaryKeys []string, metafieldKeys []string, dampeningFieldKeys []string, notificationSettings map[string]NotificationSettingEntry) error {
+func (c *Client) UpdateJsonKeySummarySettings(
+	projectName string,
+	summaryKeys []string,
+	metafieldKeys []string,
+	dampeningFieldKeys []string,
+	notificationSettings map[string]NotificationSettingEntry,
+	serviceNowNotificationSettings map[string]NotificationSettingEntry,
+	serviceNowAdditionalSetting *ServiceNowNotificationAdditionalSetting,
+) error {
 	projectQualifiedName := fmt.Sprintf("%s@%s", projectName, c.Username)
 	path := fmt.Sprintf("/api/external/v1/logsummarysettings?projectName=%s", url.QueryEscape(projectQualifiedName))
 
 	payload := map[string]interface{}{
-		"summarySetting":        summaryKeys,
-		"metaFieldSetting":      metafieldKeys,
-		"dampeningFieldSetting": dampeningFieldKeys,
-		"notificationSetting":   notificationSettings,
+		"summarySetting":                          summaryKeys,
+		"metaFieldSetting":                        metafieldKeys,
+		"dampeningFieldSetting":                   dampeningFieldKeys,
+		"notificationSetting":                     notificationSettings,
+		"serviceNowNotificationSetting":           serviceNowNotificationSettings,
+		"serviceNowNotificationAdditionalSetting": serviceNowAdditionalSetting,
 	}
 
 	body, statusCode, err := c.DoRequest("POST", path, payload)

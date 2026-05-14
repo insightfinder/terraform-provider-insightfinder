@@ -5,6 +5,21 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.9.1] - 2026-05-14
+
+### Added
+- **insightfinder_servicenow**: New `department_id` attribute (String, Optional) — ServiceNow department ID to associate with created tickets. Maps to the `departmentId` field in both the POST params and the `configs` JSON returned by the GET API.
+- **insightfinder_project**: Two new optional attributes inside each `json_key_settings` entry:
+  - `service_now_notification_setting` (Boolean, Optional) — when `true`, the key is included in the `serviceNowNotificationSetting` map sent to the `logsummarysettings` API with `selected: true`
+  - `service_now_notification_setting_display_name` (String, Optional) — display name for the ServiceNow notification setting entry; defaults to the `json_key` value when not set
+- **insightfinder_project**: Two new top-level optional attributes for ServiceNow notification format strings:
+  - `service_now_short_description_format` (String, Optional) — short description format string; maps to `serviceNowNotificationAdditionalSetting.shortDescriptionFormat`
+  - `service_now_description_format` (String, Optional) — description format string; maps to `serviceNowNotificationAdditionalSetting.descriptionFormat`
+  - Both fields are read back from the API on refresh; empty strings returned by the API are treated as null to avoid perpetual plan diffs when the fields are not set in config
+
+### Removed
+- **insightfinder_servicenow**: Removed `dampening_period` attribute — this field was not present in the ServiceNow API and had no effect. Use `trigger_window_in_mills` to control the event correlation window.
+
 ## [1.9.0] - 2026-05-12
 
 ### Added

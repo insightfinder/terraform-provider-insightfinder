@@ -56,7 +56,6 @@ type servicenowResourceModel struct {
 	ServiceHost                types.String `tfsdk:"service_host"`
 	Password                   types.String `tfsdk:"password"`
 	Proxy                      types.String `tfsdk:"proxy"`
-	DampeningPeriod            types.Int64  `tfsdk:"dampening_period"`
 	AppID                      types.String `tfsdk:"app_id"`
 	AppKey                     types.String `tfsdk:"app_key"`
 	AuthType                   types.String `tfsdk:"auth_type"`
@@ -70,6 +69,7 @@ type servicenowResourceModel struct {
 	TicketCreatedBySourceKey   types.String `tfsdk:"ticket_created_by_source_key"`
 	TicketCreatedBySourceValue types.String `tfsdk:"ticket_created_by_source_value"`
 	ConfigurationItem          types.String `tfsdk:"configuration_item"`
+	DepartmentID               types.String `tfsdk:"department_id"`
 	ProjectConfigs             types.Map    `tfsdk:"project_configs"`
 	TableMapping               types.Map    `tfsdk:"table_mapping"`
 }
@@ -114,10 +114,6 @@ func (r *servicenowResource) Schema(_ context.Context, _ resource.SchemaRequest,
 				Description: "Proxy server URL (optional).",
 				Optional:    true,
 				Computed:    true,
-			},
-			"dampening_period": schema.Int64Attribute{
-				Description: "Dampening period in seconds.",
-				Required:    true,
 			},
 			"app_id": schema.StringAttribute{
 				Description: "ServiceNow application ID (optional).",
@@ -179,6 +175,10 @@ func (r *servicenowResource) Schema(_ context.Context, _ resource.SchemaRequest,
 			},
 			"configuration_item": schema.StringAttribute{
 				Description: "ServiceNow configuration item (CMDB CI) to associate with created tickets.",
+				Optional:    true,
+			},
+			"department_id": schema.StringAttribute{
+				Description: "ServiceNow department ID to associate with created tickets.",
 				Optional:    true,
 			},
 			"project_configs": schema.MapNestedAttribute{
@@ -335,7 +335,6 @@ func (r *servicenowResource) Create(ctx context.Context, req resource.CreateRequ
 		ServiceHost:                plan.ServiceHost.ValueString(),
 		Password:                   plan.Password.ValueString(),
 		Proxy:                      plan.Proxy.ValueString(),
-		DampeningPeriod:            int(plan.DampeningPeriod.ValueInt64()),
 		AppID:                      plan.AppID.ValueString(),
 		AppKey:                     plan.AppKey.ValueString(),
 		AuthType:                   authType,
@@ -349,6 +348,7 @@ func (r *servicenowResource) Create(ctx context.Context, req resource.CreateRequ
 		TicketCreatedBySourceKey:   plan.TicketCreatedBySourceKey.ValueString(),
 		TicketCreatedBySourceValue: plan.TicketCreatedBySourceValue.ValueString(),
 		ConfigurationItem:          plan.ConfigurationItem.ValueString(),
+		DepartmentID:               plan.DepartmentID.ValueString(),
 		ProjectConfigs:             projectConfigs,
 	}
 
@@ -432,7 +432,6 @@ func (r *servicenowResource) Read(ctx context.Context, req resource.ReadRequest,
 	}
 
 	state.Proxy = types.StringValue(config.Proxy)
-	state.DampeningPeriod = types.Int64Value(int64(config.DampeningPeriod))
 
 	// Resolve system IDs from API to names and store only the names.
 	if len(config.SystemIDs) > 0 {
@@ -514,6 +513,12 @@ func (r *servicenowResource) Read(ctx context.Context, req resource.ReadRequest,
 		// Prior state was ""; API treats "" and null identically — preserve "" to avoid perpetual diff.
 	} else {
 		state.ConfigurationItem = types.StringNull()
+	}
+
+	if config.DepartmentID != "" {
+		state.DepartmentID = types.StringValue(config.DepartmentID)
+	} else {
+		state.DepartmentID = types.StringNull()
 	}
 
 	if len(config.ProjectConfigs) > 0 {
@@ -657,7 +662,6 @@ func (r *servicenowResource) Update(ctx context.Context, req resource.UpdateRequ
 		ServiceHost:                plan.ServiceHost.ValueString(),
 		Password:                   plan.Password.ValueString(),
 		Proxy:                      plan.Proxy.ValueString(),
-		DampeningPeriod:            int(plan.DampeningPeriod.ValueInt64()),
 		AppID:                      appIDValue,
 		AppKey:                     appKeyValue,
 		AuthType:                   authType,
@@ -671,6 +675,7 @@ func (r *servicenowResource) Update(ctx context.Context, req resource.UpdateRequ
 		TicketCreatedBySourceKey:   plan.TicketCreatedBySourceKey.ValueString(),
 		TicketCreatedBySourceValue: plan.TicketCreatedBySourceValue.ValueString(),
 		ConfigurationItem:          plan.ConfigurationItem.ValueString(),
+		DepartmentID:               plan.DepartmentID.ValueString(),
 		ProjectConfigs:             projectConfigs,
 	}
 

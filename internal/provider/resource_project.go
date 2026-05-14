@@ -155,20 +155,22 @@ type projectResourceModel struct {
 	ZoneNameKey                  types.String `tfsdk:"zone_name_key"`
 
 	// Complex object fields (will use types.String for JSON encoding)
-	BaseValueSetting          types.String `tfsdk:"base_value_setting"`
-	CdfSetting                types.String `tfsdk:"cdf_setting"`
-	EmailSetting              types.String `tfsdk:"email_setting"`
-	InstanceGroupingUpdate    types.String `tfsdk:"instance_grouping_update"`
-	LlmEvaluationSetting      types.String `tfsdk:"llm_evaluation_setting"`
-	LogToLogSettingList       types.String `tfsdk:"log_to_log_setting_list"`
-	WebhookHeaderList         types.String `tfsdk:"webhook_header_list"`
-	SharedUsernames           types.String `tfsdk:"shared_usernames"`
-	LogLabelSettings          types.Set    `tfsdk:"log_label_settings"`
-	JsonKeySettings           types.Set    `tfsdk:"json_key_settings"`
-	ProjectServiceNowSettings types.Object `tfsdk:"project_servicenow_settings"`
-	HolidaySettings           types.Set    `tfsdk:"holiday_settings"`
-	L2MSettings               types.Set    `tfsdk:"l2m_settings"`
-	Mode                      types.Int64  `tfsdk:"mode"`
+	BaseValueSetting                 types.String `tfsdk:"base_value_setting"`
+	CdfSetting                       types.String `tfsdk:"cdf_setting"`
+	EmailSetting                     types.String `tfsdk:"email_setting"`
+	InstanceGroupingUpdate           types.String `tfsdk:"instance_grouping_update"`
+	LlmEvaluationSetting             types.String `tfsdk:"llm_evaluation_setting"`
+	LogToLogSettingList              types.String `tfsdk:"log_to_log_setting_list"`
+	WebhookHeaderList                types.String `tfsdk:"webhook_header_list"`
+	SharedUsernames                  types.String `tfsdk:"shared_usernames"`
+	LogLabelSettings                 types.Set    `tfsdk:"log_label_settings"`
+	JsonKeySettings                  types.Set    `tfsdk:"json_key_settings"`
+	ServiceNowShortDescriptionFormat types.String `tfsdk:"service_now_short_description_format"`
+	ServiceNowDescriptionFormat      types.String `tfsdk:"service_now_description_format"`
+	ProjectServiceNowSettings        types.Object `tfsdk:"project_servicenow_settings"`
+	HolidaySettings                  types.Set    `tfsdk:"holiday_settings"`
+	L2MSettings                      types.Set    `tfsdk:"l2m_settings"`
+	Mode                             types.Int64  `tfsdk:"mode"`
 }
 
 type holidaySettingModel struct {
@@ -178,13 +180,15 @@ type holidaySettingModel struct {
 }
 
 type jsonKeySettingModel struct {
-	JsonKey                        types.String `tfsdk:"json_key"`
-	Type                           types.String `tfsdk:"type"`
-	SummarySetting                 types.Bool   `tfsdk:"summary_setting"`
-	MetafieldSetting               types.Bool   `tfsdk:"metafield_setting"`
-	DampeningfieldSetting          types.Bool   `tfsdk:"dampening_field_setting"`
-	NotificationSetting            types.Bool   `tfsdk:"notification_setting"`
-	NotificationSettingDisplayName types.String `tfsdk:"notification_setting_display_name"`
+	JsonKey                                  types.String `tfsdk:"json_key"`
+	Type                                     types.String `tfsdk:"type"`
+	SummarySetting                           types.Bool   `tfsdk:"summary_setting"`
+	MetafieldSetting                         types.Bool   `tfsdk:"metafield_setting"`
+	DampeningfieldSetting                    types.Bool   `tfsdk:"dampening_field_setting"`
+	NotificationSetting                      types.Bool   `tfsdk:"notification_setting"`
+	NotificationSettingDisplayName           types.String `tfsdk:"notification_setting_display_name"`
+	ServiceNowNotificationSetting            types.Bool   `tfsdk:"service_now_notification_setting"`
+	ServiceNowNotificationSettingDisplayName types.String `tfsdk:"service_now_notification_setting_display_name"`
 }
 
 type projectCreationConfigModel struct {
@@ -1003,8 +1007,24 @@ func (r *projectResource) Schema(_ context.Context, _ resource.SchemaRequest, re
 							Description: "Display name for the notification setting entry",
 							Optional:    true,
 						},
+						"service_now_notification_setting": schema.BoolAttribute{
+							Description: "Whether to include this key in the ServiceNow notification settings",
+							Optional:    true,
+						},
+						"service_now_notification_setting_display_name": schema.StringAttribute{
+							Description: "Display name for the ServiceNow notification setting entry",
+							Optional:    true,
+						},
 					},
 				},
+			},
+			"service_now_short_description_format": schema.StringAttribute{
+				Description: "Short description format string for ServiceNow notifications.",
+				Optional:    true,
+			},
+			"service_now_description_format": schema.StringAttribute{
+				Description: "Description format string for ServiceNow notifications.",
+				Optional:    true,
 			},
 			"mode": schema.Int64Attribute{
 				Description: "The process mode for the project (set via logdedicatedmode API).",
@@ -2379,6 +2399,7 @@ func (r *projectResource) Create(ctx context.Context, req resource.CreateRequest
 		var metafieldKeys []string
 		var dampeningFieldKeys []string
 		notificationSettings := make(map[string]client.NotificationSettingEntry)
+		serviceNowNotificationSettings := make(map[string]client.NotificationSettingEntry)
 
 		for _, jsonKeySetting := range configJsonKeys {
 			jsonKeyType := client.JsonKeyType{
@@ -2389,28 +2410,31 @@ func (r *projectResource) Create(ctx context.Context, req resource.CreateRequest
 			}
 			jsonKeysToUpdate = append(jsonKeysToUpdate, jsonKeyType)
 
-			// Track which keys have summary settings enabled
 			if jsonKeySetting.SummarySetting.ValueBool() {
 				summaryKeys = append(summaryKeys, jsonKeySetting.JsonKey.ValueString())
 			}
-
-			// Track which keys have metafield settings enabled
 			if jsonKeySetting.MetafieldSetting.ValueBool() {
 				metafieldKeys = append(metafieldKeys, jsonKeySetting.JsonKey.ValueString())
 			}
-
-			// Track which keys have dampening field settings enabled
 			if jsonKeySetting.DampeningfieldSetting.ValueBool() {
 				dampeningFieldKeys = append(dampeningFieldKeys, jsonKeySetting.JsonKey.ValueString())
 			}
-
-			// Track which keys have notification settings enabled
 			if !jsonKeySetting.NotificationSetting.IsNull() && !jsonKeySetting.NotificationSetting.IsUnknown() && jsonKeySetting.NotificationSetting.ValueBool() {
 				displayName := jsonKeySetting.JsonKey.ValueString()
 				if !jsonKeySetting.NotificationSettingDisplayName.IsNull() && !jsonKeySetting.NotificationSettingDisplayName.IsUnknown() && jsonKeySetting.NotificationSettingDisplayName.ValueString() != "" {
 					displayName = jsonKeySetting.NotificationSettingDisplayName.ValueString()
 				}
 				notificationSettings[jsonKeySetting.JsonKey.ValueString()] = client.NotificationSettingEntry{
+					Selected:    true,
+					DisplayName: displayName,
+				}
+			}
+			if !jsonKeySetting.ServiceNowNotificationSetting.IsNull() && !jsonKeySetting.ServiceNowNotificationSetting.IsUnknown() && jsonKeySetting.ServiceNowNotificationSetting.ValueBool() {
+				displayName := jsonKeySetting.JsonKey.ValueString()
+				if !jsonKeySetting.ServiceNowNotificationSettingDisplayName.IsNull() && !jsonKeySetting.ServiceNowNotificationSettingDisplayName.IsUnknown() && jsonKeySetting.ServiceNowNotificationSettingDisplayName.ValueString() != "" {
+					displayName = jsonKeySetting.ServiceNowNotificationSettingDisplayName.ValueString()
+				}
+				serviceNowNotificationSettings[jsonKeySetting.JsonKey.ValueString()] = client.NotificationSettingEntry{
 					Selected:    true,
 					DisplayName: displayName,
 				}
@@ -2429,8 +2453,13 @@ func (r *projectResource) Create(ctx context.Context, req resource.CreateRequest
 			}
 		}
 
-		// Update summary, metafield, dampening field, and notification settings
-		err := r.client.UpdateJsonKeySummarySettings(plan.ProjectName.ValueString(), summaryKeys, metafieldKeys, dampeningFieldKeys, notificationSettings)
+		// Build ServiceNow additional setting from top-level plan fields
+		snAdditional := &client.ServiceNowNotificationAdditionalSetting{
+			ShortDescriptionFormat: plan.ServiceNowShortDescriptionFormat.ValueString(),
+			DescriptionFormat:      plan.ServiceNowDescriptionFormat.ValueString(),
+		}
+
+		err := r.client.UpdateJsonKeySummarySettings(plan.ProjectName.ValueString(), summaryKeys, metafieldKeys, dampeningFieldKeys, notificationSettings, serviceNowNotificationSettings, snAdditional)
 		if err != nil {
 			resp.Diagnostics.AddError(
 				"Error updating JSON key summary and metafield settings",
@@ -2443,17 +2472,7 @@ func (r *projectResource) Create(ctx context.Context, req resource.CreateRequest
 		plan.JsonKeySettings = config.JsonKeySettings
 	} else {
 		// No JSON key settings in config - set to null
-		plan.JsonKeySettings = types.SetNull(types.ObjectType{
-			AttrTypes: map[string]attr.Type{
-				"json_key":                          types.StringType,
-				"type":                              types.StringType,
-				"summary_setting":                   types.BoolType,
-				"metafield_setting":                 types.BoolType,
-				"dampening_field_setting":           types.BoolType,
-				"notification_setting":              types.BoolType,
-				"notification_setting_display_name": types.StringType,
-			},
-		})
+		plan.JsonKeySettings = types.SetNull(types.ObjectType{AttrTypes: jsonKeySettingAttrTypes()})
 	}
 
 	// Process l2m_settings
@@ -2942,63 +2961,61 @@ func (r *projectResource) Read(ctx context.Context, req resource.ReadRequest, re
 		var jsonKeySettings []jsonKeySettingModel
 		for _, jsonKey := range jsonKeyTypes {
 			setting := jsonKeySettingModel{
-				JsonKey:                        types.StringValue(jsonKey.JsonKey),
-				Type:                           types.StringValue(jsonKey.Type),
-				SummarySetting:                 types.BoolValue(summarySet[jsonKey.JsonKey]),
-				MetafieldSetting:               types.BoolValue(metafieldSet[jsonKey.JsonKey]),
-				DampeningfieldSetting:          types.BoolValue(dampeningFieldSet[jsonKey.JsonKey]),
-				NotificationSetting:            types.BoolNull(),
-				NotificationSettingDisplayName: types.StringNull(),
+				JsonKey:                                  types.StringValue(jsonKey.JsonKey),
+				Type:                                     types.StringValue(jsonKey.Type),
+				SummarySetting:                           types.BoolValue(summarySet[jsonKey.JsonKey]),
+				MetafieldSetting:                         types.BoolValue(metafieldSet[jsonKey.JsonKey]),
+				DampeningfieldSetting:                    types.BoolValue(dampeningFieldSet[jsonKey.JsonKey]),
+				NotificationSetting:                      types.BoolNull(),
+				NotificationSettingDisplayName:           types.StringNull(),
+				ServiceNowNotificationSetting:            types.BoolNull(),
+				ServiceNowNotificationSettingDisplayName: types.StringNull(),
 			}
 			if entry, ok := summarySettingsResp.NotificationSetting[jsonKey.JsonKey]; ok && entry.Selected {
 				setting.NotificationSetting = types.BoolValue(true)
 				setting.NotificationSettingDisplayName = types.StringValue(entry.DisplayName)
 			}
+			if summarySettingsResp.ServiceNowNotificationSetting != nil {
+				if entry, ok := summarySettingsResp.ServiceNowNotificationSetting[jsonKey.JsonKey]; ok && entry.Selected {
+					setting.ServiceNowNotificationSetting = types.BoolValue(true)
+					setting.ServiceNowNotificationSettingDisplayName = types.StringValue(entry.DisplayName)
+				}
+			}
 			jsonKeySettings = append(jsonKeySettings, setting)
+		}
+
+		// Populate top-level ServiceNow additional setting fields; treat empty strings as null
+		// to avoid perpetual diff when the user has not set these fields in config.
+		if s := summarySettingsResp.ServiceNowNotificationAdditionalSetting; s != nil && (s.ShortDescriptionFormat != "" || s.DescriptionFormat != "") {
+			if s.ShortDescriptionFormat != "" {
+				state.ServiceNowShortDescriptionFormat = types.StringValue(s.ShortDescriptionFormat)
+			} else {
+				state.ServiceNowShortDescriptionFormat = types.StringNull()
+			}
+			if s.DescriptionFormat != "" {
+				state.ServiceNowDescriptionFormat = types.StringValue(s.DescriptionFormat)
+			} else {
+				state.ServiceNowDescriptionFormat = types.StringNull()
+			}
+		} else {
+			state.ServiceNowShortDescriptionFormat = types.StringNull()
+			state.ServiceNowDescriptionFormat = types.StringNull()
 		}
 
 		// Convert to types.Set
 		if len(jsonKeySettings) > 0 {
-			setValue, diags := types.SetValueFrom(ctx, types.ObjectType{
-				AttrTypes: map[string]attr.Type{
-					"json_key":                          types.StringType,
-					"type":                              types.StringType,
-					"summary_setting":                   types.BoolType,
-					"metafield_setting":                 types.BoolType,
-					"dampening_field_setting":           types.BoolType,
-					"notification_setting":              types.BoolType,
-					"notification_setting_display_name": types.StringType,
-				},
-			}, jsonKeySettings)
+			setValue, diags := types.SetValueFrom(ctx, types.ObjectType{AttrTypes: jsonKeySettingAttrTypes()}, jsonKeySettings)
 			resp.Diagnostics.Append(diags...)
 			if !resp.Diagnostics.HasError() {
 				state.JsonKeySettings = setValue
 			}
 		} else {
-			state.JsonKeySettings = types.SetNull(types.ObjectType{
-				AttrTypes: map[string]attr.Type{
-					"json_key":                          types.StringType,
-					"type":                              types.StringType,
-					"summary_setting":                   types.BoolType,
-					"metafield_setting":                 types.BoolType,
-					"dampening_field_setting":           types.BoolType,
-					"notification_setting":              types.BoolType,
-					"notification_setting_display_name": types.StringType,
-				},
-			})
+			state.JsonKeySettings = types.SetNull(types.ObjectType{AttrTypes: jsonKeySettingAttrTypes()})
 		}
 	} else {
-		state.JsonKeySettings = types.SetNull(types.ObjectType{
-			AttrTypes: map[string]attr.Type{
-				"json_key":                          types.StringType,
-				"type":                              types.StringType,
-				"summary_setting":                   types.BoolType,
-				"metafield_setting":                 types.BoolType,
-				"dampening_field_setting":           types.BoolType,
-				"notification_setting":              types.BoolType,
-				"notification_setting_display_name": types.StringType,
-			},
-		})
+		state.JsonKeySettings = types.SetNull(types.ObjectType{AttrTypes: jsonKeySettingAttrTypes()})
+		state.ServiceNowShortDescriptionFormat = types.StringNull()
+		state.ServiceNowDescriptionFormat = types.StringNull()
 	}
 
 	// Read L2M settings from API
@@ -3678,6 +3695,7 @@ func (r *projectResource) Update(ctx context.Context, req resource.UpdateRequest
 		var metafieldKeys []string
 		var dampeningFieldKeys []string
 		notificationSettings := make(map[string]client.NotificationSettingEntry)
+		serviceNowNotificationSettings := make(map[string]client.NotificationSettingEntry)
 
 		for _, jsonKeySetting := range configJsonKeys {
 			jsonKeyType := client.JsonKeyType{
@@ -3688,28 +3706,31 @@ func (r *projectResource) Update(ctx context.Context, req resource.UpdateRequest
 			}
 			jsonKeysToUpdate = append(jsonKeysToUpdate, jsonKeyType)
 
-			// Track which keys have summary settings enabled
 			if jsonKeySetting.SummarySetting.ValueBool() {
 				summaryKeys = append(summaryKeys, jsonKeySetting.JsonKey.ValueString())
 			}
-
-			// Track which keys have metafield settings enabled
 			if jsonKeySetting.MetafieldSetting.ValueBool() {
 				metafieldKeys = append(metafieldKeys, jsonKeySetting.JsonKey.ValueString())
 			}
-
-			// Track which keys have dampening field settings enabled
 			if jsonKeySetting.DampeningfieldSetting.ValueBool() {
 				dampeningFieldKeys = append(dampeningFieldKeys, jsonKeySetting.JsonKey.ValueString())
 			}
-
-			// Track which keys have notification settings enabled
 			if !jsonKeySetting.NotificationSetting.IsNull() && !jsonKeySetting.NotificationSetting.IsUnknown() && jsonKeySetting.NotificationSetting.ValueBool() {
 				displayName := jsonKeySetting.JsonKey.ValueString()
 				if !jsonKeySetting.NotificationSettingDisplayName.IsNull() && !jsonKeySetting.NotificationSettingDisplayName.IsUnknown() && jsonKeySetting.NotificationSettingDisplayName.ValueString() != "" {
 					displayName = jsonKeySetting.NotificationSettingDisplayName.ValueString()
 				}
 				notificationSettings[jsonKeySetting.JsonKey.ValueString()] = client.NotificationSettingEntry{
+					Selected:    true,
+					DisplayName: displayName,
+				}
+			}
+			if !jsonKeySetting.ServiceNowNotificationSetting.IsNull() && !jsonKeySetting.ServiceNowNotificationSetting.IsUnknown() && jsonKeySetting.ServiceNowNotificationSetting.ValueBool() {
+				displayName := jsonKeySetting.JsonKey.ValueString()
+				if !jsonKeySetting.ServiceNowNotificationSettingDisplayName.IsNull() && !jsonKeySetting.ServiceNowNotificationSettingDisplayName.IsUnknown() && jsonKeySetting.ServiceNowNotificationSettingDisplayName.ValueString() != "" {
+					displayName = jsonKeySetting.ServiceNowNotificationSettingDisplayName.ValueString()
+				}
+				serviceNowNotificationSettings[jsonKeySetting.JsonKey.ValueString()] = client.NotificationSettingEntry{
 					Selected:    true,
 					DisplayName: displayName,
 				}
@@ -3728,8 +3749,13 @@ func (r *projectResource) Update(ctx context.Context, req resource.UpdateRequest
 			}
 		}
 
-		// Update summary, metafield, dampening field, and notification settings
-		err := r.client.UpdateJsonKeySummarySettings(plan.ProjectName.ValueString(), summaryKeys, metafieldKeys, dampeningFieldKeys, notificationSettings)
+		// Build ServiceNow additional setting from top-level plan fields
+		snAdditional := &client.ServiceNowNotificationAdditionalSetting{
+			ShortDescriptionFormat: plan.ServiceNowShortDescriptionFormat.ValueString(),
+			DescriptionFormat:      plan.ServiceNowDescriptionFormat.ValueString(),
+		}
+
+		err := r.client.UpdateJsonKeySummarySettings(plan.ProjectName.ValueString(), summaryKeys, metafieldKeys, dampeningFieldKeys, notificationSettings, serviceNowNotificationSettings, snAdditional)
 		if err != nil {
 			resp.Diagnostics.AddError(
 				"Error updating JSON key summary and metafield settings",
@@ -3741,17 +3767,7 @@ func (r *projectResource) Update(ctx context.Context, req resource.UpdateRequest
 		plan.JsonKeySettings = config.JsonKeySettings
 	} else {
 		// No JSON key settings in config - set to null
-		plan.JsonKeySettings = types.SetNull(types.ObjectType{
-			AttrTypes: map[string]attr.Type{
-				"json_key":                          types.StringType,
-				"type":                              types.StringType,
-				"summary_setting":                   types.BoolType,
-				"metafield_setting":                 types.BoolType,
-				"dampening_field_setting":           types.BoolType,
-				"notification_setting":              types.BoolType,
-				"notification_setting_display_name": types.StringType,
-			},
-		})
+		plan.JsonKeySettings = types.SetNull(types.ObjectType{AttrTypes: jsonKeySettingAttrTypes()})
 	}
 
 	// Process l2m_settings
@@ -4272,4 +4288,18 @@ func l2mBoolPtrToTF(p *bool) types.Bool {
 		return types.BoolNull()
 	}
 	return types.BoolValue(*p)
+}
+
+func jsonKeySettingAttrTypes() map[string]attr.Type {
+	return map[string]attr.Type{
+		"json_key":                          types.StringType,
+		"type":                              types.StringType,
+		"summary_setting":                   types.BoolType,
+		"metafield_setting":                 types.BoolType,
+		"dampening_field_setting":           types.BoolType,
+		"notification_setting":              types.BoolType,
+		"notification_setting_display_name": types.StringType,
+		"service_now_notification_setting":  types.BoolType,
+		"service_now_notification_setting_display_name": types.StringType,
+	}
 }

@@ -15,14 +15,13 @@ Manages ServiceNow integration configuration. Allows InsightFinder to create and
 
 ```terraform
 resource "insightfinder_servicenow" "basic" {
-  account          = "admin"
-  service_host     = "https://dev12345.service-now.com/"
-  password         = var.servicenow_password
-  dampening_period = 3600000
-  system_names     = ["Production"]
-  options          = ["Root Cause"]
-  content_option   = ["SUMMARY"]
-  auth_type        = "basic"
+  account        = "admin"
+  service_host   = "https://dev12345.service-now.com/"
+  password       = var.servicenow_password
+  system_names   = ["Production"]
+  options        = ["Root Cause"]
+  content_option = ["SUMMARY"]
+  auth_type      = "basic"
 }
 ```
 
@@ -30,16 +29,15 @@ resource "insightfinder_servicenow" "basic" {
 
 ```terraform
 resource "insightfinder_servicenow" "oauth" {
-  account          = "admin"
-  service_host     = "https://company.service-now.com/"
-  password         = var.servicenow_password
-  dampening_period = 7200000
-  app_id           = var.servicenow_app_id
-  app_key          = var.servicenow_app_key
-  system_names     = ["Production", "Staging"]
-  options          = ["Root Cause", "Prediction"]
-  content_option   = ["SUMMARY", "DESCRIPTION"]
-  auth_type        = "oauth"
+  account        = "admin"
+  service_host   = "https://company.service-now.com/"
+  password       = var.servicenow_password
+  app_id         = var.servicenow_app_id
+  app_key        = var.servicenow_app_key
+  system_names   = ["Production", "Staging"]
+  options        = ["Root Cause", "Prediction"]
+  content_option = ["SUMMARY", "DESCRIPTION"]
+  auth_type      = "oauth"
 }
 ```
 
@@ -47,11 +45,10 @@ resource "insightfinder_servicenow" "oauth" {
 
 ```terraform
 resource "insightfinder_servicenow" "full" {
-  account          = "serviceaccount"
-  service_host     = "https://company.service-now.com/"
-  password         = var.servicenow_password
-  dampening_period = 3600000
-  system_names     = [
+  account      = "serviceaccount"
+  service_host = "https://company.service-now.com/"
+  password     = var.servicenow_password
+  system_names = [
     "Production-US",
     "Production-EU",
     "Production-APAC"
@@ -79,6 +76,9 @@ resource "insightfinder_servicenow" "full" {
 
   # Associate created tickets with a CMDB configuration item
   configuration_item = "My-Server-CI"
+
+  # Associate tickets with a ServiceNow department
+  department_id = "9c777c281bd335906f2ca797b04bcb9e"
 
   # Per-project ticket creation, update, and consolidation settings
   project_configs = {
@@ -113,7 +113,6 @@ resource "insightfinder_servicenow" "full" {
 - `account` (String) ServiceNow account username. Forces replacement on change.
 - `service_host` (String) ServiceNow instance URL (e.g., `https://dev12345.service-now.com/`). Forces replacement on change.
 - `password` (String, Sensitive) ServiceNow account password.
-- `dampening_period` (Number) Dampening period in milliseconds (e.g., `3600000` for 1 hour).
 - `options` (Set of String) Integration options (e.g., `Root Cause`, `Prediction`).
 - `content_option` (Set of String) Incident content fields (e.g., `SUMMARY`, `DESCRIPTION`, `IMPACT`).
 
@@ -131,6 +130,7 @@ resource "insightfinder_servicenow" "full" {
 - `ticket_created_by_source_key` (String) ServiceNow field key used to filter when a ticket is created (e.g., `activity_source`).
 - `ticket_created_by_source_value` (String) Value matched against `ticket_created_by_source_key` to determine whether to create a ticket.
 - `configuration_item` (String) ServiceNow CMDB configuration item to associate with created tickets.
+- `department_id` (String) ServiceNow department ID to associate with created tickets.
 - `project_configs` (Map of Object) Per-project ServiceNow ticket configuration. Each key is an InsightFinder project name, and the value is an object with:
   - `enable_ticket_creation` (Boolean, Computed) Whether to enable ticket creation for this project. Defaults to `false`.
   - `enable_ticket_update` (Boolean, Computed) Whether to enable ticket updates for this project. Defaults to `false`.
@@ -156,5 +156,4 @@ terraform import insightfinder_servicenow.example admin@https://dev12345.service
 - When using OAuth authentication, both `app_id` and `app_key` are required.
 - `options` and `content_option` are sets — order does not matter and will not cause plan drift.
 - System names are automatically resolved to system IDs internally.
-- The `dampening_period` prevents duplicate incidents within the specified time window.
 - `table_mapping` sends each `[projectName, tableName]` pair to a dedicated PUT endpoint.
