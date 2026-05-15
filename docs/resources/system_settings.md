@@ -70,8 +70,10 @@ resource "insightfinder_system_settings" "example" {
     incident_detection_email = ""
     root_cause_email        = ""
 
-    incident_count_threshold = jsonencode({})
-    assignment_map           = jsonencode({})
+    incident_count_threshold               = jsonencode({})
+    assignment_map                         = jsonencode({})
+    component_level_incident_consolidation = true
+    enabled_consolidation_algorithms       = ["derivedIncidents", "rcaChain", "contentBased", "metricInstanceTimestamp"]
 
     system_down_notification = {
       enable_system_down_email_alert = true
@@ -141,6 +143,8 @@ resource "insightfinder_system_settings" "with_dampening_windows" {
     incident_dampening_window              = 14400000
     incident_count_threshold               = jsonencode({ "my-llm-project@admin" = 3 })
     assignment_map                         = jsonencode({})
+    component_level_incident_consolidation = false
+    enabled_consolidation_algorithms       = ["derivedIncidents", "contentBased"]
 
     project_level_dampening_windows = [
       {
@@ -422,6 +426,13 @@ All attributes are Optional and Computed (server defaults are used when omitted)
 | `incident_count_threshold` | String | JSON-encoded map of `"ProjectName@username"` keys to integer thresholds. An incident alert is suppressed until the count exceeds the threshold for that project. Example: `jsonencode({"MyProject@admin": 5})`. Use `jsonencode({})` for no thresholds. |
 | `assignment_map` | String | JSON-encoded map of zone/component keys to assignee lists. Each value is an object with `jiraAssignees`, `emailAssignees`, and `serviceNowAssignees` arrays. Use `jsonencode({})` for no assignments. |
 
+#### Incident Consolidation
+
+| Attribute | Type | Description |
+|-----------|------|-------------|
+| `component_level_incident_consolidation` | Boolean | Enable component-level incident consolidation. When enabled, incidents from different components are consolidated before alerting. Maps to `componentLevelIncidentConsolidation` in the health view API. |
+| `enabled_consolidation_algorithms` | List of String | Consolidation algorithms to apply. Supported values: `"derivedIncidents"`, `"rcaChain"`, `"contentBased"`, `"metricInstanceTimestamp"`. Example: `["derivedIncidents", "rcaChain", "contentBased", "metricInstanceTimestamp"]`. |
+
 #### System Down Notification
 
 Configures system-down alerts via a dedicated API (`/api/external/v2/systemdownsetting`). All attributes are Optional and Computed.
@@ -507,4 +518,5 @@ After import, run `terraform plan` to review which computed fields will be popul
 - **`satellite_system_set`**: Must be provided as a JSON-encoded string using `jsonencode(...)`. The value is semantically compared during plan/apply to avoid spurious diffs caused by JSON key ordering.
 - **`incident_count_threshold` and `assignment_map`**: Must be provided as JSON-encoded strings using `jsonencode(...)`. These fields are stored as serialized JSON in Terraform state and compared semantically to avoid key-ordering diffs.
 - **`project_level_dampening_windows`**: Optional and Computed list. When omitted, the server value is preserved in state. When set (even to `[]`), the declared list replaces any existing rules on the server. `source_customer` and `target_customer` default to the provider username when not specified.
+- **`enabled_consolidation_algorithms`**: Optional and Computed list of strings. Supported algorithm names are `"derivedIncidents"`, `"rcaChain"`, `"contentBased"`, and `"metricInstanceTimestamp"`. When omitted, the server value is preserved in state.
 - **API endpoints**: `knowledgebase_settings` maps to two separate API calls — `SetGlobalKBSetting` and `SetIncidentPredictionSetting`. `notifications_settings` maps to `SetHealthViewSetting`. `miscellaneous_settings` maps to two calls on `/api/external/v1/systemframework` — `operation=hideOrOrderOrLongTerm` for `healthview_longterm`, and `operation=systemFrameworkSetting` for the remaining three fields. All four fields are read via a single `GET /api/external/v1/systemframework` call.

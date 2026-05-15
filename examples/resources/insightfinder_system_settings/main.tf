@@ -70,6 +70,8 @@ resource "insightfinder_system_settings" "with_notifications" {
     alert_frequency                        = 0
     incident_count_threshold               = jsonencode({})
     assignment_map                         = jsonencode({})
+    component_level_incident_consolidation = true
+    enabled_consolidation_algorithms       = ["derivedIncidents", "rcaChain", "contentBased", "metricInstanceTimestamp"]
 
     # System down notifications (via dedicated /api/external/v2/systemdownsetting API)
     system_down_notification = {
@@ -176,6 +178,8 @@ resource "insightfinder_system_settings" "full" {
     alert_frequency                        = 0
     incident_count_threshold               = jsonencode({})
     assignment_map                         = jsonencode({})
+    component_level_incident_consolidation = true
+    enabled_consolidation_algorithms       = ["derivedIncidents", "rcaChain", "contentBased", "metricInstanceTimestamp"]
 
     system_down_notification = {
       enable_system_down_email_alert = true
