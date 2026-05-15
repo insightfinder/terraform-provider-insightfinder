@@ -3921,7 +3921,7 @@ func normalizeJSON(jsonStr string) string {
 // convertLogLabelsToState converts API log labels response to Terraform state model
 // Compares labels in sorted order (order-independent) but preserves original order in state
 func convertLogLabelsToState(apiLabels map[string]string, existingState []logLabelSettingModel) []logLabelSettingModel {
-	var result []logLabelSettingModel
+	result := make([]logLabelSettingModel, 0)
 
 	// Map from API field names to label types
 	apiFieldToLabelType := map[string]string{

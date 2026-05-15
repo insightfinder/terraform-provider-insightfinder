@@ -83,39 +83,41 @@ type HealthViewKey struct {
 
 // HealthViewSetting represents the health view / notifications settings for a system
 type HealthViewSetting struct {
-	Key                                HealthViewKey                 `json:"key"`
-	Order                              int64                         `json:"order"`
-	HideFlag                           bool                          `json:"hideFlag"`
-	AggregationInterval                int64                         `json:"aggregationInterval"`
-	PredictionEmail                    string                        `json:"predictionEmail"`
-	AlertHealthScore                   float64                       `json:"alertHealthScore"`
-	LastAlertTimestamp                 int64                         `json:"lastAlertTimestamp"`
-	EnableSplunkExport                 bool                          `json:"enableSplunkExport"`
-	MetricTotal99Percentile            float64                       `json:"metricTotal99Percentile"`
-	LogTotal99Percentile               float64                       `json:"logTotal99Percentile"`
-	SplunkExportTimestamp              int64                         `json:"splunkExportTimestamp"`
-	AlertFrequency                     int64                         `json:"alertFrequency"`
-	EmailDampeningPeriod               int64                         `json:"emailDampeningPeriod"`
-	AlertsEmailDampeningPeriod         int64                         `json:"alertsEmailDampeningPeriod"`
-	PredictionEmailDampeningPeriod     int64                         `json:"predictionEmailDampeningPeriod"`
-	EnableSystemDownEmailAlert         bool                          `json:"enableSystemDownEmailAlert"`
-	OnlySendWithRCA                    bool                          `json:"onlySendWithRCA"`
-	EnableIncidentPredictionEmailAlert bool                          `json:"enableIncidentPredictionEmailAlert"`
-	EnableIncidentDetectionEmailAlert  bool                          `json:"enableIncidentDetectionEmailAlert"`
-	EnableAlertsEmail                  bool                          `json:"enableAlertsEmail"`
-	EnableHealthEmailAlert             bool                          `json:"enableHealthEmailAlert"`
-	AlertEmail                         string                        `json:"alertEmail"`
-	HealthAlertEmail                   string                        `json:"healthAlertEmail"`
-	IncidentDetectionEmail             string                        `json:"incidentDetectionEmail"`
-	EnableRootCauseEmailAlert          bool                          `json:"enableRootCauseEmailAlert"`
-	RootCauseEmail                     string                        `json:"rootCauseEmail"`
-	IncidentCountThreshold             map[string]int64              `json:"incidentCountThreshold,omitempty"`
-	AssignmentMap                      map[string]any                `json:"assignmentMap"`
-	IncidentDampeningWindow            int64                         `json:"incidentDampeningWindow"`
-	TicketOpenTime                     int64                         `json:"ticketOpenTime"`
-	ProjectLevelDampeningWindows       []ProjectLevelDampeningWindow `json:"projectLevelDampeningWindows"`
-	SystemID                           string                        `json:"systemId,omitempty"`
-	ID                                 string                        `json:"id,omitempty"`
+	Key                                 HealthViewKey                 `json:"key"`
+	Order                               int64                         `json:"order"`
+	HideFlag                            bool                          `json:"hideFlag"`
+	AggregationInterval                 int64                         `json:"aggregationInterval"`
+	PredictionEmail                     string                        `json:"predictionEmail"`
+	AlertHealthScore                    float64                       `json:"alertHealthScore"`
+	LastAlertTimestamp                  int64                         `json:"lastAlertTimestamp"`
+	EnableSplunkExport                  bool                          `json:"enableSplunkExport"`
+	MetricTotal99Percentile             float64                       `json:"metricTotal99Percentile"`
+	LogTotal99Percentile                float64                       `json:"logTotal99Percentile"`
+	SplunkExportTimestamp               int64                         `json:"splunkExportTimestamp"`
+	AlertFrequency                      int64                         `json:"alertFrequency"`
+	EmailDampeningPeriod                int64                         `json:"emailDampeningPeriod"`
+	AlertsEmailDampeningPeriod          int64                         `json:"alertsEmailDampeningPeriod"`
+	PredictionEmailDampeningPeriod      int64                         `json:"predictionEmailDampeningPeriod"`
+	EnableSystemDownEmailAlert          bool                          `json:"enableSystemDownEmailAlert"`
+	OnlySendWithRCA                     bool                          `json:"onlySendWithRCA"`
+	EnableIncidentPredictionEmailAlert  bool                          `json:"enableIncidentPredictionEmailAlert"`
+	EnableIncidentDetectionEmailAlert   bool                          `json:"enableIncidentDetectionEmailAlert"`
+	EnableAlertsEmail                   bool                          `json:"enableAlertsEmail"`
+	EnableHealthEmailAlert              bool                          `json:"enableHealthEmailAlert"`
+	AlertEmail                          string                        `json:"alertEmail"`
+	HealthAlertEmail                    string                        `json:"healthAlertEmail"`
+	IncidentDetectionEmail              string                        `json:"incidentDetectionEmail"`
+	EnableRootCauseEmailAlert           bool                          `json:"enableRootCauseEmailAlert"`
+	RootCauseEmail                      string                        `json:"rootCauseEmail"`
+	IncidentCountThreshold              map[string]int64              `json:"incidentCountThreshold,omitempty"`
+	AssignmentMap                       map[string]any                `json:"assignmentMap"`
+	IncidentDampeningWindow             int64                         `json:"incidentDampeningWindow"`
+	TicketOpenTime                      int64                         `json:"ticketOpenTime"`
+	ComponentLevelIncidentConsolidation bool                          `json:"componentLevelIncidentConsolidation"`
+	EnabledConsolidationAlgorithms      []string                      `json:"enabledConsolidationAlgorithms"`
+	ProjectLevelDampeningWindows        []ProjectLevelDampeningWindow `json:"projectLevelDampeningWindows"`
+	SystemID                            string                        `json:"systemId,omitempty"`
+	ID                                  string                        `json:"id,omitempty"`
 }
 
 // ProjectLevelDampeningWindow represents a project-level dampening window entry
@@ -916,6 +918,8 @@ func (c *Client) SetHealthViewSetting(systemID string, updates *HealthViewSettin
 	current.RootCauseEmail = updates.RootCauseEmail
 	current.IncidentDampeningWindow = updates.IncidentDampeningWindow
 	current.TicketOpenTime = updates.TicketOpenTime
+	current.ComponentLevelIncidentConsolidation = updates.ComponentLevelIncidentConsolidation
+	current.EnabledConsolidationAlgorithms = updates.EnabledConsolidationAlgorithms
 	current.ProjectLevelDampeningWindows = updates.ProjectLevelDampeningWindows
 	current.SystemID = systemID
 	current.ID = systemID

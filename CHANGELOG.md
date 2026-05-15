@@ -5,6 +5,16 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.9.2] - 2026-05-15
+
+### Added
+- **insightfinder_system_settings**: Two new optional attributes inside `notifications_settings`:
+  - `component_level_incident_consolidation` (Boolean, Optional, Computed) — enable component-level incident consolidation. Maps to `componentLevelIncidentConsolidation` in the health view setting API.
+  - `enabled_consolidation_algorithms` (List of String, Optional, Computed) — list of consolidation algorithms to enable (e.g. `["derivedIncidents", "rcaChain", "contentBased", "metricInstanceTimestamp"]`). Maps to `enabledConsolidationAlgorithms` in the health view setting API.
+
+### Fixed
+- **insightfinder_project**: `log_label_settings = []` no longer causes a perpetual plan diff after the first apply. Previously, clearing all log labels caused the provider to write a null set to state (instead of an empty set), which Terraform interpreted as a missing value on every subsequent plan.
+
 ## [1.9.1] - 2026-05-14
 
 ### Added

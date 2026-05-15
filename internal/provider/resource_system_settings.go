@@ -83,31 +83,33 @@ type knowledgebaseSettingsModel struct {
 
 // notificationsSettingsModel holds notification/health view settings
 type notificationsSettingsModel struct {
-	Order                              types.Int64   `tfsdk:"order"`
-	HideFlag                           types.Bool    `tfsdk:"hide_flag"`
-	AggregationInterval                types.Int64   `tfsdk:"aggregation_interval"`
-	EnableSplunkExport                 types.Bool    `tfsdk:"enable_splunk_export"`
-	IncidentCountThreshold             types.String  `tfsdk:"incident_count_threshold"`
-	AssignmentMap                      types.String  `tfsdk:"assignment_map"`
-	PredictionEmail                    types.String  `tfsdk:"prediction_email"`
-	AlertHealthScore                   types.Float64 `tfsdk:"alert_health_score"`
-	AlertFrequency                     types.Int64   `tfsdk:"alert_frequency"`
-	EmailDampeningPeriod               types.Int64   `tfsdk:"email_dampening_period"`
-	AlertsEmailDampeningPeriod         types.Int64   `tfsdk:"alerts_email_dampening_period"`
-	PredictionEmailDampeningPeriod     types.Int64   `tfsdk:"prediction_email_dampening_period"`
-	EnableSystemDownEmailAlert         types.Bool    `tfsdk:"enable_system_down_email_alert"`
-	OnlySendWithRCA                    types.Bool    `tfsdk:"only_send_with_rca"`
-	EnableIncidentPredictionEmailAlert types.Bool    `tfsdk:"enable_incident_prediction_email_alert"`
-	EnableIncidentDetectionEmailAlert  types.Bool    `tfsdk:"enable_incident_detection_email_alert"`
-	EnableAlertsEmail                  types.Bool    `tfsdk:"enable_alerts_email"`
-	EnableHealthEmailAlert             types.Bool    `tfsdk:"enable_health_email_alert"`
-	AlertEmail                         types.String  `tfsdk:"alert_email"`
-	HealthAlertEmail                   types.String  `tfsdk:"health_alert_email"`
-	IncidentDetectionEmail             types.String  `tfsdk:"incident_detection_email"`
-	EnableRootCauseEmailAlert          types.Bool    `tfsdk:"enable_root_cause_email_alert"`
-	RootCauseEmail                     types.String  `tfsdk:"root_cause_email"`
-	IncidentDampeningWindow            types.Int64   `tfsdk:"incident_dampening_window"`
-	TicketOpenTime                     types.Int64   `tfsdk:"ticket_open_time"`
+	Order                               types.Int64   `tfsdk:"order"`
+	HideFlag                            types.Bool    `tfsdk:"hide_flag"`
+	AggregationInterval                 types.Int64   `tfsdk:"aggregation_interval"`
+	EnableSplunkExport                  types.Bool    `tfsdk:"enable_splunk_export"`
+	IncidentCountThreshold              types.String  `tfsdk:"incident_count_threshold"`
+	AssignmentMap                       types.String  `tfsdk:"assignment_map"`
+	PredictionEmail                     types.String  `tfsdk:"prediction_email"`
+	AlertHealthScore                    types.Float64 `tfsdk:"alert_health_score"`
+	AlertFrequency                      types.Int64   `tfsdk:"alert_frequency"`
+	EmailDampeningPeriod                types.Int64   `tfsdk:"email_dampening_period"`
+	AlertsEmailDampeningPeriod          types.Int64   `tfsdk:"alerts_email_dampening_period"`
+	PredictionEmailDampeningPeriod      types.Int64   `tfsdk:"prediction_email_dampening_period"`
+	EnableSystemDownEmailAlert          types.Bool    `tfsdk:"enable_system_down_email_alert"`
+	OnlySendWithRCA                     types.Bool    `tfsdk:"only_send_with_rca"`
+	EnableIncidentPredictionEmailAlert  types.Bool    `tfsdk:"enable_incident_prediction_email_alert"`
+	EnableIncidentDetectionEmailAlert   types.Bool    `tfsdk:"enable_incident_detection_email_alert"`
+	EnableAlertsEmail                   types.Bool    `tfsdk:"enable_alerts_email"`
+	EnableHealthEmailAlert              types.Bool    `tfsdk:"enable_health_email_alert"`
+	AlertEmail                          types.String  `tfsdk:"alert_email"`
+	HealthAlertEmail                    types.String  `tfsdk:"health_alert_email"`
+	IncidentDetectionEmail              types.String  `tfsdk:"incident_detection_email"`
+	EnableRootCauseEmailAlert           types.Bool    `tfsdk:"enable_root_cause_email_alert"`
+	RootCauseEmail                      types.String  `tfsdk:"root_cause_email"`
+	IncidentDampeningWindow             types.Int64   `tfsdk:"incident_dampening_window"`
+	TicketOpenTime                      types.Int64   `tfsdk:"ticket_open_time"`
+	ComponentLevelIncidentConsolidation types.Bool    `tfsdk:"component_level_incident_consolidation"`
+	EnabledConsolidationAlgorithms      types.List    `tfsdk:"enabled_consolidation_algorithms"`
 	// New notification settings
 	SystemDownNotification       *systemDownNotificationModel       `tfsdk:"system_down_notification"`
 	DailyReportNotification      *insightsReportNotificationModel   `tfsdk:"daily_report_notification"`
@@ -530,6 +532,20 @@ func (r *systemSettingsResource) Schema(_ context.Context, _ resource.SchemaRequ
 							int64planmodifier.UseStateForUnknown(),
 						},
 					},
+					"component_level_incident_consolidation": schema.BoolAttribute{
+						Description: "Enable component-level incident consolidation.",
+						Optional:    true,
+						Computed:    true,
+						PlanModifiers: []planmodifier.Bool{
+							boolplanmodifier.UseStateForUnknown(),
+						},
+					},
+					"enabled_consolidation_algorithms": schema.ListAttribute{
+						Description: "List of consolidation algorithms to enable (e.g. [\"derivedIncidents\", \"rcaChain\", \"contentBased\", \"metricInstanceTimestamp\"]).",
+						ElementType: types.StringType,
+						Optional:    true,
+						Computed:    true,
+					},
 					"system_down_notification": schema.SingleNestedAttribute{
 						Description: "System down notification settings (dedicated API at /api/external/v2/systemdownsetting).",
 						Optional:    true,
@@ -940,29 +956,31 @@ func (r *systemSettingsResource) applyKnowledgebaseSettings(_ context.Context, s
 // applyNotificationsSettings writes notifications settings to the API
 func (r *systemSettingsResource) applyNotificationsSettings(_ context.Context, systemID string, m *notificationsSettingsModel) error {
 	updates := &client.HealthViewSetting{
-		Order:                              m.Order.ValueInt64(),
-		HideFlag:                           m.HideFlag.ValueBool(),
-		AggregationInterval:                m.AggregationInterval.ValueInt64(),
-		EnableSplunkExport:                 m.EnableSplunkExport.ValueBool(),
-		PredictionEmail:                    m.PredictionEmail.ValueString(),
-		AlertHealthScore:                   m.AlertHealthScore.ValueFloat64(),
-		AlertFrequency:                     m.AlertFrequency.ValueInt64(),
-		EmailDampeningPeriod:               m.EmailDampeningPeriod.ValueInt64(),
-		AlertsEmailDampeningPeriod:         m.AlertsEmailDampeningPeriod.ValueInt64(),
-		PredictionEmailDampeningPeriod:     m.PredictionEmailDampeningPeriod.ValueInt64(),
-		EnableSystemDownEmailAlert:         m.EnableSystemDownEmailAlert.ValueBool(),
-		OnlySendWithRCA:                    m.OnlySendWithRCA.ValueBool(),
-		EnableIncidentPredictionEmailAlert: m.EnableIncidentPredictionEmailAlert.ValueBool(),
-		EnableIncidentDetectionEmailAlert:  m.EnableIncidentDetectionEmailAlert.ValueBool(),
-		EnableAlertsEmail:                  m.EnableAlertsEmail.ValueBool(),
-		EnableHealthEmailAlert:             m.EnableHealthEmailAlert.ValueBool(),
-		AlertEmail:                         m.AlertEmail.ValueString(),
-		HealthAlertEmail:                   m.HealthAlertEmail.ValueString(),
-		IncidentDetectionEmail:             m.IncidentDetectionEmail.ValueString(),
-		EnableRootCauseEmailAlert:          m.EnableRootCauseEmailAlert.ValueBool(),
-		RootCauseEmail:                     m.RootCauseEmail.ValueString(),
-		IncidentDampeningWindow:            m.IncidentDampeningWindow.ValueInt64(),
-		TicketOpenTime:                     m.TicketOpenTime.ValueInt64(),
+		Order:                               m.Order.ValueInt64(),
+		HideFlag:                            m.HideFlag.ValueBool(),
+		AggregationInterval:                 m.AggregationInterval.ValueInt64(),
+		EnableSplunkExport:                  m.EnableSplunkExport.ValueBool(),
+		PredictionEmail:                     m.PredictionEmail.ValueString(),
+		AlertHealthScore:                    m.AlertHealthScore.ValueFloat64(),
+		AlertFrequency:                      m.AlertFrequency.ValueInt64(),
+		EmailDampeningPeriod:                m.EmailDampeningPeriod.ValueInt64(),
+		AlertsEmailDampeningPeriod:          m.AlertsEmailDampeningPeriod.ValueInt64(),
+		PredictionEmailDampeningPeriod:      m.PredictionEmailDampeningPeriod.ValueInt64(),
+		EnableSystemDownEmailAlert:          m.EnableSystemDownEmailAlert.ValueBool(),
+		OnlySendWithRCA:                     m.OnlySendWithRCA.ValueBool(),
+		EnableIncidentPredictionEmailAlert:  m.EnableIncidentPredictionEmailAlert.ValueBool(),
+		EnableIncidentDetectionEmailAlert:   m.EnableIncidentDetectionEmailAlert.ValueBool(),
+		EnableAlertsEmail:                   m.EnableAlertsEmail.ValueBool(),
+		EnableHealthEmailAlert:              m.EnableHealthEmailAlert.ValueBool(),
+		AlertEmail:                          m.AlertEmail.ValueString(),
+		HealthAlertEmail:                    m.HealthAlertEmail.ValueString(),
+		IncidentDetectionEmail:              m.IncidentDetectionEmail.ValueString(),
+		EnableRootCauseEmailAlert:           m.EnableRootCauseEmailAlert.ValueBool(),
+		RootCauseEmail:                      m.RootCauseEmail.ValueString(),
+		IncidentDampeningWindow:             m.IncidentDampeningWindow.ValueInt64(),
+		TicketOpenTime:                      m.TicketOpenTime.ValueInt64(),
+		ComponentLevelIncidentConsolidation: m.ComponentLevelIncidentConsolidation.ValueBool(),
+		EnabledConsolidationAlgorithms:      typesListToStrings(m.EnabledConsolidationAlgorithms),
 	}
 
 	if v := m.IncidentCountThreshold.ValueString(); v != "" && v != "null" {
@@ -1193,6 +1211,8 @@ func (r *systemSettingsResource) readIntoModel(_ context.Context, systemID strin
 			m.NotificationsSettings.RootCauseEmail = types.StringValue(hvSetting.RootCauseEmail)
 			m.NotificationsSettings.IncidentDampeningWindow = types.Int64Value(hvSetting.IncidentDampeningWindow)
 			m.NotificationsSettings.TicketOpenTime = types.Int64Value(hvSetting.TicketOpenTime)
+			m.NotificationsSettings.ComponentLevelIncidentConsolidation = types.BoolValue(hvSetting.ComponentLevelIncidentConsolidation)
+			m.NotificationsSettings.EnabledConsolidationAlgorithms = stringsToTypesList(hvSetting.EnabledConsolidationAlgorithms)
 
 			if m.NotificationsSettings.ProjectLevelDampeningWindows != nil {
 				newWindows := make([]projectLevelDampeningWindowModel, 0, len(hvSetting.ProjectLevelDampeningWindows))
