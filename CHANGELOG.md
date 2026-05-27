@@ -5,6 +5,11 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.9.3] - 2026-05-27
+
+### Fixed
+- **insightfinder_project**: `data_filter` and `metric_name` were silently ignored in `json_parsers` entries when `json_flag = true`. These fields were missing from the `L2MJsonParser` client struct, the Terraform schema, and both the write and read conversion functions. They are now correctly serialized into the `regexInfo` payload sent to the API and read back on refresh, resolving both the missing values and the absent plan diff.
+
 ## [1.9.2] - 2026-05-15
 
 ### Added

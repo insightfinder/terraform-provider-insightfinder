@@ -246,7 +246,9 @@ type l2mJsonParserModel struct {
 	ContainerNameKey     types.String `tfsdk:"container_name_key"`
 	TimestampKey         types.String `tfsdk:"timestamp_key"`
 	TimestampFormat      types.String `tfsdk:"timestamp_format"`
+	DataFilter           types.String `tfsdk:"data_filter"`
 	Operation            types.Int64  `tfsdk:"operation"`
+	MetricName           types.String `tfsdk:"metric_name"`
 	AdditionalMetricName types.String `tfsdk:"additional_metric_name"`
 	AggregationMode      types.Int64  `tfsdk:"aggregation_mode"`
 	GroupingByComponent  types.Bool   `tfsdk:"grouping_by_component"`
@@ -294,7 +296,9 @@ var l2mJsonParserAttrTypes = map[string]attr.Type{
 	"container_name_key":     types.StringType,
 	"timestamp_key":          types.StringType,
 	"timestamp_format":       types.StringType,
+	"data_filter":            types.StringType,
 	"operation":              types.Int64Type,
+	"metric_name":            types.StringType,
 	"additional_metric_name": types.StringType,
 	"aggregation_mode":       types.Int64Type,
 	"grouping_by_component":  types.BoolType,
@@ -1166,8 +1170,18 @@ func (r *projectResource) Schema(_ context.Context, _ resource.SchemaRequest, re
 										Optional:    true,
 										Computed:    true,
 									},
+									"data_filter": schema.StringAttribute{
+										Description: "Filter expression applied to log data before parsing.",
+										Optional:    true,
+										Computed:    true,
+									},
 									"operation": schema.Int64Attribute{
 										Description: "Parser operation type.",
+										Optional:    true,
+										Computed:    true,
+									},
+									"metric_name": schema.StringAttribute{
+										Description: "Name for the derived metric.",
 										Optional:    true,
 										Computed:    true,
 									},
@@ -4134,7 +4148,9 @@ func l2mSettingModelToClient(ctx context.Context, m l2mSettingModel) (*client.L2
 				ContainerNameKey:     jm.ContainerNameKey.ValueStringPointer(),
 				TimestampKey:         jm.TimestampKey.ValueStringPointer(),
 				TimestampFormat:      jm.TimestampFormat.ValueStringPointer(),
+				DataFilter:           jm.DataFilter.ValueStringPointer(),
 				Operation:            l2mInt64ToIntPtr(jm.Operation),
+				MetricName:           jm.MetricName.ValueStringPointer(),
 				AdditionalMetricName: jm.AdditionalMetricName.ValueStringPointer(),
 				AggregationMode:      l2mInt64ToIntPtr(jm.AggregationMode),
 				GroupingByComponent:  jm.GroupingByComponent.ValueBoolPointer(),
@@ -4214,7 +4230,9 @@ func l2mSettingModelFromClient(ctx context.Context, s client.L2MSetting) (l2mSet
 				ContainerNameKey:     l2mStrPtrToTF(jp.ContainerNameKey),
 				TimestampKey:         l2mStrPtrToTF(jp.TimestampKey),
 				TimestampFormat:      l2mStrPtrToTF(jp.TimestampFormat),
+				DataFilter:           l2mStrPtrToTF(jp.DataFilter),
 				Operation:            l2mIntPtrToTF(jp.Operation),
+				MetricName:           l2mStrPtrToTF(jp.MetricName),
 				AdditionalMetricName: l2mStrPtrToTF(jp.AdditionalMetricName),
 				AggregationMode:      l2mIntPtrToTF(jp.AggregationMode),
 				GroupingByComponent:  l2mBoolPtrToTF(jp.GroupingByComponent),
