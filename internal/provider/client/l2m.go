@@ -43,7 +43,9 @@ type L2MJsonParser struct {
 	ContainerNameKey     *string               `json:"containerNameKey,omitempty"`
 	TimestampKey         *string               `json:"timestampKey,omitempty"`
 	TimestampFormat      *string               `json:"timestampFormat,omitempty"`
+	DataFilter           *string               `json:"dataFilter,omitempty"`
 	Operation            *int                  `json:"operation,omitempty"`
+	MetricName           *string               `json:"metricName,omitempty"`
 	AdditionalMetricName *string               `json:"additionalMetricName,omitempty"`
 	AggregationMode      *int                  `json:"aggregationMode,omitempty"`
 	GroupingByComponent  *bool                 `json:"groupingByComponent,omitempty"`

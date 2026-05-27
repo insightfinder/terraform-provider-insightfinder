@@ -270,6 +270,15 @@ resource "insightfinder_project" "l2m_example" {
       enable_mapping      = false
       json_parsers = [
         {
+          metric_value_key      = ""
+          data_filter           = "alert->error->message=.*(?i)EFS.*"
+          operation             = 1
+          metric_name           = "EFS Error"
+          aggregation_mode      = 0
+          aggregation_period    = 0
+          grouping_by_component = false
+        },
+        {
           metric_value_key     = "alert->core->value"
           instance_name_key    = "alert->asset->asset_id"
           timestamp_key        = "alert->timestamp"
@@ -398,6 +407,8 @@ resource "insightfinder_project" "loki_logs" {
     - `container_name_key` (String, Optional) JSON path key for the container name
     - `timestamp_key` (String, Optional) JSON path key for the timestamp
     - `timestamp_format` (String, Optional) Format string for the timestamp value
+    - `data_filter` (String, Optional) Filter expression applied to log data before parsing (e.g., `alert->error->message=.*(?i)EFS.*`)
+    - `metric_name` (String, Optional) Static name for the derived metric
     - `additional_metric_name` (String, Optional) JSON path key for an additional metric name
     - `operation` (Number, Optional) Aggregation operation type
     - `aggregation_mode` (Number, Optional) Aggregation mode
