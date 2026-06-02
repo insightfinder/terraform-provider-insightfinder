@@ -46,38 +46,6 @@ func ignoreStringDrift() planmodifier.String {
 	return useStateIfConfigNullModifier{desc: "Preserves state value when config is null, suppressing API drift."}
 }
 
-type useStateIfConfigNullBoolModifier struct{ desc string }
-
-func (m useStateIfConfigNullBoolModifier) Description(_ context.Context) string { return m.desc }
-func (m useStateIfConfigNullBoolModifier) MarkdownDescription(_ context.Context) string {
-	return m.desc
-}
-func (m useStateIfConfigNullBoolModifier) PlanModifyBool(_ context.Context, req planmodifier.BoolRequest, resp *planmodifier.BoolResponse) {
-	if req.ConfigValue.IsNull() && !req.StateValue.IsNull() && !req.StateValue.IsUnknown() {
-		resp.PlanValue = req.StateValue
-	}
-}
-
-func ignoreBoolDrift() planmodifier.Bool {
-	return useStateIfConfigNullBoolModifier{desc: "Preserves state value when config is null, suppressing API drift."}
-}
-
-type useStateIfConfigNullInt64Modifier struct{ desc string }
-
-func (m useStateIfConfigNullInt64Modifier) Description(_ context.Context) string { return m.desc }
-func (m useStateIfConfigNullInt64Modifier) MarkdownDescription(_ context.Context) string {
-	return m.desc
-}
-func (m useStateIfConfigNullInt64Modifier) PlanModifyInt64(_ context.Context, req planmodifier.Int64Request, resp *planmodifier.Int64Response) {
-	if req.ConfigValue.IsNull() && !req.StateValue.IsNull() && !req.StateValue.IsUnknown() {
-		resp.PlanValue = req.StateValue
-	}
-}
-
-func ignoreInt64Drift() planmodifier.Int64 {
-	return useStateIfConfigNullInt64Modifier{desc: "Preserves state value when config is null, suppressing API drift."}
-}
-
 type useStateIfConfigNullListModifier struct{ desc string }
 
 func (m useStateIfConfigNullListModifier) Description(_ context.Context) string { return m.desc }
