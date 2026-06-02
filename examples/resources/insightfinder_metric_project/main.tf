@@ -171,9 +171,8 @@ resource "insightfinder_metric_project" "with_metric_config" {
   sampling_interval = 60
   retention_time    = 90
 
-  metric_configurations = [
-    {
-      metric_name                  = "cpu_usage"
+  metric_configurations = {
+    "cpu_usage" = {
       escalate_incident_components = ["web-server-01", "web-server-02"]
       ignored_components           = ["test-instance"]
       metric_alert_settings = [
@@ -211,14 +210,13 @@ resource "insightfinder_metric_project" "with_metric_config" {
           anomaly_gap_tolerance_duration          = 60000
         }
       ]
-    },
-    {
-      metric_name                  = "memory_usage"
+    }
+    "memory_usage" = {
       escalate_incident_components = []
       ignored_components           = []
       metric_alert_settings        = []
     }
-  ]
+  }
 }
 
 variable "username" {

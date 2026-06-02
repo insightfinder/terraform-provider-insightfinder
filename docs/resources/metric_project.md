@@ -149,54 +149,52 @@ resource "insightfinder_metric_project" "with_metric_config" {
   sampling_interval = 60
   retention_time    = 90
 
-  metric_configurations = [
-    {
-      metric_name                  = "cpu_usage"
+  metric_configurations = {
+    "cpu_usage" = {
       escalate_incident_components = ["web-server-01", "web-server-02"]
       ignored_components           = ["test-instance"]
       metric_alert_settings = [
         {
-          component_name                       = ""
-          threshold_alert_lower_bound          = ""
-          threshold_alert_upper_bound          = "95"
-          threshold_alert_lower_bound_negative = ""
-          threshold_alert_upper_bound_negative = ""
-          threshold_no_alert_lower_bound       = ""
-          threshold_no_alert_upper_bound       = "80"
+          component_name                          = ""
+          threshold_alert_lower_bound             = ""
+          threshold_alert_upper_bound             = "95"
+          threshold_alert_lower_bound_negative    = ""
+          threshold_alert_upper_bound_negative    = ""
+          threshold_no_alert_lower_bound          = ""
+          threshold_no_alert_upper_bound          = "80"
           threshold_no_alert_lower_bound_negative = ""
           threshold_no_alert_upper_bound_negative = ""
-          incident_alert_lower_bound           = ""
-          incident_alert_upper_bound           = "99"
-          incident_alert_lower_bound_negative  = ""
-          incident_alert_upper_bound_negative  = ""
-          incident_no_alert_lower_bound        = ""
-          incident_no_alert_upper_bound        = "90"
-          incident_no_alert_lower_bound_negative = ""
-          incident_no_alert_upper_bound_negative = ""
-          is_kpi                               = true
-          is_flapping_result_only              = false
-          incident_duration_threshold          = 300000
-          detection_type                       = "positive"
-          c_value_override                     = null
-          high_c_value_override                = null
-          pattern_name_higher                  = "High CPU"
-          pattern_name_lower                   = ""
-          metric_type                          = "CPU Utilization"
-          fill_zero                            = false
-          rouge_value                          = null
-          enable_baseline_near_constance       = false
-          compute_difference                   = false
-          anomaly_gap_tolerance_duration       = 60000
+          incident_alert_lower_bound              = ""
+          incident_alert_upper_bound              = "99"
+          incident_alert_lower_bound_negative     = ""
+          incident_alert_upper_bound_negative     = ""
+          incident_no_alert_lower_bound           = ""
+          incident_no_alert_upper_bound           = "90"
+          incident_no_alert_lower_bound_negative  = ""
+          incident_no_alert_upper_bound_negative  = ""
+          is_kpi                                  = true
+          is_flapping_result_only                 = false
+          incident_duration_threshold             = 300000
+          detection_type                          = "positive"
+          c_value_override                        = null
+          high_c_value_override                   = null
+          pattern_name_higher                     = "High CPU"
+          pattern_name_lower                      = ""
+          metric_type                             = "CPU Utilization"
+          fill_zero                               = false
+          rouge_value                             = null
+          enable_baseline_near_constance          = false
+          compute_difference                      = false
+          anomaly_gap_tolerance_duration          = 60000
         }
       ]
-    },
-    {
-      metric_name                  = "memory_usage"
+    }
+    "memory_usage" = {
       escalate_incident_components = []
       ignored_components           = []
       metric_alert_settings        = []
     }
-  ]
+  }
 }
 ```
 
@@ -371,8 +369,7 @@ resource "insightfinder_metric_project" "alerted_metrics" {
 
 ### Optional — Metric Configurations
 
-- `metric_configurations` (List of Objects, Computed) Per-metric alert threshold settings and component operation rules. Each entry manages one named metric:
-  - `metric_name` (String, Required) The exact metric name to configure.
+- `metric_configurations` (Map of Objects) Per-metric alert threshold settings and component operation rules, **keyed by metric name**. Each map key is the exact metric name (e.g., `"cpu_usage"`); the value object contains:
   - `escalate_incident_components` (List of String, Optional) Component names that escalate incidents for this metric.
   - `ignored_components` (List of String, Optional) Component names excluded from anomaly detection for this metric.
   - `metric_alert_settings` (List of Objects, Optional) Per-component (or global) alert threshold rows. Each row has:
@@ -393,20 +390,20 @@ resource "insightfinder_metric_project" "alerted_metrics" {
     - `incident_no_alert_upper_bound` (String) Upper threshold above which no incident alert is raised.
     - `incident_no_alert_lower_bound_negative` (String) Negative direction lower no-incident-alert threshold.
     - `incident_no_alert_upper_bound_negative` (String) Negative direction upper no-incident-alert threshold.
-    - `is_kpi` (Boolean) Mark this metric as a KPI metric.
-    - `is_flapping_result_only` (Boolean) Only report flapping anomalies.
-    - `incident_duration_threshold` (Number) Minimum incident duration in milliseconds before alerting.
-    - `detection_type` (String) Detection direction: `positive`, `negative`, or `both`. Defaults to `positive` when left empty.
-    - `c_value_override` (Number, Optional, Computed) Per-metric override for the C value anomaly sensitivity. When set, overrides the project-level `c_value` for this metric only. Null means use the project default.
-    - `high_c_value_override` (Number, Optional, Computed) Per-metric override for the high-ratio C value anomaly sensitivity. When set, overrides the project-level `high_ratio_c_value` for this metric only. Null means use the project default.
-    - `pattern_name_higher` (String) Pattern name for values above threshold.
-    - `pattern_name_lower` (String) Pattern name for values below threshold.
-    - `metric_type` (String) Metric data type (e.g., `Unknown`, `CPU Utilization`, `Network Utilization`).
-    - `fill_zero` (Boolean) Fill missing data points with zero.
-    - `rouge_value` (String) Raw rouge value string from the API (e.g., `{"l":NaN,"s":NaN}`). Set to empty string to clear.
-    - `enable_baseline_near_constance` (Boolean) Enable near-constance baseline detection.
-    - `compute_difference` (Boolean) Compute derivative (difference) of this metric before detection.
-    - `anomaly_gap_tolerance_duration` (Number) Anomaly gap tolerance in milliseconds. Internally converted to a count using the project `sampling_interval` before being sent to the API.
+    - `is_kpi` (Boolean, Optional) Mark this metric as a KPI metric.
+    - `is_flapping_result_only` (Boolean, Optional) Only report flapping anomalies.
+    - `incident_duration_threshold` (Number, Optional) Minimum incident duration in milliseconds before alerting.
+    - `detection_type` (String, Optional) Detection direction: `positive`, `negative`, or `both`.
+    - `c_value_override` (Number, Optional, Computed) Per-metric override for the C value anomaly sensitivity. Null means use the project default.
+    - `high_c_value_override` (Number, Optional, Computed) Per-metric override for the high-ratio C value anomaly sensitivity. Null means use the project default.
+    - `pattern_name_higher` (String, Optional) Pattern name for values above threshold.
+    - `pattern_name_lower` (String, Optional) Pattern name for values below threshold.
+    - `metric_type` (String, Optional) Metric data type (e.g., `Unknown`, `CPU Utilization`, `Network Utilization`).
+    - `fill_zero` (Boolean, Optional, Computed) Fill missing data points with zero.
+    - `rouge_value` (String, Optional) Raw rouge value string from the API (e.g., `{"l":NaN,"s":NaN}`). Set to empty string to clear.
+    - `enable_baseline_near_constance` (Boolean, Optional) Enable near-constance baseline detection.
+    - `compute_difference` (Boolean, Optional) Compute derivative (difference) of this metric before detection.
+    - `anomaly_gap_tolerance_duration` (Number, Optional, Computed) Anomaly gap tolerance in milliseconds. Internally converted to a count using the project `sampling_interval` before being sent to the API.
 
 ### Read-Only
 
