@@ -46,38 +46,6 @@ func ignoreStringDrift() planmodifier.String {
 	return useStateIfConfigNullModifier{desc: "Preserves state value when config is null, suppressing API drift."}
 }
 
-type useStateIfConfigNullBoolModifier struct{ desc string }
-
-func (m useStateIfConfigNullBoolModifier) Description(_ context.Context) string { return m.desc }
-func (m useStateIfConfigNullBoolModifier) MarkdownDescription(_ context.Context) string {
-	return m.desc
-}
-func (m useStateIfConfigNullBoolModifier) PlanModifyBool(_ context.Context, req planmodifier.BoolRequest, resp *planmodifier.BoolResponse) {
-	if req.ConfigValue.IsNull() && !req.StateValue.IsNull() && !req.StateValue.IsUnknown() {
-		resp.PlanValue = req.StateValue
-	}
-}
-
-func ignoreBoolDrift() planmodifier.Bool {
-	return useStateIfConfigNullBoolModifier{desc: "Preserves state value when config is null, suppressing API drift."}
-}
-
-type useStateIfConfigNullInt64Modifier struct{ desc string }
-
-func (m useStateIfConfigNullInt64Modifier) Description(_ context.Context) string { return m.desc }
-func (m useStateIfConfigNullInt64Modifier) MarkdownDescription(_ context.Context) string {
-	return m.desc
-}
-func (m useStateIfConfigNullInt64Modifier) PlanModifyInt64(_ context.Context, req planmodifier.Int64Request, resp *planmodifier.Int64Response) {
-	if req.ConfigValue.IsNull() && !req.StateValue.IsNull() && !req.StateValue.IsUnknown() {
-		resp.PlanValue = req.StateValue
-	}
-}
-
-func ignoreInt64Drift() planmodifier.Int64 {
-	return useStateIfConfigNullInt64Modifier{desc: "Preserves state value when config is null, suppressing API drift."}
-}
-
 type useStateIfConfigNullListModifier struct{ desc string }
 
 func (m useStateIfConfigNullListModifier) Description(_ context.Context) string { return m.desc }
@@ -205,7 +173,7 @@ type metricProjectResourceModel struct {
 	HolidaySettings types.List `tfsdk:"holiday_settings"`
 
 	// Metric configurations (per-metric alert thresholds + component operations)
-	MetricConfigurations types.List `tfsdk:"metric_configurations"`
+	MetricConfigurations types.Map `tfsdk:"metric_configurations"`
 }
 
 // metricAlertSettingModel maps one entry in metric_alert_settings.
@@ -243,12 +211,21 @@ type metricAlertSettingModel struct {
 	AnomalyGapToleranceDuration        types.Int64  `tfsdk:"anomaly_gap_tolerance_duration"`
 }
 
-// metricConfigurationModel maps one entry in metric_configurations.
+// metricConfigurationModel is the internal representation of one metric_configurations entry.
+// MetricName holds the map key; used internally and not exposed to tfsdk directly.
 type metricConfigurationModel struct {
-	MetricName                 types.String `tfsdk:"metric_name"`
-	EscalateIncidentComponents types.List   `tfsdk:"escalate_incident_components"` // list of strings
-	IgnoredComponents          types.List   `tfsdk:"ignored_components"`           // list of strings
-	MetricAlertSettings        types.List   `tfsdk:"metric_alert_settings"`        // list of metricAlertSettingModel
+	MetricName                 types.String
+	EscalateIncidentComponents types.List // list of strings
+	IgnoredComponents          types.List // list of strings
+	MetricAlertSettings        types.List // list of metricAlertSettingModel
+}
+
+// metricConfigurationValueModel is the tfsdk-facing value type for metric_configurations map entries.
+// The map key is the metric_name.
+type metricConfigurationValueModel struct {
+	EscalateIncidentComponents types.List `tfsdk:"escalate_incident_components"`
+	IgnoredComponents          types.List `tfsdk:"ignored_components"`
+	MetricAlertSettings        types.List `tfsdk:"metric_alert_settings"`
 }
 
 type metricProjectCreationConfigModel struct {
@@ -295,14 +272,56 @@ func metricAlertSettingAttrTypes() map[string]attr.Type {
 	}
 }
 
-// metricConfigurationAttrTypes returns the attr.Type map for a metricConfigurationModel object.
-func metricConfigurationAttrTypes() map[string]attr.Type {
+// metricConfigurationValueAttrTypes returns the attr.Type map for a metricConfigurationValueModel
+// (the map value; metric_name is the map key and not repeated here).
+func metricConfigurationValueAttrTypes() map[string]attr.Type {
 	return map[string]attr.Type{
-		"metric_name":                  types.StringType,
 		"escalate_incident_components": types.ListType{ElemType: types.StringType},
 		"ignored_components":           types.ListType{ElemType: types.StringType},
 		"metric_alert_settings":        types.ListType{ElemType: types.ObjectType{AttrTypes: metricAlertSettingAttrTypes()}},
 	}
+}
+
+// metricConfigsFromMap extracts the metric_configurations map from state into the internal slice.
+func metricConfigsFromMap(ctx context.Context, m types.Map) ([]metricConfigurationModel, diag.Diagnostics) {
+	var diags diag.Diagnostics
+	rawMap := make(map[string]metricConfigurationValueModel)
+	diags.Append(m.ElementsAs(ctx, &rawMap, false)...)
+	if diags.HasError() {
+		return nil, diags
+	}
+	result := make([]metricConfigurationModel, 0, len(rawMap))
+	for k, v := range rawMap {
+		result = append(result, metricConfigurationModel{
+			MetricName:                 types.StringValue(k),
+			EscalateIncidentComponents: v.EscalateIncidentComponents,
+			IgnoredComponents:          v.IgnoredComponents,
+			MetricAlertSettings:        v.MetricAlertSettings,
+		})
+	}
+	return result, diags
+}
+
+// metricConfigsToMap converts the internal slice back to a types.Map for state storage.
+func metricConfigsToMap(ctx context.Context, configs []metricConfigurationModel) (types.Map, diag.Diagnostics) {
+	var diags diag.Diagnostics
+	elemType := types.ObjectType{AttrTypes: metricConfigurationValueAttrTypes()}
+	elements := make(map[string]attr.Value, len(configs))
+	for _, c := range configs {
+		objVal, d := types.ObjectValueFrom(ctx, metricConfigurationValueAttrTypes(), metricConfigurationValueModel{
+			EscalateIncidentComponents: c.EscalateIncidentComponents,
+			IgnoredComponents:          c.IgnoredComponents,
+			MetricAlertSettings:        c.MetricAlertSettings,
+		})
+		diags.Append(d...)
+		if diags.HasError() {
+			return types.MapNull(elemType), diags
+		}
+		elements[c.MetricName.ValueString()] = objVal
+	}
+	mapVal, d := types.MapValue(elemType, elements)
+	diags.Append(d...)
+	return mapVal, diags
 }
 
 func (r *metricProjectResource) Metadata(_ context.Context, req resource.MetadataRequest, resp *resource.MetadataResponse) {
@@ -782,16 +801,11 @@ func (r *metricProjectResource) Schema(_ context.Context, _ resource.SchemaReque
 					},
 				},
 			},
-			"metric_configurations": schema.ListNestedAttribute{
-				Description: "Per-metric alert threshold settings and component escalation/ignored configurations.",
+			"metric_configurations": schema.MapNestedAttribute{
+				Description: "Per-metric alert threshold and component configurations, keyed by metric name.",
 				Optional:    true,
-				Computed:    false,
 				NestedObject: schema.NestedAttributeObject{
 					Attributes: map[string]schema.Attribute{
-						"metric_name": schema.StringAttribute{
-							Description: "The metric name (e.g., 'txMcs').",
-							Required:    true,
-						},
 						"escalate_incident_components": schema.ListAttribute{
 							Description:   "Components for which incidents are escalated. Use ['Global_<hash>'] to select all.",
 							ElementType:   types.StringType,
@@ -830,31 +844,24 @@ func (r *metricProjectResource) Schema(_ context.Context, _ resource.SchemaReque
 									"incident_no_alert_lower_bound_negative":  schema.StringAttribute{Description: "Incident no-alert lower bound negative.", Optional: true, Computed: true},
 									"incident_no_alert_upper_bound_negative":  schema.StringAttribute{Description: "Incident no-alert upper bound negative.", Optional: true, Computed: true},
 									"is_kpi":                                  schema.BoolAttribute{Description: "Whether this metric is a KPI.", Optional: true, Computed: true},
-									"is_flapping_result_only":                 schema.BoolAttribute{Description: "Whether to report flapping results only.", Optional: true, Computed: true, PlanModifiers: []planmodifier.Bool{ignoreBoolDrift()}},
-									"incident_duration_threshold":             schema.Int64Attribute{Description: "Minimum incident duration (ms) to trigger.", Optional: true, Computed: true, PlanModifiers: []planmodifier.Int64{ignoreInt64Drift()}},
-									"detection_type": schema.StringAttribute{
-										Description: "Detection direction: 'positive', 'negative', or 'both'.",
-										Optional:    true,
-										Computed:    true,
-										PlanModifiers: []planmodifier.String{
-											stringplanmodifier.UseStateForUnknown(),
-											ignoreStringDrift(),
-										},
-									},
+									"is_flapping_result_only":                 schema.BoolAttribute{Description: "Whether to report flapping results only.", Optional: true},
+									"incident_duration_threshold":             schema.Int64Attribute{Description: "Minimum incident duration (ms) to trigger.", Optional: true},
+									"detection_type":                          schema.StringAttribute{Description: "Detection direction: 'positive', 'negative', or 'both'.", Optional: true},
 									"c_value_override": schema.Int64Attribute{
 										Description: "Override for the C value anomaly sensitivity. Null means use project default.",
 										Optional:    true,
-										Computed:    false,
 									},
 									"high_c_value_override": schema.Int64Attribute{
 										Description: "Override for the high-ratio C value anomaly sensitivity. Null means use project default.",
 										Optional:    true,
-										Computed:    false,
 									},
-									"pattern_name_higher": schema.StringAttribute{Description: "Pattern name for higher anomalies.", Optional: true, Computed: true, PlanModifiers: []planmodifier.String{ignoreStringDrift()}},
-									"pattern_name_lower":  schema.StringAttribute{Description: "Pattern name for lower anomalies.", Optional: true, Computed: true, PlanModifiers: []planmodifier.String{ignoreStringDrift()}},
-									"metric_type":         schema.StringAttribute{Description: "Metric type classification (e.g., 'Unknown', 'CPU Utilization').", Optional: true, Computed: true, PlanModifiers: []planmodifier.String{ignoreStringDrift()}},
-									"fill_zero":           schema.BoolAttribute{Description: "Fill missing data with zero.", Optional: true, Computed: true},
+									"pattern_name_higher":            schema.StringAttribute{Description: "Pattern name for higher anomalies.", Optional: true},
+									"pattern_name_lower":             schema.StringAttribute{Description: "Pattern name for lower anomalies.", Optional: true},
+									"metric_type":                    schema.StringAttribute{Description: "Metric type classification (e.g., 'Unknown', 'CPU Utilization').", Optional: true},
+									"fill_zero":                      schema.BoolAttribute{Description: "Fill missing data with zero.", Optional: true, Computed: true},
+									"enable_baseline_near_constance": schema.BoolAttribute{Description: "Enable baseline near constance detection.", Optional: true},
+									"compute_difference":             schema.BoolAttribute{Description: "Compute difference for this metric.", Optional: true},
+									"anomaly_gap_tolerance_duration": schema.Int64Attribute{Description: "Anomaly gap tolerance duration in milliseconds.", Optional: true, Computed: true},
 									"rouge_value": schema.StringAttribute{
 										Description: "Rouge value as raw JSON string from API (e.g., '{\"l\":NaN,\"s\":NaN}'). Null to disable.",
 										Optional:    true,
@@ -864,9 +871,6 @@ func (r *metricProjectResource) Schema(_ context.Context, _ resource.SchemaReque
 											ignoreStringDrift(),
 										},
 									},
-									"enable_baseline_near_constance": schema.BoolAttribute{Description: "Enable baseline near constance detection.", Optional: true, Computed: true, PlanModifiers: []planmodifier.Bool{ignoreBoolDrift()}},
-									"compute_difference":             schema.BoolAttribute{Description: "Compute difference for this metric.", Optional: true, Computed: true, PlanModifiers: []planmodifier.Bool{ignoreBoolDrift()}},
-									"anomaly_gap_tolerance_duration": schema.Int64Attribute{Description: "Anomaly gap tolerance duration in milliseconds.", Optional: true, Computed: true},
 								},
 							},
 						},
@@ -1561,9 +1565,8 @@ func (r *metricProjectResource) Create(ctx context.Context, req resource.CreateR
 
 	// Process metric_configurations
 	if !config.MetricConfigurations.IsNull() && !config.MetricConfigurations.IsUnknown() {
-		var metricConfigs []metricConfigurationModel
-		diags = config.MetricConfigurations.ElementsAs(ctx, &metricConfigs, false)
-		resp.Diagnostics.Append(diags...)
+		metricConfigs, mcDiags := metricConfigsFromMap(ctx, config.MetricConfigurations)
+		resp.Diagnostics.Append(mcDiags...)
 		if resp.Diagnostics.HasError() {
 			return
 		}
@@ -1580,14 +1583,14 @@ func (r *metricProjectResource) Create(ctx context.Context, req resource.CreateR
 		if resp.Diagnostics.HasError() {
 			return
 		}
-		setVal, d := types.ListValueFrom(ctx, types.ObjectType{AttrTypes: metricConfigurationAttrTypes()}, normalizedConfigs)
+		setVal, d := metricConfigsToMap(ctx, normalizedConfigs)
 		resp.Diagnostics.Append(d...)
 		if resp.Diagnostics.HasError() {
 			return
 		}
 		plan.MetricConfigurations = setVal
 	} else {
-		plan.MetricConfigurations = types.ListNull(types.ObjectType{AttrTypes: metricConfigurationAttrTypes()})
+		plan.MetricConfigurations = types.MapNull(types.ObjectType{AttrTypes: metricConfigurationValueAttrTypes()})
 	}
 
 	plan.SystemName = config.SystemName
@@ -1701,23 +1704,21 @@ func (r *metricProjectResource) Read(ctx context.Context, req resource.ReadReque
 	}
 
 	// Read metric_configurations from API (only for metrics already tracked in state)
-	// Disabled: metric_configurations is no longer Computed, so we preserve state as-is.
-	// if !state.MetricConfigurations.IsNull() && !state.MetricConfigurations.IsUnknown() {
-	// 	var existingConfigs []metricConfigurationModel
-	// 	diags = state.MetricConfigurations.ElementsAs(ctx, &existingConfigs, false)
-	// 	resp.Diagnostics.Append(diags...)
-	// 	if !resp.Diagnostics.HasError() {
-	// 		updatedConfigs, readDiags := readMetricConfigurationsFromAPI(ctx, r.client, state.ProjectName.ValueString(), existingConfigs)
-	// 		resp.Diagnostics.Append(readDiags...)
-	// 		if !resp.Diagnostics.HasError() && len(updatedConfigs) > 0 {
-	// 			setVal, d := types.ListValueFrom(ctx, types.ObjectType{AttrTypes: metricConfigurationAttrTypes()}, updatedConfigs)
-	// 			resp.Diagnostics.Append(d...)
-	// 			if !resp.Diagnostics.HasError() {
-	// 				state.MetricConfigurations = setVal
-	// 			}
-	// 		}
-	// 	}
-	// }
+	if !state.MetricConfigurations.IsNull() && !state.MetricConfigurations.IsUnknown() {
+		existingConfigs, mcDiags := metricConfigsFromMap(ctx, state.MetricConfigurations)
+		resp.Diagnostics.Append(mcDiags...)
+		if !resp.Diagnostics.HasError() {
+			updatedConfigs, readDiags := readMetricConfigurationsFromAPI(ctx, r.client, state.ProjectName.ValueString(), existingConfigs)
+			resp.Diagnostics.Append(readDiags...)
+			if !resp.Diagnostics.HasError() && len(updatedConfigs) > 0 {
+				setVal, d := metricConfigsToMap(ctx, updatedConfigs)
+				resp.Diagnostics.Append(d...)
+				if !resp.Diagnostics.HasError() {
+					state.MetricConfigurations = setVal
+				}
+			}
+		}
+	}
 
 	diags = resp.State.Set(ctx, &state)
 	resp.Diagnostics.Append(diags...)
@@ -1864,9 +1865,8 @@ func (r *metricProjectResource) Update(ctx context.Context, req resource.UpdateR
 
 	// Process metric_configurations
 	if !config.MetricConfigurations.IsNull() && !config.MetricConfigurations.IsUnknown() {
-		var metricConfigs []metricConfigurationModel
-		diags = config.MetricConfigurations.ElementsAs(ctx, &metricConfigs, false)
-		resp.Diagnostics.Append(diags...)
+		metricConfigs, mcDiags := metricConfigsFromMap(ctx, config.MetricConfigurations)
+		resp.Diagnostics.Append(mcDiags...)
 		if resp.Diagnostics.HasError() {
 			return
 		}
@@ -1883,14 +1883,14 @@ func (r *metricProjectResource) Update(ctx context.Context, req resource.UpdateR
 		if resp.Diagnostics.HasError() {
 			return
 		}
-		setVal, d := types.ListValueFrom(ctx, types.ObjectType{AttrTypes: metricConfigurationAttrTypes()}, normalizedConfigs)
+		setVal, d := metricConfigsToMap(ctx, normalizedConfigs)
 		resp.Diagnostics.Append(d...)
 		if resp.Diagnostics.HasError() {
 			return
 		}
 		plan.MetricConfigurations = setVal
 	} else {
-		plan.MetricConfigurations = types.ListNull(types.ObjectType{AttrTypes: metricConfigurationAttrTypes()})
+		plan.MetricConfigurations = types.MapNull(types.ObjectType{AttrTypes: metricConfigurationValueAttrTypes()})
 	}
 
 	plan.SystemName = config.SystemName
@@ -2037,8 +2037,6 @@ func buildSingleMetricAlertSettingPost(metricName string, s metricAlertSettingMo
 
 // readMetricConfigurationsFromAPI reads current metric configuration state from the API
 // for all metrics listed in existingConfigs.
-//
-//nolint:unused
 func readMetricConfigurationsFromAPI(ctx context.Context, c *client.Client, projectName string, existingConfigs []metricConfigurationModel) ([]metricConfigurationModel, diag.Diagnostics) {
 	var diags diag.Diagnostics
 	if len(existingConfigs) == 0 {
@@ -2125,8 +2123,6 @@ func readMetricConfigurationsFromAPI(ctx context.Context, c *client.Client, proj
 // freshly-read model back to null. This prevents perpetual diffs when the API returns
 // server-side defaults (e.g. detection_type="positive", rouge_value=NaN JSON) that were
 // never explicitly set by the user.
-//
-//nolint:unused
 func preserveConfiguredNulls(m *metricAlertSettingModel, existingByComponent map[string]metricAlertSettingModel) {
 	old, ok := existingByComponent[m.ComponentName.ValueString()]
 	if !ok {
@@ -2138,15 +2134,34 @@ func preserveConfiguredNulls(m *metricAlertSettingModel, existingByComponent map
 	if old.HighCValueOverride.IsNull() {
 		m.HighCValueOverride = types.Int64Null()
 	}
-	// If prior state had no detection_type (null or empty string), restore that rather
-	// than storing the API's default "positive", which the provider sends for null config.
 	if old.DetectionType.IsNull() || old.DetectionType.ValueString() == "" {
 		m.DetectionType = old.DetectionType
 	}
-	// If prior state had null rouge_value, restore null rather than storing the API's
-	// default NaN JSON that the provider sends when rouge_value is null in config.
 	if old.RougeValue.IsNull() {
 		m.RougeValue = types.StringNull()
+	}
+	// For fields that are Optional-only (not Computed), restore null when old state was null
+	// so they don't produce spurious diffs from API-side defaults.
+	if old.IsFlappingResultOnly.IsNull() {
+		m.IsFlappingResultOnly = types.BoolNull()
+	}
+	if old.IncidentDurationThreshold.IsNull() {
+		m.IncidentDurationThreshold = types.Int64Null()
+	}
+	if old.PatternNameHigher.IsNull() || old.PatternNameHigher.ValueString() == "" {
+		m.PatternNameHigher = old.PatternNameHigher
+	}
+	if old.PatternNameLower.IsNull() || old.PatternNameLower.ValueString() == "" {
+		m.PatternNameLower = old.PatternNameLower
+	}
+	if old.MetricType.IsNull() || old.MetricType.ValueString() == "" {
+		m.MetricType = old.MetricType
+	}
+	if old.EnableBaselineNearConstance.IsNull() {
+		m.EnableBaselineNearConstance = types.BoolNull()
+	}
+	if old.ComputeDifference.IsNull() {
+		m.ComputeDifference = types.BoolNull()
 	}
 }
 

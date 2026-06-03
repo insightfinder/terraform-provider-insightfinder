@@ -5,6 +5,13 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.9.4] - 2026-06-02
+
+### Changed
+- **insightfinder_metric_project**: `metric_configurations` is now a **map** instead of a list. The metric name is the map key; the `metric_name` field inside each entry has been removed. Existing configurations must be migrated to map syntax (see examples). This eliminates ordering-related plan diffs and makes per-metric lookup unambiguous.
+- **insightfinder_metric_project**: `metric_configurations` values are now read back from the API on refresh (`Read`), so Terraform state stays in sync with server-side changes.
+- **insightfinder_metric_project**: The following `metric_alert_settings` fields are now `Optional` only (no longer `Computed` with drift suppression): `detection_type`, `pattern_name_higher`, `pattern_name_lower`, `metric_type`, `is_flapping_result_only`, `incident_duration_threshold`, `enable_baseline_near_constance`, `compute_difference`. Unset fields will not produce plan diffs from API-returned defaults.
+
 ## [1.9.3] - 2026-05-27
 
 ### Fixed
