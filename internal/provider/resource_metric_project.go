@@ -174,6 +174,8 @@ type metricProjectResourceModel struct {
 
 	// Metric configurations (per-metric alert thresholds + component operations)
 	MetricConfigurations types.Map `tfsdk:"metric_configurations"`
+
+	Mode types.Int64 `tfsdk:"mode"`
 }
 
 // metricAlertSettingModel maps one entry in metric_alert_settings.
@@ -801,6 +803,11 @@ func (r *metricProjectResource) Schema(_ context.Context, _ resource.SchemaReque
 					},
 				},
 			},
+			"mode": schema.Int64Attribute{
+				Description: "The process mode for the project (set via logdedicatedmode API).",
+				Optional:    true,
+				Computed:    true,
+			},
 			"metric_configurations": schema.MapNestedAttribute{
 				Description: "Per-metric alert threshold and component configurations, keyed by metric name.",
 				Optional:    true,
@@ -1148,6 +1155,9 @@ func populateMetricSettings(plan *metricProjectResourceModel) map[string]interfa
 	if !plan.ComponentNameAutoOverwrite.IsNull() {
 		s["componentNameAutoOverwrite"] = plan.ComponentNameAutoOverwrite.ValueBool()
 	}
+	if !plan.Mode.IsNull() {
+		s["processMode"] = int(plan.Mode.ValueInt64())
+	}
 
 	// Complex JSON fields
 	if !plan.LinkedLogProjects.IsNull() {
@@ -1331,6 +1341,7 @@ func populateMetricStateFromSettings(m *metricProjectResourceModel, settings map
 	m.AnomalyDampening = getInt64("anomalyDampening")
 	m.InstanceDownRatioThreshold = getFloat64("instanceDownRatioThreshold")
 	m.ComponentNameAutoOverwrite = getBool("componentNameAutoOverwrite")
+	m.Mode = getInt64("processMode")
 
 	// Complex JSON fields
 	m.LinkedLogProjects = getJSONString("linkedLogProjects")
@@ -1456,6 +1467,7 @@ func preserveMetricConfigValues(plan *metricProjectResourceModel, config *metric
 	if !config.MetricConfigurations.IsNull() {
 		plan.MetricConfigurations = config.MetricConfigurations
 	}
+	preserveInt(&plan.Mode, &config.Mode)
 }
 
 func (r *metricProjectResource) Create(ctx context.Context, req resource.CreateRequest, resp *resource.CreateResponse) {
