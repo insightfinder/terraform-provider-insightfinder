@@ -5,6 +5,11 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.9.5] - 2026-06-05
+
+### Added
+- **insightfinder_metric_project**: New `mode` attribute (Number, Optional, Computed) — sets the process mode for the project (e.g., `mode = 4` for L2M). Maps to `processMode` in the metric project settings object, sent and read via the existing `watch-tower-setting` API alongside all other project settings.
+
 ## [1.9.4] - 2026-06-02
 
 ### Changed

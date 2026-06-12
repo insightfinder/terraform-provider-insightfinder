@@ -33,6 +33,27 @@ resource "insightfinder_metric_project" "app_metrics" {
 }
 ```
 
+### Metric Project with Process Mode (L2M)
+
+```terraform
+resource "insightfinder_metric_project" "conviva_alerts_l2m" {
+  project_name = "Conviva-Alerts-Stage-L2M"
+  system_name  = "my-system"
+
+  project_creation_config = {
+    data_type          = "Metric"
+    instance_type      = "PrivateCloud"
+    project_cloud_type = "PrivateCloud"
+    insight_agent_type = "Custom"
+  }
+
+  sampling_interval = 60
+  retention_time    = 90
+
+  mode = 4
+}
+```
+
 ### Metric Project with Detection Tuning
 
 ```terraform
@@ -249,6 +270,7 @@ resource "insightfinder_metric_project" "alerted_metrics" {
 
 ### Optional — Common Settings
 
+- `mode` (Number, Computed) Process mode for the project (set via `logdedicatedmode` API). Common values: `0` = normal, `4` = L2M (log-to-metric). Corresponds to `processMode` in the API payload.
 - `project_display_name` (String, Computed) Display name for the project.
 - `project_time_zone` (String, Computed) Time zone (e.g., `UTC`, `US/Eastern`).
 - `sampling_interval` (Number, Computed) Data sampling interval in seconds.
