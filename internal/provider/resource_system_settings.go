@@ -111,11 +111,14 @@ type notificationsSettingsModel struct {
 	ComponentLevelIncidentConsolidation types.Bool    `tfsdk:"component_level_incident_consolidation"`
 	EnabledConsolidationAlgorithms      types.List    `tfsdk:"enabled_consolidation_algorithms"`
 	// New notification settings
-	SystemDownNotification       *systemDownNotificationModel       `tfsdk:"system_down_notification"`
-	DailyReportNotification      *insightsReportNotificationModel   `tfsdk:"daily_report_notification"`
-	WeeklyReportNotification     *insightsReportNotificationModel   `tfsdk:"weekly_report_notification"`
-	InstanceDownNotification     []instanceDownNotificationModel    `tfsdk:"instance_down_notification"`
-	ProjectLevelDampeningWindows []projectLevelDampeningWindowModel `tfsdk:"project_level_dampening_windows"`
+	SystemDownNotification        *systemDownNotificationModel        `tfsdk:"system_down_notification"`
+	DailyReportNotification       *insightsReportNotificationModel    `tfsdk:"daily_report_notification"`
+	WeeklyReportNotification      *insightsReportNotificationModel    `tfsdk:"weekly_report_notification"`
+	InstanceDownNotification      []instanceDownNotificationModel     `tfsdk:"instance_down_notification"`
+	ProjectLevelDampeningWindows  []projectLevelDampeningWindowModel  `tfsdk:"project_level_dampening_windows"`
+	MaxNotificationDelayTolerance types.Int64                         `tfsdk:"max_notification_delay_tolerance"`
+	CustomConsolidationRules      []customConsolidationRuleModel      `tfsdk:"custom_consolidation_rules"`
+	MetricLogConsolidationConfigs []metricLogConsolidationConfigModel `tfsdk:"metric_log_consolidation_configs"`
 }
 
 // systemDownNotificationModel holds system down notification settings
@@ -148,6 +151,43 @@ type projectLevelDampeningWindowModel struct {
 	SourceCustomer types.String `tfsdk:"source_customer"`
 	TargetCustomer types.String `tfsdk:"target_customer"`
 	Duration       types.Int64  `tfsdk:"duration"`
+}
+
+// conditionModel holds a single matching condition in a custom consolidation rule project entry
+type conditionModel struct {
+	Type    types.String `tfsdk:"type"`
+	Keyword types.String `tfsdk:"keyword"`
+}
+
+// projectEntryModel holds a project and its matching conditions in a custom consolidation rule
+type projectEntryModel struct {
+	ProjectName types.String     `tfsdk:"project_name"`
+	Conditions  []conditionModel `tfsdk:"conditions"`
+}
+
+// projectFieldKeyModel holds one project's field key in a field correlation
+type projectFieldKeyModel struct {
+	ProjectName types.String `tfsdk:"project_name"`
+	Type        types.String `tfsdk:"type"`
+	FieldKey    types.String `tfsdk:"field_key"`
+}
+
+// fieldCorrelationModel holds a set of correlated field keys across projects
+type fieldCorrelationModel struct {
+	ProjectFieldKeys []projectFieldKeyModel `tfsdk:"project_field_keys"`
+}
+
+// customConsolidationRuleModel holds one custom incident consolidation rule
+type customConsolidationRuleModel struct {
+	ProjectEntries    []projectEntryModel     `tfsdk:"project_entries"`
+	FieldCorrelations []fieldCorrelationModel `tfsdk:"field_correlations"`
+}
+
+// metricLogConsolidationConfigModel holds a metric-to-log project consolidation mapping
+type metricLogConsolidationConfigModel struct {
+	MetricProjectName types.String `tfsdk:"metric_project_name"`
+	LogProjectName    types.String `tfsdk:"log_project_name"`
+	FieldKeys         types.List   `tfsdk:"field_keys"`
 }
 
 // Metadata returns the resource type name.
@@ -694,6 +734,103 @@ func (r *systemSettingsResource) Schema(_ context.Context, _ resource.SchemaRequ
 							},
 						},
 					},
+					"max_notification_delay_tolerance": schema.Int64Attribute{
+						Description: "Maximum notification delay tolerance in milliseconds.",
+						Optional:    true,
+						Computed:    true,
+						PlanModifiers: []planmodifier.Int64{
+							int64planmodifier.UseStateForUnknown(),
+						},
+					},
+					"custom_consolidation_rules": schema.ListNestedAttribute{
+						Description: "Custom incident consolidation rules.",
+						Optional:    true,
+						Computed:    true,
+						NestedObject: schema.NestedAttributeObject{
+							Attributes: map[string]schema.Attribute{
+								"project_entries": schema.ListNestedAttribute{
+									Description: "Projects and their matching conditions for this consolidation rule.",
+									Optional:    true,
+									NestedObject: schema.NestedAttributeObject{
+										Attributes: map[string]schema.Attribute{
+											"project_name": schema.StringAttribute{
+												Description: "The project name.",
+												Required:    true,
+											},
+											"conditions": schema.ListNestedAttribute{
+												Description: "Matching conditions for this project entry.",
+												Optional:    true,
+												NestedObject: schema.NestedAttributeObject{
+													Attributes: map[string]schema.Attribute{
+														"type": schema.StringAttribute{
+															Description: "Condition type: \"fieldName\" or \"content\".",
+															Required:    true,
+														},
+														"keyword": schema.StringAttribute{
+															Description: "The keyword or field expression to match.",
+															Required:    true,
+														},
+													},
+												},
+											},
+										},
+									},
+								},
+								"field_correlations": schema.ListNestedAttribute{
+									Description: "Field correlations mapping project fields across the consolidation rule.",
+									Optional:    true,
+									NestedObject: schema.NestedAttributeObject{
+										Attributes: map[string]schema.Attribute{
+											"project_field_keys": schema.ListNestedAttribute{
+												Description: "List of project field key mappings.",
+												Required:    true,
+												NestedObject: schema.NestedAttributeObject{
+													Attributes: map[string]schema.Attribute{
+														"project_name": schema.StringAttribute{
+															Description: "The project name.",
+															Required:    true,
+														},
+														"type": schema.StringAttribute{
+															Description: "Field type: \"fieldName\" or \"content\".",
+															Required:    true,
+														},
+														"field_key": schema.StringAttribute{
+															Description: "The field key path. Empty or omitted for content type.",
+															Optional:    true,
+															Computed:    true,
+														},
+													},
+												},
+											},
+										},
+									},
+								},
+							},
+						},
+					},
+					"metric_log_consolidation_configs": schema.ListNestedAttribute{
+						Description: "Metric-to-log project consolidation configuration.",
+						Optional:    true,
+						Computed:    true,
+						NestedObject: schema.NestedAttributeObject{
+							Attributes: map[string]schema.Attribute{
+								"metric_project_name": schema.StringAttribute{
+									Description: "The metric project name.",
+									Required:    true,
+								},
+								"log_project_name": schema.StringAttribute{
+									Description: "The log project name.",
+									Required:    true,
+								},
+								"field_keys": schema.ListAttribute{
+									Description: "List of field keys used for consolidation.",
+									ElementType: types.StringType,
+									Optional:    true,
+									Computed:    true,
+								},
+							},
+						},
+					},
 				},
 			},
 			"miscellaneous_settings": schema.SingleNestedAttribute{
@@ -1019,6 +1156,60 @@ func (r *systemSettingsResource) applyNotificationsSettings(_ context.Context, s
 	}
 	updates.ProjectLevelDampeningWindows = windows
 
+	updates.MaxNotificationDelayTolerance = m.MaxNotificationDelayTolerance.ValueInt64()
+
+	rules := make([]client.CustomConsolidationRule, 0, len(m.CustomConsolidationRules))
+	for _, rule := range m.CustomConsolidationRules {
+		entries := make([]client.ProjectEntry, 0, len(rule.ProjectEntries))
+		for _, pe := range rule.ProjectEntries {
+			conds := make([]client.Condition, 0, len(pe.Conditions))
+			for _, c := range pe.Conditions {
+				conds = append(conds, client.Condition{
+					Type:    c.Type.ValueString(),
+					Keyword: c.Keyword.ValueString(),
+				})
+			}
+			entries = append(entries, client.ProjectEntry{
+				ProjectName: pe.ProjectName.ValueString(),
+				Conditions:  conds,
+			})
+		}
+		corrs := make([]client.FieldCorrelation, 0, len(rule.FieldCorrelations))
+		for _, fc := range rule.FieldCorrelations {
+			keys := make([]client.ProjectFieldKey, 0, len(fc.ProjectFieldKeys))
+			for _, pk := range fc.ProjectFieldKeys {
+				var fkPtr *string
+				if !pk.FieldKey.IsNull() && !pk.FieldKey.IsUnknown() {
+					fk := pk.FieldKey.ValueString()
+					fkPtr = &fk
+				}
+				keys = append(keys, client.ProjectFieldKey{
+					ProjectName: pk.ProjectName.ValueString(),
+					Type:        pk.Type.ValueString(),
+					FieldKey:    fkPtr,
+				})
+			}
+			corrs = append(corrs, client.FieldCorrelation{
+				ProjectFieldKeys: keys,
+			})
+		}
+		rules = append(rules, client.CustomConsolidationRule{
+			ProjectEntries:    entries,
+			FieldCorrelations: corrs,
+		})
+	}
+	updates.CustomConsolidationRules = rules
+
+	mlConfigs := make([]client.MetricLogConsolidationConfig, 0, len(m.MetricLogConsolidationConfigs))
+	for _, cfg := range m.MetricLogConsolidationConfigs {
+		mlConfigs = append(mlConfigs, client.MetricLogConsolidationConfig{
+			MetricProjectName: cfg.MetricProjectName.ValueString(),
+			LogProjectName:    cfg.LogProjectName.ValueString(),
+			FieldKeys:         typesListToStrings(cfg.FieldKeys),
+		})
+	}
+	updates.MetricLogConsolidationConfigs = mlConfigs
+
 	if err := r.client.SetHealthViewSetting(systemID, updates); err != nil {
 		return fmt.Errorf("failed to set health view setting: %w", err)
 	}
@@ -1213,6 +1404,65 @@ func (r *systemSettingsResource) readIntoModel(_ context.Context, systemID strin
 			m.NotificationsSettings.TicketOpenTime = types.Int64Value(hvSetting.TicketOpenTime)
 			m.NotificationsSettings.ComponentLevelIncidentConsolidation = types.BoolValue(hvSetting.ComponentLevelIncidentConsolidation)
 			m.NotificationsSettings.EnabledConsolidationAlgorithms = stringsToTypesList(hvSetting.EnabledConsolidationAlgorithms)
+			m.NotificationsSettings.MaxNotificationDelayTolerance = types.Int64Value(hvSetting.MaxNotificationDelayTolerance)
+
+			// Custom consolidation rules
+			newRules := make([]customConsolidationRuleModel, 0, len(hvSetting.CustomConsolidationRules))
+			for _, rule := range hvSetting.CustomConsolidationRules {
+				entries := make([]projectEntryModel, 0, len(rule.ProjectEntries))
+				for _, pe := range rule.ProjectEntries {
+					// Use nil (not empty slice) for empty conditions so Terraform
+					// state stays null when the user omits the field in config.
+					var conds []conditionModel
+					if len(pe.Conditions) > 0 {
+						conds = make([]conditionModel, 0, len(pe.Conditions))
+						for _, c := range pe.Conditions {
+							conds = append(conds, conditionModel{
+								Type:    types.StringValue(c.Type),
+								Keyword: types.StringValue(c.Keyword),
+							})
+						}
+					}
+					entries = append(entries, projectEntryModel{
+						ProjectName: types.StringValue(pe.ProjectName),
+						Conditions:  conds,
+					})
+				}
+				corrs := make([]fieldCorrelationModel, 0, len(rule.FieldCorrelations))
+				for _, fc := range rule.FieldCorrelations {
+					keys := make([]projectFieldKeyModel, 0, len(fc.ProjectFieldKeys))
+					for _, pk := range fc.ProjectFieldKeys {
+						fk := types.StringNull()
+						if pk.FieldKey != nil {
+							fk = types.StringValue(*pk.FieldKey)
+						}
+						keys = append(keys, projectFieldKeyModel{
+							ProjectName: types.StringValue(pk.ProjectName),
+							Type:        types.StringValue(pk.Type),
+							FieldKey:    fk,
+						})
+					}
+					corrs = append(corrs, fieldCorrelationModel{
+						ProjectFieldKeys: keys,
+					})
+				}
+				newRules = append(newRules, customConsolidationRuleModel{
+					ProjectEntries:    entries,
+					FieldCorrelations: corrs,
+				})
+			}
+			m.NotificationsSettings.CustomConsolidationRules = newRules
+
+			// Metric-log consolidation configs
+			newMLConfigs := make([]metricLogConsolidationConfigModel, 0, len(hvSetting.MetricLogConsolidationConfigs))
+			for _, cfg := range hvSetting.MetricLogConsolidationConfigs {
+				newMLConfigs = append(newMLConfigs, metricLogConsolidationConfigModel{
+					MetricProjectName: types.StringValue(cfg.MetricProjectName),
+					LogProjectName:    types.StringValue(cfg.LogProjectName),
+					FieldKeys:         stringsToTypesList(cfg.FieldKeys),
+				})
+			}
+			m.NotificationsSettings.MetricLogConsolidationConfigs = newMLConfigs
 
 			if m.NotificationsSettings.ProjectLevelDampeningWindows != nil {
 				newWindows := make([]projectLevelDampeningWindowModel, 0, len(hvSetting.ProjectLevelDampeningWindows))
