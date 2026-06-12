@@ -5,6 +5,14 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.9.6] - 2026-06-12
+
+### Added
+- **insightfinder_system_settings**: Three new optional attributes inside `notifications_settings` for the `healthviewsetting` API:
+  - `max_notification_delay_tolerance` (Number, Optional, Computed) — maximum delay tolerance for notifications in milliseconds (e.g. `10800000` = 3 hours). Maps to `maxNotificationDelayTolerance`.
+  - `custom_consolidation_rules` (List of Object, Optional, Computed) — custom incident consolidation rules. Each rule has `project_entries` (projects + keyword/field conditions) and `field_correlations` (cross-project field key mappings used for consolidation matching). Maps to `customConsolidationRules`.
+  - `metric_log_consolidation_configs` (List of Object, Optional, Computed) — metric-to-log project consolidation mappings. Each entry links a `metric_project_name` and `log_project_name` with a list of `field_keys` used to correlate incidents. Maps to `metricLogConsolidationConfigs`.
+
 ## [1.9.5] - 2026-06-05
 
 ### Added
