@@ -2,7 +2,7 @@ terraform {
   required_providers {
     insightfinder = {
       source  = "insightfinder/insightfinder"
-      version = "~> 1.8"
+      version = "~> 1.9"
     }
   }
 }
@@ -125,6 +125,111 @@ resource "insightfinder_system_settings" "with_notifications" {
         source_customer = "admin"
         target_customer = "admin"
         duration        = 28800000
+      }
+    ]
+  }
+}
+
+# Custom consolidation rules, metric-log configs, and max notification delay tolerance
+resource "insightfinder_system_settings" "with_consolidation" {
+  system_name = "my-production-system"
+
+  notifications_settings = {
+    aggregation_interval                   = 10
+    order                                  = 0
+    hide_flag                              = false
+    enable_splunk_export                   = false
+    only_send_with_rca                     = false
+    enable_system_down_email_alert         = false
+    enable_incident_prediction_email_alert = true
+    enable_incident_detection_email_alert  = true
+    enable_alerts_email                    = false
+    enable_health_email_alert              = false
+    enable_root_cause_email_alert          = false
+    prediction_email                       = ""
+    alert_email                            = ""
+    health_alert_email                     = ""
+    incident_detection_email               = ""
+    root_cause_email                       = ""
+    alert_health_score                     = 0.0
+    alert_frequency                        = 0
+    email_dampening_period                 = 3600000
+    alerts_email_dampening_period          = 3600000
+    prediction_email_dampening_period      = 3600000
+    incident_dampening_window              = 14400000
+    ticket_open_time                       = 5400000
+    incident_count_threshold               = jsonencode({})
+    assignment_map                         = jsonencode({})
+    component_level_incident_consolidation = false
+    enabled_consolidation_algorithms       = ["contentBased", "metricInstanceTimestamp", "consolidationCustom"]
+
+    # Maximum delay before a notification must be sent regardless of dampening
+    max_notification_delay_tolerance = 10800000
+
+    # Custom rules that consolidate incidents from specific projects when conditions match
+    custom_consolidation_rules = [
+      {
+        project_entries = [
+          {
+            project_name = "frontend-logs"
+            conditions = [
+              {
+                type    = "fieldName"
+                keyword = "alert->options->severity=critical"
+              },
+              {
+                type    = "content"
+                keyword = "OutOfMemoryError"
+              }
+            ]
+          },
+          {
+            project_name = "backend-metrics"
+            conditions = [
+              {
+                type    = "fieldName"
+                keyword = "region=us-east-1"
+              }
+            ]
+          }
+        ]
+        field_correlations = [
+          {
+            project_field_keys = [
+              {
+                project_name = "frontend-logs"
+                type         = "fieldName"
+                field_key    = "alert->server->host"
+              },
+              {
+                project_name = "backend-metrics"
+                type         = "fieldName"
+                field_key    = "hostname"
+              }
+            ]
+          },
+          {
+            project_field_keys = [
+              {
+                project_name = "frontend-logs"
+                type         = "content"
+              },
+              {
+                project_name = "backend-metrics"
+                type         = "content"
+              }
+            ]
+          }
+        ]
+      }
+    ]
+
+    # Link metric and log projects so their incidents are consolidated together
+    metric_log_consolidation_configs = [
+      {
+        metric_project_name = "backend-metrics"
+        log_project_name    = "frontend-logs"
+        field_keys          = ["alert->server->ip", "alert->asset->asset_id"]
       }
     ]
   }

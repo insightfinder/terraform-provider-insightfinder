@@ -230,6 +230,111 @@ resource "insightfinder_system_settings" "notifications_extended" {
 }
 ```
 
+### Notifications with Custom Consolidation Rules and Metric-Log Configs
+
+```terraform
+resource "insightfinder_system_settings" "with_consolidation" {
+  system_name = "my-production-system"
+
+  notifications_settings = {
+    aggregation_interval                   = 10
+    order                                  = 0
+    hide_flag                              = false
+    enable_splunk_export                   = false
+    only_send_with_rca                     = false
+    enable_system_down_email_alert         = false
+    enable_incident_prediction_email_alert = true
+    enable_incident_detection_email_alert  = true
+    enable_alerts_email                    = false
+    enable_health_email_alert              = false
+    enable_root_cause_email_alert          = false
+    prediction_email                       = ""
+    alert_email                            = ""
+    health_alert_email                     = ""
+    incident_detection_email               = ""
+    root_cause_email                       = ""
+    alert_health_score                     = 0.0
+    alert_frequency                        = 0
+    email_dampening_period                 = 3600000
+    alerts_email_dampening_period          = 3600000
+    prediction_email_dampening_period      = 3600000
+    incident_dampening_window              = 14400000
+    ticket_open_time                       = 5400000
+    incident_count_threshold               = jsonencode({})
+    assignment_map                         = jsonencode({})
+    component_level_incident_consolidation = false
+    enabled_consolidation_algorithms       = ["contentBased", "metricInstanceTimestamp", "consolidationCustom"]
+
+    max_notification_delay_tolerance = 10800000
+
+    custom_consolidation_rules = [
+      {
+        project_entries = [
+          {
+            project_name = "frontend-logs"
+            conditions = [
+              {
+                type    = "fieldName"
+                keyword = "alert->options->severity=critical"
+              },
+              {
+                type    = "content"
+                keyword = "OutOfMemoryError"
+              }
+            ]
+          },
+          {
+            project_name = "backend-metrics"
+            conditions = [
+              {
+                type    = "fieldName"
+                keyword = "region=us-east-1"
+              }
+            ]
+          }
+        ]
+        field_correlations = [
+          {
+            project_field_keys = [
+              {
+                project_name = "frontend-logs"
+                type         = "fieldName"
+                field_key    = "alert->server->host"
+              },
+              {
+                project_name = "backend-metrics"
+                type         = "fieldName"
+                field_key    = "hostname"
+              }
+            ]
+          },
+          {
+            project_field_keys = [
+              {
+                project_name = "frontend-logs"
+                type         = "content"
+              },
+              {
+                project_name = "backend-metrics"
+                type         = "content"
+              }
+            ]
+          }
+        ]
+      }
+    ]
+
+    metric_log_consolidation_configs = [
+      {
+        metric_project_name = "backend-metrics"
+        log_project_name    = "frontend-logs"
+        field_keys          = ["alert->server->ip", "alert->asset->asset_id"]
+      }
+    ]
+  }
+}
+```
+
 ### Miscellaneous Settings Only
 
 ```terraform
@@ -486,6 +591,39 @@ A set of project-pair dampening window rules stored in the health view setting. 
 | `target_customer` | String | Customer (username) of the target project (`ct`). Defaults to the provider username when omitted. |
 | `duration` | Number (Required) | Dampening duration in milliseconds (`d`). |
 
+#### Max Notification Delay Tolerance
+
+| Attribute | Type | Description |
+|-----------|------|-------------|
+| `max_notification_delay_tolerance` | Number | Maximum delay in milliseconds before a notification must fire regardless of dampening windows (e.g. `10800000` = 3 hours). Maps to `maxNotificationDelayTolerance`. |
+
+#### Custom Consolidation Rules
+
+A list of custom incident consolidation rules. When `consolidationCustom` is included in `enabled_consolidation_algorithms`, these rules control which incidents from different projects are consolidated into a single notification. Each rule has two sub-blocks:
+
+**`project_entries`** — projects and their keyword/field matching conditions (all Optional):
+
+| Attribute | Type | Description |
+|-----------|------|-------------|
+| `project_name` | String (Required) | The project this entry applies to. |
+| `conditions` | List of Object | Matching conditions. Each has a `type` (`"fieldName"` or `"content"`) and a `keyword` string. |
+
+**`field_correlations`** — cross-project field mappings that determine which field values must match for incidents to be consolidated (all Optional):
+
+| Attribute | Type | Description |
+|-----------|------|-------------|
+| `project_field_keys` | List of Object (Required) | One entry per project in the correlation. Each has `project_name`, `type` (`"fieldName"` or `"content"`), and `field_key` (the field path; optional/null for `"content"` type). |
+
+#### Metric-Log Consolidation Configs
+
+A list of metric-to-log project consolidation mappings. Each entry links one metric project with one log project and specifies the field keys used to correlate their incidents.
+
+| Attribute | Type | Description |
+|-----------|------|-------------|
+| `metric_project_name` | String (Required) | The metric project name. |
+| `log_project_name` | String (Required) | The log project name. |
+| `field_keys` | List of String | Field key paths used to match incidents between the metric and log projects. |
+
 ---
 
 ### Nested Schema for `miscellaneous_settings`
@@ -518,5 +656,8 @@ After import, run `terraform plan` to review which computed fields will be popul
 - **`satellite_system_set`**: Must be provided as a JSON-encoded string using `jsonencode(...)`. The value is semantically compared during plan/apply to avoid spurious diffs caused by JSON key ordering.
 - **`incident_count_threshold` and `assignment_map`**: Must be provided as JSON-encoded strings using `jsonencode(...)`. These fields are stored as serialized JSON in Terraform state and compared semantically to avoid key-ordering diffs.
 - **`project_level_dampening_windows`**: Optional and Computed list. When omitted, the server value is preserved in state. When set (even to `[]`), the declared list replaces any existing rules on the server. `source_customer` and `target_customer` default to the provider username when not specified.
-- **`enabled_consolidation_algorithms`**: Optional and Computed list of strings. Supported algorithm names are `"derivedIncidents"`, `"rcaChain"`, `"contentBased"`, and `"metricInstanceTimestamp"`. When omitted, the server value is preserved in state.
+- **`enabled_consolidation_algorithms`**: Optional and Computed list of strings. Supported algorithm names are `"derivedIncidents"`, `"rcaChain"`, `"contentBased"`, `"metricInstanceTimestamp"`, and `"consolidationCustom"`. When omitted, the server value is preserved in state.
+- **`max_notification_delay_tolerance`**: Optional and Computed number (milliseconds). When omitted, the server value is preserved in state.
+- **`custom_consolidation_rules`**: Optional and Computed list of rule objects. Always read back from the API on refresh. Include `"consolidationCustom"` in `enabled_consolidation_algorithms` to activate these rules. For `"content"` type `project_field_keys` entries, `field_key` can be omitted or set to `null`.
+- **`metric_log_consolidation_configs`**: Optional and Computed list of metric-log mapping objects. Always read back from the API on refresh.
 - **API endpoints**: `knowledgebase_settings` maps to two separate API calls — `SetGlobalKBSetting` and `SetIncidentPredictionSetting`. `notifications_settings` maps to `SetHealthViewSetting`. `miscellaneous_settings` maps to two calls on `/api/external/v1/systemframework` — `operation=hideOrOrderOrLongTerm` for `healthview_longterm`, and `operation=systemFrameworkSetting` for the remaining three fields. All four fields are read via a single `GET /api/external/v1/systemframework` call.
