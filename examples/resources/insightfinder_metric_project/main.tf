@@ -230,3 +230,33 @@ variable "license_key" {
   type        = string
   sensitive   = true
 }
+
+# Metric project with incident priority by anomaly score
+resource "insightfinder_metric_project" "priority_example" {
+  project_name = "priority-configured-metrics"
+  system_name  = "Production"
+
+  project_creation_config = {
+    data_type          = "Metric"
+    instance_type      = "PrivateCloud"
+    project_cloud_type = "PrivateCloud"
+    insight_agent_type = "Custom"
+  }
+
+  project_display_name = "Priority Configured Metrics"
+  project_time_zone    = "UTC"
+  sampling_interval    = 60
+  retention_time       = 90
+
+  # Map anomaly score ranges to incident priority levels 1 (highest) through 5 (lowest)
+  incident_priority_by_anomaly_score_setting = jsonencode({
+    enabled = true
+    priorityScoreRangeMap = {
+      "1" = "10001-"
+      "2" = "5001-10000"
+      "3" = "2001-5000"
+      "4" = "1001-2000"
+      "5" = "0-1000"
+    }
+  })
+}
