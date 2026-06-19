@@ -126,6 +126,10 @@ type MetricProjectSettings struct {
 		PredictionEmailDampeningPeriod     int    `json:"predictionEmailDampeningPeriod"`
 		AwSeverityLevel                    string `json:"awSeverityLevel,omitempty"`
 	} `json:"emailSetting,omitempty"`
+	IncidentPriorityByAnomalyScoreSetting struct {
+		Enabled               bool              `json:"enabled,omitempty"`
+		PriorityScoreRangeMap map[string]string `json:"priorityScoreRangeMap,omitempty"`
+	} `json:"incidentPriorityByAnomalyScoreSetting,omitempty"`
 }
 
 // ─── Metric Configuration Types ───────────────────────────────────────────────
