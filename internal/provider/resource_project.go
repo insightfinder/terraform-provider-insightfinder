@@ -2793,6 +2793,7 @@ func (r *projectResource) Read(ctx context.Context, req resource.ReadRequest, re
 	state.LogToLogSettingList = getJSONString("logToLogSettingList")
 	state.WebhookHeaderList = getJSONString("webhookHeaderList")
 	state.SharedUsernames = getJSONString("sharedUsernames")
+	state.IncidentPriorityByAnomalyScoreSetting = getJSONString("incidentPriorityByAnomalyScoreSetting")
 
 	// Read log label settings from API
 	logLabels, err := r.client.GetLogLabels(state.ProjectName.ValueString(), r.client.Username)
