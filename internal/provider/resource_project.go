@@ -171,6 +171,7 @@ type projectResourceModel struct {
 	HolidaySettings                  types.Set    `tfsdk:"holiday_settings"`
 	L2MSettings                      types.Set    `tfsdk:"l2m_settings"`
 	Mode                             types.Int64  `tfsdk:"mode"`
+	IncidentPriorityByAnomalyScoreSetting types.String `tfsdk:"incident_priority_by_anomaly_score_setting"`
 }
 
 type holidaySettingModel struct {
@@ -1035,6 +1036,11 @@ func (r *projectResource) Schema(_ context.Context, _ resource.SchemaRequest, re
 				Optional:    true,
 				Computed:    true,
 			},
+			"incident_priority_by_anomaly_score_setting": schema.StringAttribute{
+				Description: "Incident priority by anomaly score settings (JSON). Contains 'enabled' bool and 'priorityScoreRangeMap' mapping priority levels (1-5) to score ranges (e.g. '{\"enabled\":true,\"priorityScoreRangeMap\":{\"1\":\"10001-\",\"2\":\"5001-10000\"}}').",
+				Optional:    true,
+				Computed:    true,
+			},
 			"l2m_settings": schema.SetNestedAttribute{
 				Description: "Log-to-metric settings. Each entry maps this log project to a target metric project.",
 				Optional:    true,
@@ -1612,6 +1618,11 @@ func populateSettings(plan *projectResourceModel) map[string]interface{} {
 			}
 		}
 	}
+	if !plan.IncidentPriorityByAnomalyScoreSetting.IsNull() {
+		if parsed := parseJSONField(plan.IncidentPriorityByAnomalyScoreSetting.ValueString()); parsed != nil {
+			s["incidentPriorityByAnomalyScoreSetting"] = parsed
+		}
+	}
 
 	return s
 }
@@ -1895,6 +1906,7 @@ func (r *projectResource) Create(ctx context.Context, req resource.CreateRequest
 		plan.LogToLogSettingList = getJSONString("logToLogSettingList")
 		plan.WebhookHeaderList = getJSONString("webhookHeaderList")
 		plan.SharedUsernames = getJSONString("sharedUsernames")
+		plan.IncidentPriorityByAnomalyScoreSetting = getJSONString("incidentPriorityByAnomalyScoreSetting")
 	}
 
 	// Always preserve config values over API values for fields explicitly set by user
@@ -2192,6 +2204,9 @@ func (r *projectResource) Create(ctx context.Context, req resource.CreateRequest
 	}
 	if !config.SharedUsernames.IsNull() {
 		plan.SharedUsernames = config.SharedUsernames
+	}
+	if !config.IncidentPriorityByAnomalyScoreSetting.IsNull() {
+		plan.IncidentPriorityByAnomalyScoreSetting = config.IncidentPriorityByAnomalyScoreSetting
 	}
 
 	// Process log_label_settings if provided - each setting must be applied individually
@@ -2778,6 +2793,7 @@ func (r *projectResource) Read(ctx context.Context, req resource.ReadRequest, re
 	state.LogToLogSettingList = getJSONString("logToLogSettingList")
 	state.WebhookHeaderList = getJSONString("webhookHeaderList")
 	state.SharedUsernames = getJSONString("sharedUsernames")
+	state.IncidentPriorityByAnomalyScoreSetting = getJSONString("incidentPriorityByAnomalyScoreSetting")
 
 	// Read log label settings from API
 	logLabels, err := r.client.GetLogLabels(state.ProjectName.ValueString(), r.client.Username)
@@ -3333,6 +3349,7 @@ func (r *projectResource) Update(ctx context.Context, req resource.UpdateRequest
 		plan.LogToLogSettingList = getJSONString("logToLogSettingList")
 		plan.WebhookHeaderList = getJSONString("webhookHeaderList")
 		plan.SharedUsernames = getJSONString("sharedUsernames")
+		plan.IncidentPriorityByAnomalyScoreSetting = getJSONString("incidentPriorityByAnomalyScoreSetting")
 	}
 
 	// Process log_label_settings if provided - each setting must be applied individually

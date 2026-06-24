@@ -5,6 +5,12 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.9.7] - 2026-06-19
+
+### Added
+- **insightfinder_project**: New `incident_priority_by_anomaly_score_setting` attribute (String/JSON, Optional, Computed) — configures incident priority levels based on anomaly score ranges. Accepts a JSON-encoded object with `enabled` (Boolean) and `priorityScoreRangeMap` (Object mapping priority levels `"1"`–`"5"` to score range strings, e.g. `"10001-"`). Maps to `incidentPriorityByAnomalyScoreSetting` in the `logsummarysettings` API.
+- **insightfinder_metric_project**: Same `incident_priority_by_anomaly_score_setting` attribute added for metric projects.
+
 ## [1.9.6] - 2026-06-12
 
 ### Added

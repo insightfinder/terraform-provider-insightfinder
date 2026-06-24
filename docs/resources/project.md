@@ -431,6 +431,24 @@ resource "insightfinder_project" "loki_logs" {
   | `3` | `AW` | `-aw` | AI Watchtower dedicated queue |
   | `4` | `DEDICATED` | `-dedicated` | Isolated worker queue — use for log-heavy projects to prevent starving other projects on the shared queue |
 
+- `incident_priority_by_anomaly_score_setting` (String/JSON, Optional, Computed) — Configures how incidents are assigned a priority based on their anomaly score. Accepts a JSON-encoded object with two fields:
+  - `enabled` (Boolean) — whether priority assignment is active.
+  - `priorityScoreRangeMap` (Object) — maps priority levels (`"1"` through `"5"`) to score range strings. The format is `"<lower>-<upper>"` where the upper bound may be omitted for open-ended ranges (e.g. `"10001-"`).
+
+  Example:
+  ```hcl
+  incident_priority_by_anomaly_score_setting = jsonencode({
+    enabled = true
+    priorityScoreRangeMap = {
+      "1" = "10001-"
+      "2" = "5001-10000"
+      "3" = "2001-5000"
+      "4" = "1001-2000"
+      "5" = "0-1000"
+    }
+  })
+  ```
+
 See full schema in the [complete example](https://github.com/insightfinder/terraform-provider-insightfinder/tree/main/examples/resources/insightfinder_project).
 
 ### Read-Only

@@ -176,6 +176,7 @@ type metricProjectResourceModel struct {
 	MetricConfigurations types.Map `tfsdk:"metric_configurations"`
 
 	Mode types.Int64 `tfsdk:"mode"`
+	IncidentPriorityByAnomalyScoreSetting types.String `tfsdk:"incident_priority_by_anomaly_score_setting"`
 }
 
 // metricAlertSettingModel maps one entry in metric_alert_settings.
@@ -808,6 +809,11 @@ func (r *metricProjectResource) Schema(_ context.Context, _ resource.SchemaReque
 				Optional:    true,
 				Computed:    true,
 			},
+			"incident_priority_by_anomaly_score_setting": schema.StringAttribute{
+				Description: "Incident priority by anomaly score settings (JSON). Contains 'enabled' bool and 'priorityScoreRangeMap' mapping priority levels (1-5) to score ranges (e.g. '{\"enabled\":true,\"priorityScoreRangeMap\":{\"1\":\"10001-\",\"2\":\"5001-10000\"}}').",
+				Optional:    true,
+				Computed:    true,
+			},
 			"metric_configurations": schema.MapNestedAttribute{
 				Description: "Per-metric alert threshold and component configurations, keyed by metric name.",
 				Optional:    true,
@@ -1198,6 +1204,11 @@ func populateMetricSettings(plan *metricProjectResourceModel) map[string]interfa
 			}
 		}
 	}
+	if !plan.IncidentPriorityByAnomalyScoreSetting.IsNull() {
+		if parsed := parseJSONField(plan.IncidentPriorityByAnomalyScoreSetting.ValueString()); parsed != nil {
+			s["incidentPriorityByAnomalyScoreSetting"] = parsed
+		}
+	}
 
 	return s
 }
@@ -1349,6 +1360,7 @@ func populateMetricStateFromSettings(m *metricProjectResourceModel, settings map
 	m.InstanceGroupingUpdate = getJSONString("instanceGroupingUpdate")
 	m.SharedUsernames = getJSONString("sharedUsernames")
 	m.WebhookHeaderList = getJSONString("webhookHeaderList")
+	m.IncidentPriorityByAnomalyScoreSetting = getJSONString("incidentPriorityByAnomalyScoreSetting")
 }
 
 // preserveMetricConfigValues overwrites state fields with explicit config values to prevent drift.
@@ -1468,6 +1480,7 @@ func preserveMetricConfigValues(plan *metricProjectResourceModel, config *metric
 		plan.MetricConfigurations = config.MetricConfigurations
 	}
 	preserveInt(&plan.Mode, &config.Mode)
+	preserve(&plan.IncidentPriorityByAnomalyScoreSetting, &config.IncidentPriorityByAnomalyScoreSetting)
 }
 
 func (r *metricProjectResource) Create(ctx context.Context, req resource.CreateRequest, resp *resource.CreateResponse) {

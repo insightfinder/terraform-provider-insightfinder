@@ -269,3 +269,33 @@ variable "servicenow_password" {
   type        = string
   sensitive   = true
 }
+
+# Project with incident priority by anomaly score
+resource "insightfinder_project" "priority_example" {
+  project_name = "priority-configured-logs"
+  system_name  = "Production"
+
+  project_creation_config = {
+    data_type          = "Log"
+    instance_type      = "PrivateCloud"
+    project_cloud_type = "PrivateCloud"
+    insight_agent_type = "LogStreaming"
+  }
+
+  project_display_name = "Priority Configured Logs"
+  project_time_zone    = "UTC"
+  sampling_interval    = 600
+  retention_time       = 90
+
+  # Map anomaly score ranges to incident priority levels 1 (highest) through 5 (lowest)
+  incident_priority_by_anomaly_score_setting = jsonencode({
+    enabled = true
+    priorityScoreRangeMap = {
+      "1" = "10001-"
+      "2" = "5001-10000"
+      "3" = "2001-5000"
+      "4" = "1001-2000"
+      "5" = "0-1000"
+    }
+  })
+}
