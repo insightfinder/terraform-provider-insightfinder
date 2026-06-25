@@ -2136,6 +2136,14 @@ func readMetricConfigurationsFromAPI(ctx context.Context, c *client.Client, proj
 				preserveConfiguredNulls(&cm, existingSettingByComponent)
 				alertSettingModels = append(alertSettingModels, cm)
 			}
+			// Sort component-level entries (index 1+) by component name so the
+			// list order is stable regardless of API response ordering, preventing
+			// spurious diffs when the server returns entries in a different order.
+			if len(alertSettingModels) > 2 {
+				sort.Slice(alertSettingModels[1:], func(i, j int) bool {
+					return alertSettingModels[1+i].ComponentName.ValueString() < alertSettingModels[1+j].ComponentName.ValueString()
+				})
+			}
 		}
 
 		alertSettingsListVal, d := types.ListValueFrom(ctx, types.ObjectType{AttrTypes: metricAlertSettingAttrTypes()}, alertSettingModels)
