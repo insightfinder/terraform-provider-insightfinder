@@ -9,6 +9,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"sort"
+	"sync"
 
 	"github.com/hashicorp/terraform-plugin-framework/attr"
 	"github.com/hashicorp/terraform-plugin-framework/diag"
@@ -2062,6 +2063,8 @@ func buildSingleMetricAlertSettingPost(metricName string, s metricAlertSettingMo
 
 // readMetricConfigurationsFromAPI reads current metric configuration state from the API
 // for all metrics listed in existingConfigs.
+// Component maps are fetched in two bulk calls. Alert settings are fetched in a single
+// paginated sweep (GetAllMetricSettings) instead of one request per metric.
 func readMetricConfigurationsFromAPI(ctx context.Context, c *client.Client, projectName string, existingConfigs []metricConfigurationModel) ([]metricConfigurationModel, diag.Diagnostics) {
 	var diags diag.Diagnostics
 	if len(existingConfigs) == 0 {
@@ -2077,6 +2080,14 @@ func readMetricConfigurationsFromAPI(ctx context.Context, c *client.Client, proj
 	if err != nil {
 		diags.AddWarning("Could not read ignored components", err.Error())
 		ignoredMap = make(map[string][]string)
+	}
+
+	// Fetch all metric alert settings in one (or a few paginated) request(s) instead
+	// of making a separate filtered request per metric.
+	allSettings, err := c.GetAllMetricSettings(projectName)
+	if err != nil {
+		diags.AddWarning("Could not read metric settings", err.Error())
+		allSettings = make(map[string]*client.MetricSettingEntry)
 	}
 
 	var result []metricConfigurationModel
@@ -2115,11 +2126,8 @@ func readMetricConfigurationsFromAPI(ctx context.Context, c *client.Client, proj
 		ignoredListVal, d := types.ListValueFrom(ctx, types.StringType, ignoredComps)
 		diags.Append(d...)
 
-		settingEntry, err := c.GetMetricSettings(projectName, metricName)
 		var alertSettingModels []metricAlertSettingModel
-		if err != nil {
-			diags.AddWarning(fmt.Sprintf("Could not read metric settings for %s", metricName), err.Error())
-		} else if settingEntry != nil {
+		if settingEntry := allSettings[metricName]; settingEntry != nil {
 			global := buildMetricAlertSettingFromAPI(settingEntry.GlobalSetting)
 			preserveConfiguredNulls(&global, existingSettingByComponent)
 			alertSettingModels = append(alertSettingModels, global)
@@ -2127,6 +2135,14 @@ func readMetricConfigurationsFromAPI(ctx context.Context, c *client.Client, proj
 				cm := buildMetricAlertSettingFromAPI(compSetting)
 				preserveConfiguredNulls(&cm, existingSettingByComponent)
 				alertSettingModels = append(alertSettingModels, cm)
+			}
+			// Sort component-level entries (index 1+) by component name so the
+			// list order is stable regardless of API response ordering, preventing
+			// spurious diffs when the server returns entries in a different order.
+			if len(alertSettingModels) > 2 {
+				sort.Slice(alertSettingModels[1:], func(i, j int) bool {
+					return alertSettingModels[1+i].ComponentName.ValueString() < alertSettingModels[1+j].ComponentName.ValueString()
+				})
 			}
 		}
 
@@ -2192,12 +2208,19 @@ func preserveConfiguredNulls(m *metricAlertSettingModel, existingByComponent map
 
 // applyMetricConfigurations pushes metric_configurations to the API.
 // All metric alert settings are batched into a single POST request.
-// Component escalation/ignored settings are still sent per-metric (separate endpoint).
+// Component escalation/ignored operations are dispatched concurrently across metrics
+// (each metric's operations are independent of every other metric's).
 func applyMetricConfigurations(ctx context.Context, c *client.Client, projectName string, planConfigs []metricConfigurationModel, patternIdRule int, samplingIntervalS int64) diag.Diagnostics {
 	var diags diag.Diagnostics
 	var allPostData []client.MetricAlertSettingPost
 
-	for _, cfg := range planConfigs {
+	// compErr holds the result of one concurrent SetMetricComponents call.
+	type compErr struct{ summary, detail string }
+	// Slot i*2 = escalateIncident for metric i; slot i*2+1 = ignored for metric i.
+	compErrs := make([]compErr, len(planConfigs)*2)
+	var wg sync.WaitGroup
+
+	for i, cfg := range planConfigs {
 		metricName := cfg.MetricName.ValueString()
 
 		if !cfg.EscalateIncidentComponents.IsNull() && !cfg.EscalateIncidentComponents.IsUnknown() {
@@ -2205,9 +2228,17 @@ func applyMetricConfigurations(ctx context.Context, c *client.Client, projectNam
 			d := cfg.EscalateIncidentComponents.ElementsAs(ctx, &escalateComps, false)
 			diags.Append(d...)
 			if !diags.HasError() {
-				if err := c.SetMetricComponents(projectName, metricName, "escalateIncident", escalateComps); err != nil {
-					diags.AddError(fmt.Sprintf("Error setting escalateIncident components for %s", metricName), err.Error())
-				}
+				wg.Add(1)
+				errIdx, name, comps := i*2, metricName, escalateComps
+				go func() {
+					defer wg.Done()
+					if err := c.SetMetricComponents(projectName, name, "escalateIncident", comps); err != nil {
+						compErrs[errIdx] = compErr{
+							fmt.Sprintf("Error setting escalateIncident components for %s", name),
+							err.Error(),
+						}
+					}
+				}()
 			}
 		}
 
@@ -2216,9 +2247,17 @@ func applyMetricConfigurations(ctx context.Context, c *client.Client, projectNam
 			d := cfg.IgnoredComponents.ElementsAs(ctx, &ignoredComps, false)
 			diags.Append(d...)
 			if !diags.HasError() {
-				if err := c.SetMetricComponents(projectName, metricName, "ignored", ignoredComps); err != nil {
-					diags.AddError(fmt.Sprintf("Error setting ignored components for %s", metricName), err.Error())
-				}
+				wg.Add(1)
+				errIdx, name, comps := i*2+1, metricName, ignoredComps
+				go func() {
+					defer wg.Done()
+					if err := c.SetMetricComponents(projectName, name, "ignored", comps); err != nil {
+						compErrs[errIdx] = compErr{
+							fmt.Sprintf("Error setting ignored components for %s", name),
+							err.Error(),
+						}
+					}
+				}()
 			}
 		}
 
@@ -2231,6 +2270,14 @@ func applyMetricConfigurations(ctx context.Context, c *client.Client, projectNam
 					allPostData = append(allPostData, buildSingleMetricAlertSettingPost(metricName, s, samplingIntervalS))
 				}
 			}
+		}
+	}
+
+	wg.Wait()
+
+	for _, ce := range compErrs {
+		if ce.summary != "" {
+			diags.AddError(ce.summary, ce.detail)
 		}
 	}
 
