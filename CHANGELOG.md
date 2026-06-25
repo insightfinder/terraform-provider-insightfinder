@@ -5,6 +5,13 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.9.8] - 2026-06-25
+
+### Changed
+- **insightfinder_metric_project**: `metric_configurations` read now fetches all metric alert settings in a single paginated bulk request (`GetAllMetricSettings`) instead of one API call per metric, significantly reducing plan/refresh latency for projects with many metrics.
+- **insightfinder_metric_project**: Component escalation (`escalate_incident_components`) and ignored (`ignored_components`) API calls are now dispatched concurrently across metrics during apply, reducing apply time proportionally to the number of configured metrics.
+- **insightfinder_metric_project**: Reduced the retry limit for transient 502 errors on the metric component endpoint from 5 attempts to 3, and changed the retry back-off from a linear 3 s × attempt delay to a fixed 500 ms delay.
+
 ## [1.9.7] - 2026-06-19
 
 ### Added

@@ -294,6 +294,57 @@ func (c *Client) GetMetricSettings(projectName, metricName string) (*MetricSetti
 	return nil, nil
 }
 
+// GetAllMetricSettings fetches all metric alert settings for a project using paginated
+// requests without a metric filter, returning a map keyed by metric name.
+// This is far more efficient than calling GetMetricSettings once per metric when
+// reading configurations for many metrics.
+func (c *Client) GetAllMetricSettings(projectName string) (map[string]*MetricSettingEntry, error) {
+	result := make(map[string]*MetricSettingEntry)
+	start := 0
+	limit := 500
+
+	for {
+		params := url.Values{}
+		params.Set("onlyIsKpi", "false")
+		params.Set("onlyComputeDifference", "false")
+		params.Set("projectName", projectName+"@"+c.Username)
+		params.Set("start", fmt.Sprintf("%d", start))
+		params.Set("limit", fmt.Sprintf("%d", limit))
+		params.Set("customerName", c.Username)
+		params.Set("tzOffset", "-14400000")
+
+		apiPath := "/api/external/v1/componentmetricupdate?" + params.Encode()
+		body, statusCode, err := c.DoRequest("GET", apiPath, nil)
+		if err != nil {
+			return nil, err
+		}
+		if statusCode == 404 || statusCode == 204 {
+			break
+		}
+		if statusCode != 200 {
+			return nil, fmt.Errorf("failed to get all metric settings: HTTP %d - %s", statusCode, string(body))
+		}
+
+		var resp GetMetricSettingsResponse
+		if err := json.Unmarshal(body, &resp); err != nil {
+			return nil, fmt.Errorf("failed to parse metric settings response: %w", err)
+		}
+
+		for i, entry := range resp.MetricSetting {
+			if name := entry.GlobalSetting.SMetric; name != "" {
+				result[name] = &resp.MetricSetting[i]
+			}
+		}
+
+		if resp.ReachEnd {
+			break
+		}
+		start += limit
+	}
+
+	return result, nil
+}
+
 // SetMetricSettings sends a pre-serialized JSON array of MetricAlertSettingPost entries for a project.
 // data is the raw JSON bytes (built by the resource layer to handle rougeValue properly).
 func (c *Client) SetMetricSettings(projectName string, patternIdGenerationRule int, data []byte) error {
@@ -519,7 +570,7 @@ func (c *Client) postMetricComponent(projectName, metricName, operation string, 
 	var body []byte
 	var statusCode int
 	var err error
-	for attempt := 1; attempt <= 5; attempt++ {
+	for attempt := 1; attempt <= 3; attempt++ {
 		body, statusCode, err = c.DoFormRequest("POST", "/api/external/v1/metriccomponent", formData)
 		if err != nil {
 			return err
@@ -527,7 +578,7 @@ func (c *Client) postMetricComponent(projectName, metricName, operation string, 
 		if statusCode != 502 {
 			break
 		}
-		time.Sleep(time.Duration(attempt) * 3 * time.Second)
+		time.Sleep(500 * time.Millisecond)
 	}
 	if statusCode != 200 {
 		return fmt.Errorf("failed to set metric component (%s/%s): HTTP %d - %s", metricName, operation, statusCode, string(body))
