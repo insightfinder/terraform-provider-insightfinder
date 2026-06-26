@@ -9,6 +9,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"sort"
+	"strings"
 	"sync"
 
 	"github.com/hashicorp/terraform-plugin-framework/attr"
@@ -213,6 +214,7 @@ type metricAlertSettingModel struct {
 	EnableBaselineNearConstance        types.Bool   `tfsdk:"enable_baseline_near_constance"`
 	ComputeDifference                  types.Bool   `tfsdk:"compute_difference"`
 	AnomalyGapToleranceDuration        types.Int64  `tfsdk:"anomaly_gap_tolerance_duration"`
+	DetectionAnomalyType               types.Int64  `tfsdk:"detection_anomaly_type"`
 }
 
 // metricConfigurationModel is the internal representation of one metric_configurations entry.
@@ -273,6 +275,7 @@ func metricAlertSettingAttrTypes() map[string]attr.Type {
 		"enable_baseline_near_constance":          types.BoolType,
 		"compute_difference":                      types.BoolType,
 		"anomaly_gap_tolerance_duration":          types.Int64Type,
+		"detection_anomaly_type":                  types.Int64Type,
 	}
 }
 
@@ -876,6 +879,7 @@ func (r *metricProjectResource) Schema(_ context.Context, _ resource.SchemaReque
 									"enable_baseline_near_constance": schema.BoolAttribute{Description: "Enable baseline near constance detection.", Optional: true},
 									"compute_difference":             schema.BoolAttribute{Description: "Compute difference for this metric.", Optional: true},
 									"anomaly_gap_tolerance_duration": schema.Int64Attribute{Description: "Anomaly gap tolerance duration in milliseconds.", Optional: true, Computed: true},
+									"detection_anomaly_type":         schema.Int64Attribute{Description: "Anomaly detection type integer (0, 1, 2, etc.).", Optional: true, Computed: true},
 									"rouge_value": schema.StringAttribute{
 										Description: "Rouge value as raw JSON string from API (e.g., '{\"l\":NaN,\"s\":NaN}'). Null to disable.",
 										Optional:    true,
@@ -1984,6 +1988,7 @@ func buildMetricAlertSettingFromAPI(s client.MetricAlertSetting) metricAlertSett
 		EnableBaselineNearConstance:        types.BoolValue(s.EnableBaselineNearConstance),
 		ComputeDifference:                  types.BoolValue(s.ComputeDifference),
 		AnomalyGapToleranceDuration:        types.Int64Value(s.AnomalyGapToleranceDuration),
+		DetectionAnomalyType:               types.Int64Value(s.DetectionAnomalyType),
 	}
 	if s.CValueOverride != nil {
 		m.CValueOverride = types.Int64Value(*s.CValueOverride)
@@ -2028,6 +2033,7 @@ func buildSingleMetricAlertSettingPost(metricName string, s metricAlertSettingMo
 	return client.MetricAlertSettingPost{
 		SMetric:                            metricName,
 		ComponentName:                      s.ComponentName.ValueString(),
+		IsComponetLevel:                    !strings.HasPrefix(s.ComponentName.ValueString(), "Global_"),
 		ThresholdAlertLowerBound:           s.ThresholdAlertLowerBound.ValueString(),
 		ThresholdAlertUpperBound:           s.ThresholdAlertUpperBound.ValueString(),
 		ThresholdAlertLowerBoundNegative:   s.ThresholdAlertLowerBoundNegative.ValueString(),
@@ -2048,6 +2054,7 @@ func buildSingleMetricAlertSettingPost(metricName string, s metricAlertSettingMo
 		IsFlappingResultOnly:               s.IsFlappingResultOnly.ValueBool(),
 		IncidentDurationThreshold:          s.IncidentDurationThreshold.ValueInt64(),
 		DetectionType:                      detectionType,
+		DetectionAnomalyType:               s.DetectionAnomalyType.ValueInt64(),
 		PatternNameHigher:                  s.PatternNameHigher.ValueString(),
 		PatternNameLower:                   s.PatternNameLower.ValueString(),
 		MetricType:                         s.MetricType.ValueString(),
@@ -2203,6 +2210,9 @@ func preserveConfiguredNulls(m *metricAlertSettingModel, existingByComponent map
 	}
 	if old.ComputeDifference.IsNull() {
 		m.ComputeDifference = types.BoolNull()
+	}
+	if old.DetectionAnomalyType.IsNull() {
+		m.DetectionAnomalyType = types.Int64Null()
 	}
 }
 
