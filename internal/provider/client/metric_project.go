@@ -140,6 +140,7 @@ type MetricProjectSettings struct {
 type MetricAlertSetting struct {
 	SMetric                            string  `json:"smetric"`
 	ComponentName                      string  `json:"componentName"`
+	IsComponetLevel                    bool    `json:"isComponetLevel"` // API typo: "Componet" not "Component"
 	ThresholdAlertLowerBound           string  `json:"thresholdAlertLowerBound"`
 	ThresholdAlertUpperBound           string  `json:"thresholdAlertUpperBound"`
 	ThresholdAlertLowerBoundNegative   string  `json:"thresholdAlertLowerBoundNegative"`
@@ -160,6 +161,7 @@ type MetricAlertSetting struct {
 	IsFlappingResultOnly               bool    `json:"isFlappingResultOnly"`
 	IncidentDurationThreshold          int64   `json:"incidentDurationThreshold"`
 	DetectionType                      string  `json:"detectionType"`
+	DetectionAnomalyType               int64   `json:"detectionAnomalyType"`
 	CValueOverride                     *int64  `json:"cValueOverride"`
 	HighCValueOverride                 *int64  `json:"highCValueOverride"`
 	PatternNameHigher                  string  `json:"patternNameHigher"`
@@ -177,6 +179,7 @@ type MetricAlertSetting struct {
 type MetricAlertSettingPost struct {
 	SMetric                            string          `json:"smetric"`
 	ComponentName                      string          `json:"componentName"`
+	IsComponetLevel                    bool            `json:"isComponetLevel"` // API typo: "Componet" not "Component"
 	ThresholdAlertLowerBound           string          `json:"thresholdAlertLowerBound"`
 	ThresholdAlertUpperBound           string          `json:"thresholdAlertUpperBound"`
 	ThresholdAlertLowerBoundNegative   string          `json:"thresholdAlertLowerBoundNegative"`
@@ -197,6 +200,7 @@ type MetricAlertSettingPost struct {
 	IsFlappingResultOnly               bool            `json:"isFlappingResultOnly"`
 	IncidentDurationThreshold          int64           `json:"incidentDurationThreshold"`
 	DetectionType                      string          `json:"detectionType"`
+	DetectionAnomalyType               int64           `json:"detectionAnomalyType"`
 	CValueOverride                     *int64          `json:"cValueOverride"`
 	HighCValueOverride                 *int64          `json:"highCValueOverride"`
 	PatternNameHigher                  string          `json:"patternNameHigher"`

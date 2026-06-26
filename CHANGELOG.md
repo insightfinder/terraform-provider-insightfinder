@@ -5,6 +5,13 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.9.10] - 2026-06-26
+
+### Added
+- **insightfinder_metric_project**: Two new fields in `metric_alert_settings` to match updated API:
+  - `detection_anomaly_type` (Number, Optional, Computed) — anomaly detection type for the metric (any integer, e.g. `0`, `1`, `2`). Maps to `detectionAnomalyType` in the component metric update API.
+  - `isComponetLevel` is now included in POST payloads automatically (derived from `component_name`; not a user-facing attribute).
+
 ## [1.9.9] - 2026-06-25
 
 ### Fixed
