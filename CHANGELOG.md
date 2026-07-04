@@ -5,6 +5,18 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.10.0] - 2026-07-04
+
+### Added
+- **insightfinder_slack**: New resource for managing InsightFinder Slack integrations.
+  - Top-level attributes: `system_name`, `webhook` (Sensitive), `channel_name`, `options` (Set of String).
+  - `project_configs` (List of Object) — per-project notification overrides: `project_name`, `channel`, `webhook` (Sensitive), `options`, `enable_consolidation_info_update`, `priority_levels`, and an optional `rule` block (`type`, `keyword`) to filter which alerts are sent.
+  - Managed via `GET /api/external/v1/system/externalServlies/list?serviceProvider=Slack` (read), `POST /api/external/v1/service-integration` (create), and `POST /api/v2/update-ext-service-by-licenseKey` (update — authenticated with `X-User-Name`/`X-License-Key` headers instead of `X-API-Key`, and sent as a form-encoded body rather than a query string to avoid HTTP 414 errors with large `project_configs` lists).
+  - `id` is the API-generated account ID; since the create API doesn't return it directly, it's determined by diffing the list of accounts for the system before and after creation.
+  - `Create` first checks for an existing integration matching the same system, username, webhook, and channel — if found, it adopts and updates that integration instead of creating a duplicate.
+  - `Update` locates the integration to modify by matching its prior system/webhook/channel identity (not the stored `id`) against the list of existing integrations, mirroring how the InsightFinder UI resolves updates.
+- **generator**: `auto_generate_terraform.py` now also generates an environment-level `ENV/slack/` Terraform module from existing Slack integrations, mirroring the `ENV/servicenow/` module. Webhook values are inlined directly (no generated variables/secrets), one `.tf` file per integration.
+
 ## [1.9.10] - 2026-06-26
 
 ### Added

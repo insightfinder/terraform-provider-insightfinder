@@ -6,7 +6,7 @@ description: |-
 
 # InsightFinder Provider
 
-The InsightFinder provider allows you to manage InsightFinder resources using Terraform. Use it to create and configure projects, integrate with ServiceNow, manage JWT authentication, and configure log processing rules.
+The InsightFinder provider allows you to manage InsightFinder resources using Terraform. Use it to create and configure projects, integrate with ServiceNow and Slack, manage JWT authentication, and configure log processing rules.
 
 ## Example Usage
 

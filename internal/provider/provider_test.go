@@ -157,6 +157,7 @@ func TestProviderResources(t *testing.T) {
 		"insightfinder_project":         false,
 		"insightfinder_metric_project":  false,
 		"insightfinder_servicenow":      false,
+		"insightfinder_slack":           false,
 		"insightfinder_jwt_config":      false,
 		"insightfinder_log_labels":      false,
 		"insightfinder_system_settings": false,
