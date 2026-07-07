@@ -59,12 +59,14 @@ type slackProjectConfigModel struct {
 
 // slackResourceModel maps the resource schema data.
 type slackResourceModel struct {
-	ID             types.String `tfsdk:"id"`
-	SystemName     types.String `tfsdk:"system_name"`
-	Webhook        types.String `tfsdk:"webhook"`
-	ChannelName    types.String `tfsdk:"channel_name"`
-	Options        types.Set    `tfsdk:"options"`
-	ProjectConfigs types.List   `tfsdk:"project_configs"`
+	ID                     types.String `tfsdk:"id"`
+	SystemName             types.String `tfsdk:"system_name"`
+	Webhook                types.String `tfsdk:"webhook"`
+	ChannelName            types.String `tfsdk:"channel_name"`
+	Options                types.Set    `tfsdk:"options"`
+	ProjectConfigs         types.List   `tfsdk:"project_configs"`
+	PriorityUpgradeChannel types.String `tfsdk:"priority_upgrade_channel"`
+	PriorityUpgradeWebhook types.String `tfsdk:"priority_upgrade_webhook"`
 }
 
 // Metadata returns the resource type name.
@@ -101,6 +103,19 @@ func (r *slackResource) Schema(_ context.Context, _ resource.SchemaRequest, resp
 				Description: "Notification types to send to Slack (e.g., 'Detected Incident', 'Predicted Incident', 'New Pattern Alert', 'Missing Monitoring Data').",
 				Required:    true,
 				ElementType: types.StringType,
+			},
+			"priority_upgrade_channel": schema.StringAttribute{
+				Description: "Slack channel to notify when an incident's priority is upgraded.",
+				Optional:    true,
+				Computed:    true,
+				Default:     stringdefault.StaticString(""),
+			},
+			"priority_upgrade_webhook": schema.StringAttribute{
+				Description: "Slack webhook URL to notify when an incident's priority is upgraded.",
+				Optional:    true,
+				Computed:    true,
+				Sensitive:   true,
+				Default:     stringdefault.StaticString(""),
 			},
 			"project_configs": schema.ListNestedAttribute{
 				Description: "Per-project Slack notification overrides. A project may appear more than once to notify multiple channels.",
@@ -213,11 +228,13 @@ func (r *slackResource) Create(ctx context.Context, req resource.CreateRequest, 
 	}
 
 	config := &client.SlackConfig{
-		SystemID:       systemID,
-		WebHook:        plan.Webhook.ValueString(),
-		ChannelName:    plan.ChannelName.ValueString(),
-		Options:        options,
-		ProjectConfigs: projectConfigs,
+		SystemID:               systemID,
+		WebHook:                plan.Webhook.ValueString(),
+		ChannelName:            plan.ChannelName.ValueString(),
+		Options:                options,
+		ProjectConfigs:         projectConfigs,
+		PriorityUpgradeChannel: plan.PriorityUpgradeChannel.ValueString(),
+		PriorityUpgradeWebhook: plan.PriorityUpgradeWebhook.ValueString(),
 	}
 
 	account, err := r.client.CreateSlackConfig(config, r.client.Username)
@@ -264,6 +281,8 @@ func (r *slackResource) Read(ctx context.Context, req resource.ReadRequest, resp
 
 	state.Webhook = types.StringValue(config.WebHook)
 	state.ChannelName = types.StringValue(config.ChannelName)
+	state.PriorityUpgradeChannel = types.StringValue(config.PriorityUpgradeChannel)
+	state.PriorityUpgradeWebhook = types.StringValue(config.PriorityUpgradeWebhook)
 
 	optionsSet, diags := types.SetValueFrom(ctx, types.StringType, config.Options)
 	resp.Diagnostics.Append(diags...)
@@ -341,11 +360,13 @@ func (r *slackResource) Update(ctx context.Context, req resource.UpdateRequest, 
 	}
 
 	newConfig := &client.SlackConfig{
-		SystemID:       systemID,
-		WebHook:        plan.Webhook.ValueString(),
-		ChannelName:    plan.ChannelName.ValueString(),
-		Options:        options,
-		ProjectConfigs: projectConfigs,
+		SystemID:               systemID,
+		WebHook:                plan.Webhook.ValueString(),
+		ChannelName:            plan.ChannelName.ValueString(),
+		Options:                options,
+		ProjectConfigs:         projectConfigs,
+		PriorityUpgradeChannel: plan.PriorityUpgradeChannel.ValueString(),
+		PriorityUpgradeWebhook: plan.PriorityUpgradeWebhook.ValueString(),
 	}
 
 	// The integration to update is located by matching the prior system, webhook, and

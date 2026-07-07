@@ -25,6 +25,10 @@ resource "insightfinder_slack" "full" {
     "Missing Monitoring Data"
   ]
 
+  # Notify a dedicated channel when an incident's priority is upgraded.
+  priority_upgrade_channel = "#aiops-priority-upgrades"
+  priority_upgrade_webhook = var.slack_webhook
+
   # Send a subset of alert types for specific projects to a different channel,
   # optionally filtered by a match rule and priority levels.
   project_configs = [
