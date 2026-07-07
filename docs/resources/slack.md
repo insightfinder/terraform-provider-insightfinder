@@ -42,6 +42,10 @@ resource "insightfinder_slack" "full" {
     "Missing Monitoring Data"
   ]
 
+  # Notify a dedicated channel when an incident's priority is upgraded.
+  priority_upgrade_channel = "#aiops-priority-upgrades"
+  priority_upgrade_webhook = var.slack_webhook
+
   # Send a subset of alert types for specific projects to a different channel,
   # optionally filtered by a match rule and priority levels.
   project_configs = [
@@ -81,6 +85,8 @@ resource "insightfinder_slack" "full" {
 
 ### Optional
 
+- `priority_upgrade_channel` (String, Computed) Slack channel to notify when an incident's priority is upgraded.
+- `priority_upgrade_webhook` (String, Sensitive, Computed) Slack webhook URL to notify when an incident's priority is upgraded.
 - `project_configs` (List of Object) Per-project Slack notification overrides. A project may appear more than once to notify multiple channels. Each object supports:
   - `project_name` (String, Required) InsightFinder project name.
   - `channel` (String, Computed) Slack channel override for this project. Defaults to the top-level `channel_name` when empty.
