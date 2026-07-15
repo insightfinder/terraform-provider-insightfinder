@@ -483,8 +483,21 @@ func (c *Client) UpdateSlackConfig(oldSystemID, oldWebHook, oldChannelName strin
 	return account, nil
 }
 
-// DeleteSlackConfig removes a Slack integration identified by its account ID.
-func (c *Client) DeleteSlackConfig(account, username string) error {
+// DeleteSlackConfig removes a Slack integration matching systemID, webHook, and channelName.
+//
+// As with UpdateSlackConfig, the integration to delete is located via findSlackAccount rather
+// than trusting a previously stored account ID, since the account ID can drift from what's in
+// state (e.g. if the integration was recreated outside Terraform). If no matching integration
+// is found, the resource is already gone and delete is a no-op.
+func (c *Client) DeleteSlackConfig(systemID, webHook, channelName, username string) error {
+	account, found, err := c.findSlackAccount(systemID, username, webHook, channelName)
+	if err != nil {
+		return err
+	}
+	if !found {
+		return nil
+	}
+
 	serviceID := fmt.Sprintf("Slack:%s:%s", account, slackServiceHost)
 
 	formData := url.Values{}
