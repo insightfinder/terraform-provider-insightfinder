@@ -406,7 +406,13 @@ func (r *slackResource) Delete(ctx context.Context, req resource.DeleteRequest, 
 		"id": state.ID.ValueString(),
 	})
 
-	if err := r.client.DeleteSlackConfig(state.ID.ValueString(), r.client.Username); err != nil {
+	systemID, err := r.resolveSystemID(state.SystemName.ValueString())
+	if err != nil {
+		resp.Diagnostics.AddError("Error Resolving System Name", err.Error())
+		return
+	}
+
+	if err := r.client.DeleteSlackConfig(systemID, state.Webhook.ValueString(), state.ChannelName.ValueString(), r.client.Username); err != nil {
 		resp.Diagnostics.AddError(
 			"Error Deleting Slack Integration",
 			"Could not delete Slack integration: "+err.Error(),

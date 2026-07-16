@@ -382,7 +382,7 @@ func (c *Client) DeleteServiceNowConfig(account, serviceHost, username string) e
 	serviceID := fmt.Sprintf("ServiceNow:%s:%s", account, serviceHost)
 
 	formData := url.Values{}
-	formData.Set("serviceProvider", "PagerDuty")
+	formData.Set("serviceProvider", "ServiceNow")
 	formData.Set("operation", "delete")
 	formData.Set("service_id", serviceID)
 	formData.Set("serviceOwner", username)
