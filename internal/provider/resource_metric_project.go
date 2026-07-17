@@ -177,8 +177,9 @@ type metricProjectResourceModel struct {
 	// Metric configurations (per-metric alert thresholds + component operations)
 	MetricConfigurations types.Map `tfsdk:"metric_configurations"`
 
-	Mode types.Int64 `tfsdk:"mode"`
+	Mode                                  types.Int64  `tfsdk:"mode"`
 	IncidentPriorityByAnomalyScoreSetting types.String `tfsdk:"incident_priority_by_anomaly_score_setting"`
+	IncidentPriorityCapSetting            types.String `tfsdk:"incident_priority_cap_setting"`
 }
 
 // metricAlertSettingModel maps one entry in metric_alert_settings.
@@ -818,6 +819,11 @@ func (r *metricProjectResource) Schema(_ context.Context, _ resource.SchemaReque
 				Optional:    true,
 				Computed:    true,
 			},
+			"incident_priority_cap_setting": schema.StringAttribute{
+				Description: "Incident priority cap settings (JSON). Contains 'ticketCreationPriorityCap' and 'suggestedPriorityCap' string values (e.g. '{\"ticketCreationPriorityCap\":\"5\",\"suggestedPriorityCap\":\"3\"}').",
+				Optional:    true,
+				Computed:    true,
+			},
 			"metric_configurations": schema.MapNestedAttribute{
 				Description: "Per-metric alert threshold and component configurations, keyed by metric name.",
 				Optional:    true,
@@ -1214,6 +1220,11 @@ func populateMetricSettings(plan *metricProjectResourceModel) map[string]interfa
 			s["incidentPriorityByAnomalyScoreSetting"] = parsed
 		}
 	}
+	if !plan.IncidentPriorityCapSetting.IsNull() {
+		if parsed := parseJSONField(plan.IncidentPriorityCapSetting.ValueString()); parsed != nil {
+			s["incidentPriorityCapSetting"] = parsed
+		}
+	}
 
 	return s
 }
@@ -1366,6 +1377,7 @@ func populateMetricStateFromSettings(m *metricProjectResourceModel, settings map
 	m.SharedUsernames = getJSONString("sharedUsernames")
 	m.WebhookHeaderList = getJSONString("webhookHeaderList")
 	m.IncidentPriorityByAnomalyScoreSetting = getJSONString("incidentPriorityByAnomalyScoreSetting")
+	m.IncidentPriorityCapSetting = getJSONString("incidentPriorityCapSetting")
 }
 
 // preserveMetricConfigValues overwrites state fields with explicit config values to prevent drift.
@@ -1486,6 +1498,7 @@ func preserveMetricConfigValues(plan *metricProjectResourceModel, config *metric
 	}
 	preserveInt(&plan.Mode, &config.Mode)
 	preserve(&plan.IncidentPriorityByAnomalyScoreSetting, &config.IncidentPriorityByAnomalyScoreSetting)
+	preserve(&plan.IncidentPriorityCapSetting, &config.IncidentPriorityCapSetting)
 }
 
 func (r *metricProjectResource) Create(ctx context.Context, req resource.CreateRequest, resp *resource.CreateResponse) {

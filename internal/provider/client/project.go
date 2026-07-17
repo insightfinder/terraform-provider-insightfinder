@@ -27,42 +27,45 @@ type ProjectConfig struct {
 
 // Settings fields struct
 type ProjectSettings struct {
-	DailyModelSpan            int    `json:"dailyModelSpan,omitempty"`
-	KeywordFeatureNumber      int    `json:"keywordFeatureNumber,omitempty"`
-	MaxLogModelSize           int    `json:"maxLogModelSize,omitempty"`
-	ModelKeywordSetting       int    `json:"modelKeywordSetting,omitempty"`
-	NlpFlag                   bool   `json:"nlpFlag,omitempty"`
-	ProjectModelFlag          bool   `json:"projectModelFlag,omitempty"`
-	MaximumThreads            int    `json:"maximumThreads,omitempty"`
-	LogDetectionMinCount      int    `json:"logDetectionMinCount,omitempty"`
-	LogDetectionSize          int    `json:"logDetectionSize,omitempty"`
-	MaximumDetectionWaitTime  int    `json:"maximumDetectionWaitTime,omitempty"`
-	KeywordSetting            int    `json:"keywordSetting,omitempty"`
-	LogPatternLimitLevel      int    `json:"logPatternLimitLevel,omitempty"`
-	NormalEventCausalFlag     bool   `json:"normalEventCausalFlag,omitempty"`
-	SimilaritySensitivity     string `json:"similaritySensitivity,omitempty"`
-	CollectAllRareEventsFlag  bool   `json:"collectAllRareEventsFlag,omitempty"`
-	RareEventAlertThresholds  int    `json:"rareEventAlertThresholds"`
-	LogAnomalyEventBaseScore  string `json:"logAnomalyEventBaseScore,omitempty"`
-	RareNumberLimit           int    `json:"rareNumberLimit,omitempty"`
-	WhitelistNumberLimit      int    `json:"whitelistNumberLimit,omitempty"`
-	NewPatternNumberLimit     int    `json:"newPatternNumberLimit,omitempty"`
-	HotNumberLimit            int    `json:"hotNumberLimit,omitempty"`
-	ColdNumberLimit           int    `json:"coldNumberLimit,omitempty"`
-	RareAnomalyType           int    `json:"rareAnomalyType,omitempty"`
-	HotEventThreshold         int    `json:"hotEventThreshold,omitempty"`
-	ColdEventThreshold        int    `json:"coldEventThreshold,omitempty"`
-	DisableLogCompressEvent   bool   `json:"disableLogCompressEvent,omitempty"`
-	EnableHotEvent            bool   `json:"enableHotEvent,omitempty"`
-	HotEventCalmDownPeriod    int    `json:"hotEventCalmDownPeriod,omitempty"`
-	InstanceDownEnable        bool   `json:"instanceDownEnable,omitempty"`
-	AnomalySamplingInterval   int    `json:"anomalySamplingInterval,omitempty"`
-	HotEventDetectionMode     int    `json:"hotEventDetectionMode,omitempty"`
-	AnomalyDetectionMode      int    `json:"anomalyDetectionMode,omitempty"`
-	PrettyJSONConvertorFlag   bool   `json:"prettyJsonConvertorFlag,omitempty"`
-	ZoneNameKey               string `json:"zoneNameKey"`
-	MultiLineFlag             bool   `json:"multiLineFlag,omitempty"`
-	FeatureOutlierSensitivity string `json:"featureOutlierSensitivity,omitempty"`
+	DailyModelSpan            int     `json:"dailyModelSpan,omitempty"`
+	KeywordFeatureNumber      int     `json:"keywordFeatureNumber,omitempty"`
+	MaxLogModelSize           int     `json:"maxLogModelSize,omitempty"`
+	ModelKeywordSetting       int     `json:"modelKeywordSetting,omitempty"`
+	ModelMatchThreshold       float64 `json:"modelMatchThreshold,omitempty"`
+	ModelKeywordSegmentK      int     `json:"modelKeywordSegmentK,omitempty"`
+	NlpFlag                   bool    `json:"nlpFlag,omitempty"`
+	DisableLogProcessingFlag  bool    `json:"disableLogProcessingFlag,omitempty"`
+	ProjectModelFlag          bool    `json:"projectModelFlag,omitempty"`
+	MaximumThreads            int     `json:"maximumThreads,omitempty"`
+	LogDetectionMinCount      int     `json:"logDetectionMinCount,omitempty"`
+	LogDetectionSize          int     `json:"logDetectionSize,omitempty"`
+	MaximumDetectionWaitTime  int     `json:"maximumDetectionWaitTime,omitempty"`
+	KeywordSetting            int     `json:"keywordSetting,omitempty"`
+	LogPatternLimitLevel      int     `json:"logPatternLimitLevel,omitempty"`
+	NormalEventCausalFlag     bool    `json:"normalEventCausalFlag,omitempty"`
+	SimilaritySensitivity     string  `json:"similaritySensitivity,omitempty"`
+	CollectAllRareEventsFlag  bool    `json:"collectAllRareEventsFlag,omitempty"`
+	RareEventAlertThresholds  int     `json:"rareEventAlertThresholds"`
+	LogAnomalyEventBaseScore  string  `json:"logAnomalyEventBaseScore,omitempty"`
+	RareNumberLimit           int     `json:"rareNumberLimit,omitempty"`
+	WhitelistNumberLimit      int     `json:"whitelistNumberLimit,omitempty"`
+	NewPatternNumberLimit     int     `json:"newPatternNumberLimit,omitempty"`
+	HotNumberLimit            int     `json:"hotNumberLimit,omitempty"`
+	ColdNumberLimit           int     `json:"coldNumberLimit,omitempty"`
+	RareAnomalyType           int     `json:"rareAnomalyType,omitempty"`
+	HotEventThreshold         int     `json:"hotEventThreshold,omitempty"`
+	ColdEventThreshold        int     `json:"coldEventThreshold,omitempty"`
+	DisableLogCompressEvent   bool    `json:"disableLogCompressEvent,omitempty"`
+	EnableHotEvent            bool    `json:"enableHotEvent,omitempty"`
+	HotEventCalmDownPeriod    int     `json:"hotEventCalmDownPeriod,omitempty"`
+	InstanceDownEnable        bool    `json:"instanceDownEnable,omitempty"`
+	AnomalySamplingInterval   int     `json:"anomalySamplingInterval,omitempty"`
+	HotEventDetectionMode     int     `json:"hotEventDetectionMode,omitempty"`
+	AnomalyDetectionMode      int     `json:"anomalyDetectionMode,omitempty"`
+	PrettyJSONConvertorFlag   bool    `json:"prettyJsonConvertorFlag,omitempty"`
+	ZoneNameKey               string  `json:"zoneNameKey"`
+	MultiLineFlag             bool    `json:"multiLineFlag,omitempty"`
+	FeatureOutlierSensitivity string  `json:"featureOutlierSensitivity,omitempty"`
 	BaseValueSetting          struct {
 		IsSourceProject       bool          `json:"isSourceProject,omitempty"`
 		MappingKeys           []interface{} `json:"mappingKeys,omitempty"`
@@ -177,9 +180,13 @@ type ProjectSettings struct {
 		AwSeverityLevel                    string `json:"awSeverityLevel,omitempty"`
 	} `json:"emailSetting,omitempty"`
 	IncidentPriorityByAnomalyScoreSetting struct {
-		Enabled              bool              `json:"enabled,omitempty"`
+		Enabled               bool              `json:"enabled,omitempty"`
 		PriorityScoreRangeMap map[string]string `json:"priorityScoreRangeMap,omitempty"`
 	} `json:"incidentPriorityByAnomalyScoreSetting,omitempty"`
+	IncidentPriorityCapSetting struct {
+		TicketCreationPriorityCap string `json:"ticketCreationPriorityCap,omitempty"`
+		SuggestedPriorityCap      string `json:"suggestedPriorityCap,omitempty"`
+	} `json:"incidentPriorityCapSetting,omitempty"`
 }
 
 // ProjectResponse represents the API response for project operations

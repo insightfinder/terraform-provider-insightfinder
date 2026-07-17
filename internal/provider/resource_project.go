@@ -98,18 +98,21 @@ type projectResourceModel struct {
 	ShowInstanceDown           types.Bool `tfsdk:"show_instance_down"`
 
 	// Log Settings
-	KeywordFeatureNumber     types.Int64  `tfsdk:"keyword_feature_number"`
-	KeywordSetting           types.Int64  `tfsdk:"keyword_setting"`
-	LargeProject             types.Bool   `tfsdk:"large_project"`
-	LogAnomalyEventBaseScore types.String `tfsdk:"log_anomaly_event_base_score"`
-	LogDetectionMinCount     types.Int64  `tfsdk:"log_detection_min_count"`
-	LogDetectionSize         types.Int64  `tfsdk:"log_detection_size"`
-	LogPatternLimitLevel     types.Int64  `tfsdk:"log_pattern_limit_level"`
-	MaxLogModelSize          types.Int64  `tfsdk:"max_log_model_size"`
-	ModelKeywordSetting      types.Int64  `tfsdk:"model_keyword_setting"`
-	MultiLineFlag            types.Bool   `tfsdk:"multi_line_flag"`
-	NlpFlag                  types.Bool   `tfsdk:"nlp_flag"`
-	PrettyJsonConvertorFlag  types.Bool   `tfsdk:"pretty_json_convertor_flag"`
+	KeywordFeatureNumber     types.Int64   `tfsdk:"keyword_feature_number"`
+	KeywordSetting           types.Int64   `tfsdk:"keyword_setting"`
+	LargeProject             types.Bool    `tfsdk:"large_project"`
+	LogAnomalyEventBaseScore types.String  `tfsdk:"log_anomaly_event_base_score"`
+	LogDetectionMinCount     types.Int64   `tfsdk:"log_detection_min_count"`
+	LogDetectionSize         types.Int64   `tfsdk:"log_detection_size"`
+	LogPatternLimitLevel     types.Int64   `tfsdk:"log_pattern_limit_level"`
+	MaxLogModelSize          types.Int64   `tfsdk:"max_log_model_size"`
+	ModelKeywordSetting      types.Int64   `tfsdk:"model_keyword_setting"`
+	ModelMatchThreshold      types.Float64 `tfsdk:"model_match_threshold"`
+	ModelKeywordSegmentK     types.Int64   `tfsdk:"model_keyword_segment_k"`
+	MultiLineFlag            types.Bool    `tfsdk:"multi_line_flag"`
+	NlpFlag                  types.Bool    `tfsdk:"nlp_flag"`
+	DisableLogProcessingFlag types.Bool    `tfsdk:"disable_log_processing_flag"`
+	PrettyJsonConvertorFlag  types.Bool    `tfsdk:"pretty_json_convertor_flag"`
 
 	// Prediction and Root Cause Settings
 	MaximumDetectionWaitTime             types.Int64   `tfsdk:"maximum_detection_wait_time"`
@@ -155,23 +158,24 @@ type projectResourceModel struct {
 	ZoneNameKey                  types.String `tfsdk:"zone_name_key"`
 
 	// Complex object fields (will use types.String for JSON encoding)
-	BaseValueSetting                 types.String `tfsdk:"base_value_setting"`
-	CdfSetting                       types.String `tfsdk:"cdf_setting"`
-	EmailSetting                     types.String `tfsdk:"email_setting"`
-	InstanceGroupingUpdate           types.String `tfsdk:"instance_grouping_update"`
-	LlmEvaluationSetting             types.String `tfsdk:"llm_evaluation_setting"`
-	LogToLogSettingList              types.String `tfsdk:"log_to_log_setting_list"`
-	WebhookHeaderList                types.String `tfsdk:"webhook_header_list"`
-	SharedUsernames                  types.String `tfsdk:"shared_usernames"`
-	LogLabelSettings                 types.Set    `tfsdk:"log_label_settings"`
-	JsonKeySettings                  types.Set    `tfsdk:"json_key_settings"`
-	ServiceNowShortDescriptionFormat types.String `tfsdk:"service_now_short_description_format"`
-	ServiceNowDescriptionFormat      types.String `tfsdk:"service_now_description_format"`
-	ProjectServiceNowSettings        types.Object `tfsdk:"project_servicenow_settings"`
-	HolidaySettings                  types.Set    `tfsdk:"holiday_settings"`
-	L2MSettings                      types.Set    `tfsdk:"l2m_settings"`
-	Mode                             types.Int64  `tfsdk:"mode"`
+	BaseValueSetting                      types.String `tfsdk:"base_value_setting"`
+	CdfSetting                            types.String `tfsdk:"cdf_setting"`
+	EmailSetting                          types.String `tfsdk:"email_setting"`
+	InstanceGroupingUpdate                types.String `tfsdk:"instance_grouping_update"`
+	LlmEvaluationSetting                  types.String `tfsdk:"llm_evaluation_setting"`
+	LogToLogSettingList                   types.String `tfsdk:"log_to_log_setting_list"`
+	WebhookHeaderList                     types.String `tfsdk:"webhook_header_list"`
+	SharedUsernames                       types.String `tfsdk:"shared_usernames"`
+	LogLabelSettings                      types.Set    `tfsdk:"log_label_settings"`
+	JsonKeySettings                       types.Set    `tfsdk:"json_key_settings"`
+	ServiceNowShortDescriptionFormat      types.String `tfsdk:"service_now_short_description_format"`
+	ServiceNowDescriptionFormat           types.String `tfsdk:"service_now_description_format"`
+	ProjectServiceNowSettings             types.Object `tfsdk:"project_servicenow_settings"`
+	HolidaySettings                       types.Set    `tfsdk:"holiday_settings"`
+	L2MSettings                           types.Set    `tfsdk:"l2m_settings"`
+	Mode                                  types.Int64  `tfsdk:"mode"`
 	IncidentPriorityByAnomalyScoreSetting types.String `tfsdk:"incident_priority_by_anomaly_score_setting"`
+	IncidentPriorityCapSetting            types.String `tfsdk:"incident_priority_cap_setting"`
 }
 
 type holidaySettingModel struct {
@@ -628,6 +632,16 @@ func (r *projectResource) Schema(_ context.Context, _ resource.SchemaRequest, re
 				Optional:    true,
 				Computed:    true,
 			},
+			"model_match_threshold": schema.Float64Attribute{
+				Description: "Model match threshold for log pattern matching",
+				Optional:    true,
+				Computed:    true,
+			},
+			"model_keyword_segment_k": schema.Int64Attribute{
+				Description: "Number of keyword segments (K) used for the log model",
+				Optional:    true,
+				Computed:    true,
+			},
 			"multi_line_flag": schema.BoolAttribute{
 				Description: "Multi-line flag",
 				Optional:    true,
@@ -635,6 +649,11 @@ func (r *projectResource) Schema(_ context.Context, _ resource.SchemaRequest, re
 			},
 			"nlp_flag": schema.BoolAttribute{
 				Description: "NLP flag",
+				Optional:    true,
+				Computed:    true,
+			},
+			"disable_log_processing_flag": schema.BoolAttribute{
+				Description: "Disable log processing",
 				Optional:    true,
 				Computed:    true,
 			},
@@ -1041,6 +1060,11 @@ func (r *projectResource) Schema(_ context.Context, _ resource.SchemaRequest, re
 				Optional:    true,
 				Computed:    true,
 			},
+			"incident_priority_cap_setting": schema.StringAttribute{
+				Description: "Incident priority cap settings (JSON). Contains 'ticketCreationPriorityCap' and 'suggestedPriorityCap' string values (e.g. '{\"ticketCreationPriorityCap\":\"2\",\"suggestedPriorityCap\":\"5\"}').",
+				Optional:    true,
+				Computed:    true,
+			},
 			"l2m_settings": schema.SetNestedAttribute{
 				Description: "Log-to-metric settings. Each entry maps this log project to a target metric project.",
 				Optional:    true,
@@ -1377,8 +1401,17 @@ func populateSettings(plan *projectResourceModel) map[string]interface{} {
 	if !plan.ModelKeywordSetting.IsNull() {
 		s["modelKeywordSetting"] = int(plan.ModelKeywordSetting.ValueInt64())
 	}
+	if !plan.ModelMatchThreshold.IsNull() {
+		s["modelMatchThreshold"] = plan.ModelMatchThreshold.ValueFloat64()
+	}
+	if !plan.ModelKeywordSegmentK.IsNull() {
+		s["modelKeywordSegmentK"] = int(plan.ModelKeywordSegmentK.ValueInt64())
+	}
 	if !plan.NlpFlag.IsNull() {
 		s["nlpFlag"] = plan.NlpFlag.ValueBool()
+	}
+	if !plan.DisableLogProcessingFlag.IsNull() {
+		s["disableLogProcessingFlag"] = plan.DisableLogProcessingFlag.ValueBool()
 	}
 	if !plan.ProjectModelFlag.IsNull() {
 		s["projectModelFlag"] = plan.ProjectModelFlag.ValueBool()
@@ -1623,6 +1656,11 @@ func populateSettings(plan *projectResourceModel) map[string]interface{} {
 			s["incidentPriorityByAnomalyScoreSetting"] = parsed
 		}
 	}
+	if !plan.IncidentPriorityCapSetting.IsNull() {
+		if parsed := parseJSONField(plan.IncidentPriorityCapSetting.ValueString()); parsed != nil {
+			s["incidentPriorityCapSetting"] = parsed
+		}
+	}
 
 	return s
 }
@@ -1841,8 +1879,11 @@ func (r *projectResource) Create(ctx context.Context, req resource.CreateRequest
 		plan.MaximumDetectionWaitTime = getInt64("maximumDetectionWaitTime")
 		plan.MaximumThreads = getInt64("maximumThreads")
 		plan.ModelKeywordSetting = getInt64("modelKeywordSetting")
+		plan.ModelMatchThreshold = getFloat64("modelMatchThreshold")
+		plan.ModelKeywordSegmentK = getInt64("modelKeywordSegmentK")
 		plan.MultiLineFlag = getBool("multiLineFlag")
 		plan.NlpFlag = getBool("nlpFlag")
+		plan.DisableLogProcessingFlag = getBool("disableLogProcessingFlag")
 		plan.PrettyJsonConvertorFlag = getBool("prettyJsonConvertorFlag")
 
 		// Model Settings
@@ -1907,6 +1948,7 @@ func (r *projectResource) Create(ctx context.Context, req resource.CreateRequest
 		plan.WebhookHeaderList = getJSONString("webhookHeaderList")
 		plan.SharedUsernames = getJSONString("sharedUsernames")
 		plan.IncidentPriorityByAnomalyScoreSetting = getJSONString("incidentPriorityByAnomalyScoreSetting")
+		plan.IncidentPriorityCapSetting = getJSONString("incidentPriorityCapSetting")
 	}
 
 	// Always preserve config values over API values for fields explicitly set by user
@@ -2067,11 +2109,20 @@ func (r *projectResource) Create(ctx context.Context, req resource.CreateRequest
 	if !config.ModelKeywordSetting.IsNull() {
 		plan.ModelKeywordSetting = config.ModelKeywordSetting
 	}
+	if !config.ModelMatchThreshold.IsNull() {
+		plan.ModelMatchThreshold = config.ModelMatchThreshold
+	}
+	if !config.ModelKeywordSegmentK.IsNull() {
+		plan.ModelKeywordSegmentK = config.ModelKeywordSegmentK
+	}
 	if !config.MultiLineFlag.IsNull() {
 		plan.MultiLineFlag = config.MultiLineFlag
 	}
 	if !config.NlpFlag.IsNull() {
 		plan.NlpFlag = config.NlpFlag
+	}
+	if !config.DisableLogProcessingFlag.IsNull() {
+		plan.DisableLogProcessingFlag = config.DisableLogProcessingFlag
 	}
 	if !config.PrettyJsonConvertorFlag.IsNull() {
 		plan.PrettyJsonConvertorFlag = config.PrettyJsonConvertorFlag
@@ -2207,6 +2258,9 @@ func (r *projectResource) Create(ctx context.Context, req resource.CreateRequest
 	}
 	if !config.IncidentPriorityByAnomalyScoreSetting.IsNull() {
 		plan.IncidentPriorityByAnomalyScoreSetting = config.IncidentPriorityByAnomalyScoreSetting
+	}
+	if !config.IncidentPriorityCapSetting.IsNull() {
+		plan.IncidentPriorityCapSetting = config.IncidentPriorityCapSetting
 	}
 
 	// Process log_label_settings if provided - each setting must be applied individually
@@ -2729,8 +2783,11 @@ func (r *projectResource) Read(ctx context.Context, req resource.ReadRequest, re
 	state.MaximumDetectionWaitTime = getInt64("maximumDetectionWaitTime")
 	state.MaximumThreads = getInt64("maximumThreads")
 	state.ModelKeywordSetting = getInt64("modelKeywordSetting")
+	state.ModelMatchThreshold = getFloat64("modelMatchThreshold")
+	state.ModelKeywordSegmentK = getInt64("modelKeywordSegmentK")
 	state.MultiLineFlag = getBool("multiLineFlag")
 	state.NlpFlag = getBool("nlpFlag")
+	state.DisableLogProcessingFlag = getBool("disableLogProcessingFlag")
 	state.PrettyJsonConvertorFlag = getBool("prettyJsonConvertorFlag")
 
 	// Model Settings
@@ -2794,6 +2851,7 @@ func (r *projectResource) Read(ctx context.Context, req resource.ReadRequest, re
 	state.WebhookHeaderList = getJSONString("webhookHeaderList")
 	state.SharedUsernames = getJSONString("sharedUsernames")
 	state.IncidentPriorityByAnomalyScoreSetting = getJSONString("incidentPriorityByAnomalyScoreSetting")
+	state.IncidentPriorityCapSetting = getJSONString("incidentPriorityCapSetting")
 
 	// Read log label settings from API
 	logLabels, err := r.client.GetLogLabels(state.ProjectName.ValueString(), r.client.Username)
@@ -3266,8 +3324,11 @@ func (r *projectResource) Update(ctx context.Context, req resource.UpdateRequest
 		plan.MaximumDetectionWaitTime = getInt64("maximumDetectionWaitTime")
 		plan.MaximumThreads = getInt64("maximumThreads")
 		plan.ModelKeywordSetting = getInt64("modelKeywordSetting")
+		plan.ModelMatchThreshold = getFloat64("modelMatchThreshold")
+		plan.ModelKeywordSegmentK = getInt64("modelKeywordSegmentK")
 		plan.MultiLineFlag = getBool("multiLineFlag")
 		plan.NlpFlag = getBool("nlpFlag")
+		plan.DisableLogProcessingFlag = getBool("disableLogProcessingFlag")
 		plan.PrettyJsonConvertorFlag = getBool("prettyJsonConvertorFlag")
 
 		// Model Settings
@@ -3350,6 +3411,7 @@ func (r *projectResource) Update(ctx context.Context, req resource.UpdateRequest
 		plan.WebhookHeaderList = getJSONString("webhookHeaderList")
 		plan.SharedUsernames = getJSONString("sharedUsernames")
 		plan.IncidentPriorityByAnomalyScoreSetting = getJSONString("incidentPriorityByAnomalyScoreSetting")
+		plan.IncidentPriorityCapSetting = getJSONString("incidentPriorityCapSetting")
 	}
 
 	// Process log_label_settings if provided - each setting must be applied individually
