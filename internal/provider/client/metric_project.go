@@ -130,6 +130,10 @@ type MetricProjectSettings struct {
 		Enabled               bool              `json:"enabled,omitempty"`
 		PriorityScoreRangeMap map[string]string `json:"priorityScoreRangeMap,omitempty"`
 	} `json:"incidentPriorityByAnomalyScoreSetting,omitempty"`
+	IncidentPriorityCapSetting struct {
+		TicketCreationPriorityCap string `json:"ticketCreationPriorityCap,omitempty"`
+		SuggestedPriorityCap      string `json:"suggestedPriorityCap,omitempty"`
+	} `json:"incidentPriorityCapSetting,omitempty"`
 }
 
 // ─── Metric Configuration Types ───────────────────────────────────────────────

@@ -3,26 +3,26 @@
 
 # Basic Authentication
 resource "insightfinder_servicenow" "basic" {
-  account      = "admin"
-  service_host = "https://dev12345.service-now.com/"
-  password     = var.servicenow_password
-  system_names = ["Production"]
-  options      = ["Root Cause"]
+  account        = "admin"
+  service_host   = "https://dev12345.service-now.com/"
+  password       = var.servicenow_password
+  system_names   = ["Production"]
+  options        = ["Root Cause"]
   content_option = ["SUMMARY"]
-  auth_type    = "basic"
+  auth_type      = "basic"
 }
 
 # OAuth Authentication
 resource "insightfinder_servicenow" "oauth" {
-  account      = "admin"
-  service_host = "https://dev12345.service-now.com/"
-  password     = var.servicenow_password
-  app_id       = var.servicenow_app_id
-  app_key      = var.servicenow_app_key
-  system_names = ["Production", "Staging"]
-  options      = ["Root Cause", "Prediction"]
+  account        = "admin"
+  service_host   = "https://dev12345.service-now.com/"
+  password       = var.servicenow_password
+  app_id         = var.servicenow_app_id
+  app_key        = var.servicenow_app_key
+  system_names   = ["Production", "Staging"]
+  options        = ["Root Cause", "Prediction"]
   content_option = ["SUMMARY", "DESCRIPTION"]
-  auth_type    = "oauth"
+  auth_type      = "oauth"
 }
 
 # Full configuration with all optional fields
