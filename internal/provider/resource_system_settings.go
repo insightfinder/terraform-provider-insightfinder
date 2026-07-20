@@ -148,12 +148,12 @@ type instanceDownNotificationModel struct {
 
 // projectLevelDampeningWindowModel holds a single project-level dampening window entry
 type projectLevelDampeningWindowModel struct {
-	SourceProject  types.String  `tfsdk:"source_project"`
-	TargetProject  types.String  `tfsdk:"target_project"`
-	SourceCustomer types.String  `tfsdk:"source_customer"`
-	TargetCustomer types.String  `tfsdk:"target_customer"`
-	Duration       types.Int64   `tfsdk:"duration"`
-	ScoreThreshold types.Float64 `tfsdk:"score_threshold"`
+	SourceProject       types.String  `tfsdk:"source_project"`
+	TargetProject       types.String  `tfsdk:"target_project"`
+	SourceCustomer      types.String  `tfsdk:"source_customer"`
+	TargetCustomer      types.String  `tfsdk:"target_customer"`
+	Duration            types.Int64   `tfsdk:"duration"`
+	SimilarityThreshold types.Float64 `tfsdk:"similarity_threshold"`
 }
 
 // conditionModel holds a single matching condition in a custom consolidation rule project entry
@@ -742,8 +742,8 @@ func (r *systemSettingsResource) Schema(_ context.Context, _ resource.SchemaRequ
 									Description: "Dampening duration in milliseconds.",
 									Required:    true,
 								},
-								"score_threshold": schema.Float64Attribute{
-									Description: "Score threshold (st) for this dampening window.",
+								"similarity_threshold": schema.Float64Attribute{
+									Description: "Similarity threshold (st) for this dampening window.",
 									Optional:    true,
 									Computed:    true,
 									PlanModifiers: []planmodifier.Float64{
@@ -1176,12 +1176,12 @@ func (r *systemSettingsResource) applyNotificationsSettings(_ context.Context, s
 			tc = r.client.Username
 		}
 		windows = append(windows, client.ProjectLevelDampeningWindow{
-			SourceProject:  w.SourceProject.ValueString(),
-			TargetProject:  w.TargetProject.ValueString(),
-			SourceCustomer: sc,
-			TargetCustomer: tc,
-			Duration:       w.Duration.ValueInt64(),
-			ScoreThreshold: w.ScoreThreshold.ValueFloat64(),
+			SourceProject:       w.SourceProject.ValueString(),
+			TargetProject:       w.TargetProject.ValueString(),
+			SourceCustomer:      sc,
+			TargetCustomer:      tc,
+			Duration:            w.Duration.ValueInt64(),
+			SimilarityThreshold: w.SimilarityThreshold.ValueFloat64(),
 		})
 	}
 	updates.ProjectLevelDampeningWindows = windows
@@ -1500,12 +1500,12 @@ func (r *systemSettingsResource) readIntoModel(_ context.Context, systemID strin
 				newWindows := make([]projectLevelDampeningWindowModel, 0, len(hvSetting.ProjectLevelDampeningWindows))
 				for _, w := range hvSetting.ProjectLevelDampeningWindows {
 					newWindows = append(newWindows, projectLevelDampeningWindowModel{
-						SourceProject:  types.StringValue(w.SourceProject),
-						TargetProject:  types.StringValue(w.TargetProject),
-						SourceCustomer: types.StringValue(w.SourceCustomer),
-						TargetCustomer: types.StringValue(w.TargetCustomer),
-						Duration:       types.Int64Value(w.Duration),
-						ScoreThreshold: types.Float64Value(w.ScoreThreshold),
+						SourceProject:       types.StringValue(w.SourceProject),
+						TargetProject:       types.StringValue(w.TargetProject),
+						SourceCustomer:      types.StringValue(w.SourceCustomer),
+						TargetCustomer:      types.StringValue(w.TargetCustomer),
+						Duration:            types.Int64Value(w.Duration),
+						SimilarityThreshold: types.Float64Value(w.SimilarityThreshold),
 					})
 				}
 				m.NotificationsSettings.ProjectLevelDampeningWindows = newWindows

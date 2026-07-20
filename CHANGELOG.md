@@ -11,7 +11,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **insightfinder_system_settings**: Three new fields in `notifications_settings` to match previously-missing API fields in the `healthviewsetting` API:
   - `component_level_dampening` (Boolean, Optional, Computed) — enable component-level dampening. Maps to `componentLevelDampening`.
   - `metric_co_occurrence_buffer_ms` (Number, Optional, Computed) — metric co-occurrence buffer window in milliseconds. Maps to `metricCoOccurrenceBufferMs`.
-  - `score_threshold` (Number, Optional, Computed) inside each `project_level_dampening_windows` entry — score threshold for the dampening window. Maps to `st`.
+  - `similarity_threshold` (Number, Optional, Computed) inside each `project_level_dampening_windows` entry — similarity threshold for the dampening window. Maps to `st`.
   - Fixes a data-loss bug where these three fields, previously absent from the `HealthViewSetting` client struct, were silently stripped for every system in the account whenever `notifications_settings` was applied for any single system (since `SetHealthViewSetting` round-trips all systems' settings through that struct).
 
 ## [1.10.4] - 2026-07-20

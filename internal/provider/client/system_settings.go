@@ -164,12 +164,12 @@ type HealthViewSetting struct {
 
 // ProjectLevelDampeningWindow represents a project-level dampening window entry
 type ProjectLevelDampeningWindow struct {
-	SourceProject  string  `json:"ps"`
-	TargetProject  string  `json:"pt"`
-	SourceCustomer string  `json:"cs"`
-	TargetCustomer string  `json:"ct"`
-	Duration       int64   `json:"d"`
-	ScoreThreshold float64 `json:"st"`
+	SourceProject       string  `json:"ps"`
+	TargetProject       string  `json:"pt"`
+	SourceCustomer      string  `json:"cs"`
+	TargetCustomer      string  `json:"ct"`
+	Duration            int64   `json:"d"`
+	SimilarityThreshold float64 `json:"st"`
 }
 
 // SystemDownSetting represents system down notification settings for a system

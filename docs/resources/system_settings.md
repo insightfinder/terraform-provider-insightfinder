@@ -591,7 +591,7 @@ A set of project-pair dampening window rules stored in the health view setting. 
 | `source_customer` | String | Customer (username) of the source project (`cs`). Defaults to the provider username when omitted. |
 | `target_customer` | String | Customer (username) of the target project (`ct`). Defaults to the provider username when omitted. |
 | `duration` | Number (Required) | Dampening duration in milliseconds (`d`). |
-| `score_threshold` | Number | Score threshold for this dampening window (`st`). |
+| `similarity_threshold` | Number | Similarity threshold for this dampening window (`st`). |
 
 #### Max Notification Delay Tolerance
 
