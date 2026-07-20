@@ -59,14 +59,15 @@ type slackProjectConfigModel struct {
 
 // slackResourceModel maps the resource schema data.
 type slackResourceModel struct {
-	ID                     types.String `tfsdk:"id"`
-	SystemName             types.String `tfsdk:"system_name"`
-	Webhook                types.String `tfsdk:"webhook"`
-	ChannelName            types.String `tfsdk:"channel_name"`
-	Options                types.Set    `tfsdk:"options"`
-	ProjectConfigs         types.List   `tfsdk:"project_configs"`
-	PriorityUpgradeChannel types.String `tfsdk:"priority_upgrade_channel"`
-	PriorityUpgradeWebhook types.String `tfsdk:"priority_upgrade_webhook"`
+	ID                                       types.String `tfsdk:"id"`
+	SystemName                               types.String `tfsdk:"system_name"`
+	Webhook                                  types.String `tfsdk:"webhook"`
+	ChannelName                              types.String `tfsdk:"channel_name"`
+	Options                                  types.Set    `tfsdk:"options"`
+	ProjectConfigs                           types.List   `tfsdk:"project_configs"`
+	PriorityUpgradeChannel                   types.String `tfsdk:"priority_upgrade_channel"`
+	PriorityUpgradeWebhook                   types.String `tfsdk:"priority_upgrade_webhook"`
+	DisableSlackForNonInsightFinderIncidents types.Bool   `tfsdk:"disable_slack_for_non_insightfinder_incidents"`
 }
 
 // Metadata returns the resource type name.
@@ -116,6 +117,12 @@ func (r *slackResource) Schema(_ context.Context, _ resource.SchemaRequest, resp
 				Computed:    true,
 				Sensitive:   true,
 				Default:     stringdefault.StaticString(""),
+			},
+			"disable_slack_for_non_insightfinder_incidents": schema.BoolAttribute{
+				Description: "Whether to suppress Slack notifications for incidents that did not originate from InsightFinder.",
+				Optional:    true,
+				Computed:    true,
+				Default:     booldefault.StaticBool(false),
 			},
 			"project_configs": schema.ListNestedAttribute{
 				Description: "Per-project Slack notification overrides. A project may appear more than once to notify multiple channels.",
@@ -228,13 +235,14 @@ func (r *slackResource) Create(ctx context.Context, req resource.CreateRequest, 
 	}
 
 	config := &client.SlackConfig{
-		SystemID:               systemID,
-		WebHook:                plan.Webhook.ValueString(),
-		ChannelName:            plan.ChannelName.ValueString(),
-		Options:                options,
-		ProjectConfigs:         projectConfigs,
-		PriorityUpgradeChannel: plan.PriorityUpgradeChannel.ValueString(),
-		PriorityUpgradeWebhook: plan.PriorityUpgradeWebhook.ValueString(),
+		SystemID:                                 systemID,
+		WebHook:                                  plan.Webhook.ValueString(),
+		ChannelName:                              plan.ChannelName.ValueString(),
+		Options:                                  options,
+		ProjectConfigs:                           projectConfigs,
+		PriorityUpgradeChannel:                   plan.PriorityUpgradeChannel.ValueString(),
+		PriorityUpgradeWebhook:                   plan.PriorityUpgradeWebhook.ValueString(),
+		DisableSlackForNonInsightFinderIncidents: plan.DisableSlackForNonInsightFinderIncidents.ValueBool(),
 	}
 
 	account, err := r.client.CreateSlackConfig(config, r.client.Username)
@@ -283,6 +291,7 @@ func (r *slackResource) Read(ctx context.Context, req resource.ReadRequest, resp
 	state.ChannelName = types.StringValue(config.ChannelName)
 	state.PriorityUpgradeChannel = types.StringValue(config.PriorityUpgradeChannel)
 	state.PriorityUpgradeWebhook = types.StringValue(config.PriorityUpgradeWebhook)
+	state.DisableSlackForNonInsightFinderIncidents = types.BoolValue(config.DisableSlackForNonInsightFinderIncidents)
 
 	optionsSet, diags := types.SetValueFrom(ctx, types.StringType, config.Options)
 	resp.Diagnostics.Append(diags...)
@@ -360,13 +369,14 @@ func (r *slackResource) Update(ctx context.Context, req resource.UpdateRequest, 
 	}
 
 	newConfig := &client.SlackConfig{
-		SystemID:               systemID,
-		WebHook:                plan.Webhook.ValueString(),
-		ChannelName:            plan.ChannelName.ValueString(),
-		Options:                options,
-		ProjectConfigs:         projectConfigs,
-		PriorityUpgradeChannel: plan.PriorityUpgradeChannel.ValueString(),
-		PriorityUpgradeWebhook: plan.PriorityUpgradeWebhook.ValueString(),
+		SystemID:                                 systemID,
+		WebHook:                                  plan.Webhook.ValueString(),
+		ChannelName:                              plan.ChannelName.ValueString(),
+		Options:                                  options,
+		ProjectConfigs:                           projectConfigs,
+		PriorityUpgradeChannel:                   plan.PriorityUpgradeChannel.ValueString(),
+		PriorityUpgradeWebhook:                   plan.PriorityUpgradeWebhook.ValueString(),
+		DisableSlackForNonInsightFinderIncidents: plan.DisableSlackForNonInsightFinderIncidents.ValueBool(),
 	}
 
 	// The integration to update is located by matching the prior system, webhook, and

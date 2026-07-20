@@ -29,6 +29,9 @@ resource "insightfinder_slack" "full" {
   priority_upgrade_channel = "#aiops-priority-upgrades"
   priority_upgrade_webhook = var.slack_webhook
 
+  # Suppress Slack notifications for incidents that did not originate from InsightFinder.
+  disable_slack_for_non_insightfinder_incidents = true
+
   # Send a subset of alert types for specific projects to a different channel,
   # optionally filtered by a match rule and priority levels.
   project_configs = [
