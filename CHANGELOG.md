@@ -5,6 +5,11 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.10.4] - 2026-07-20
+
+### Added
+- **insightfinder_slack**: New `disable_slack_for_non_insightfinder_incidents` attribute (Boolean, Optional, Computed, default `false`) — suppresses Slack notifications for incidents that did not originate from InsightFinder. Sent as a top-level `disableSlackForNonInsightFinderIncidents` form field on create/update, and read back from the same key nested inside the API's `configs` JSON blob (alongside `projectConfigs`, `priorityUpgradeChannel`, and `priorityUpgradeWebhook`).
+
 ## [1.10.3] - 2026-07-17
 
 ### Added
