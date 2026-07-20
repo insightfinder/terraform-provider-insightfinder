@@ -151,22 +151,25 @@ type HealthViewSetting struct {
 	IncidentDampeningWindow             int64                          `json:"incidentDampeningWindow"`
 	TicketOpenTime                      int64                          `json:"ticketOpenTime"`
 	ComponentLevelIncidentConsolidation bool                           `json:"componentLevelIncidentConsolidation"`
+	ComponentLevelDampening             bool                           `json:"componentLevelDampening"`
 	EnabledConsolidationAlgorithms      []string                       `json:"enabledConsolidationAlgorithms"`
 	MaxNotificationDelayTolerance       int64                          `json:"maxNotificationDelayTolerance"`
 	ProjectLevelDampeningWindows        []ProjectLevelDampeningWindow  `json:"projectLevelDampeningWindows"`
 	CustomConsolidationRules            []CustomConsolidationRule      `json:"customConsolidationRules"`
 	MetricLogConsolidationConfigs       []MetricLogConsolidationConfig `json:"metricLogConsolidationConfigs"`
+	MetricCoOccurrenceBufferMs          int64                          `json:"metricCoOccurrenceBufferMs"`
 	SystemID                            string                         `json:"systemId,omitempty"`
 	ID                                  string                         `json:"id,omitempty"`
 }
 
 // ProjectLevelDampeningWindow represents a project-level dampening window entry
 type ProjectLevelDampeningWindow struct {
-	SourceProject  string `json:"ps"`
-	TargetProject  string `json:"pt"`
-	SourceCustomer string `json:"cs"`
-	TargetCustomer string `json:"ct"`
-	Duration       int64  `json:"d"`
+	SourceProject  string  `json:"ps"`
+	TargetProject  string  `json:"pt"`
+	SourceCustomer string  `json:"cs"`
+	TargetCustomer string  `json:"ct"`
+	Duration       int64   `json:"d"`
+	ScoreThreshold float64 `json:"st"`
 }
 
 // SystemDownSetting represents system down notification settings for a system
@@ -959,11 +962,13 @@ func (c *Client) SetHealthViewSetting(systemID string, updates *HealthViewSettin
 	current.IncidentDampeningWindow = updates.IncidentDampeningWindow
 	current.TicketOpenTime = updates.TicketOpenTime
 	current.ComponentLevelIncidentConsolidation = updates.ComponentLevelIncidentConsolidation
+	current.ComponentLevelDampening = updates.ComponentLevelDampening
 	current.EnabledConsolidationAlgorithms = updates.EnabledConsolidationAlgorithms
 	current.MaxNotificationDelayTolerance = updates.MaxNotificationDelayTolerance
 	current.ProjectLevelDampeningWindows = updates.ProjectLevelDampeningWindows
 	current.CustomConsolidationRules = updates.CustomConsolidationRules
 	current.MetricLogConsolidationConfigs = updates.MetricLogConsolidationConfigs
+	current.MetricCoOccurrenceBufferMs = updates.MetricCoOccurrenceBufferMs
 	current.SystemID = systemID
 	current.ID = systemID
 
