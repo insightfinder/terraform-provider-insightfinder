@@ -109,6 +109,7 @@ type notificationsSettingsModel struct {
 	IncidentDampeningWindow             types.Int64   `tfsdk:"incident_dampening_window"`
 	TicketOpenTime                      types.Int64   `tfsdk:"ticket_open_time"`
 	ComponentLevelIncidentConsolidation types.Bool    `tfsdk:"component_level_incident_consolidation"`
+	ComponentLevelDampening             types.Bool    `tfsdk:"component_level_dampening"`
 	EnabledConsolidationAlgorithms      types.List    `tfsdk:"enabled_consolidation_algorithms"`
 	// New notification settings
 	SystemDownNotification        *systemDownNotificationModel        `tfsdk:"system_down_notification"`
@@ -119,6 +120,7 @@ type notificationsSettingsModel struct {
 	MaxNotificationDelayTolerance types.Int64                         `tfsdk:"max_notification_delay_tolerance"`
 	CustomConsolidationRules      []customConsolidationRuleModel      `tfsdk:"custom_consolidation_rules"`
 	MetricLogConsolidationConfigs []metricLogConsolidationConfigModel `tfsdk:"metric_log_consolidation_configs"`
+	MetricCoOccurrenceBufferMs    types.Int64                         `tfsdk:"metric_co_occurrence_buffer_ms"`
 }
 
 // systemDownNotificationModel holds system down notification settings
@@ -146,11 +148,12 @@ type instanceDownNotificationModel struct {
 
 // projectLevelDampeningWindowModel holds a single project-level dampening window entry
 type projectLevelDampeningWindowModel struct {
-	SourceProject  types.String `tfsdk:"source_project"`
-	TargetProject  types.String `tfsdk:"target_project"`
-	SourceCustomer types.String `tfsdk:"source_customer"`
-	TargetCustomer types.String `tfsdk:"target_customer"`
-	Duration       types.Int64  `tfsdk:"duration"`
+	SourceProject       types.String  `tfsdk:"source_project"`
+	TargetProject       types.String  `tfsdk:"target_project"`
+	SourceCustomer      types.String  `tfsdk:"source_customer"`
+	TargetCustomer      types.String  `tfsdk:"target_customer"`
+	Duration            types.Int64   `tfsdk:"duration"`
+	SimilarityThreshold types.Float64 `tfsdk:"similarity_threshold"`
 }
 
 // conditionModel holds a single matching condition in a custom consolidation rule project entry
@@ -580,6 +583,14 @@ func (r *systemSettingsResource) Schema(_ context.Context, _ resource.SchemaRequ
 							boolplanmodifier.UseStateForUnknown(),
 						},
 					},
+					"component_level_dampening": schema.BoolAttribute{
+						Description: "Enable component-level dampening.",
+						Optional:    true,
+						Computed:    true,
+						PlanModifiers: []planmodifier.Bool{
+							boolplanmodifier.UseStateForUnknown(),
+						},
+					},
 					"enabled_consolidation_algorithms": schema.ListAttribute{
 						Description: "List of consolidation algorithms to enable (e.g. [\"derivedIncidents\", \"rcaChain\", \"contentBased\", \"metricInstanceTimestamp\"]).",
 						ElementType: types.StringType,
@@ -731,11 +742,27 @@ func (r *systemSettingsResource) Schema(_ context.Context, _ resource.SchemaRequ
 									Description: "Dampening duration in milliseconds.",
 									Required:    true,
 								},
+								"similarity_threshold": schema.Float64Attribute{
+									Description: "Similarity threshold (st) for this dampening window.",
+									Optional:    true,
+									Computed:    true,
+									PlanModifiers: []planmodifier.Float64{
+										float64planmodifier.UseStateForUnknown(),
+									},
+								},
 							},
 						},
 					},
 					"max_notification_delay_tolerance": schema.Int64Attribute{
 						Description: "Maximum notification delay tolerance in milliseconds.",
+						Optional:    true,
+						Computed:    true,
+						PlanModifiers: []planmodifier.Int64{
+							int64planmodifier.UseStateForUnknown(),
+						},
+					},
+					"metric_co_occurrence_buffer_ms": schema.Int64Attribute{
+						Description: "Metric co-occurrence buffer window in milliseconds.",
 						Optional:    true,
 						Computed:    true,
 						PlanModifiers: []planmodifier.Int64{
@@ -1117,7 +1144,9 @@ func (r *systemSettingsResource) applyNotificationsSettings(_ context.Context, s
 		IncidentDampeningWindow:             m.IncidentDampeningWindow.ValueInt64(),
 		TicketOpenTime:                      m.TicketOpenTime.ValueInt64(),
 		ComponentLevelIncidentConsolidation: m.ComponentLevelIncidentConsolidation.ValueBool(),
+		ComponentLevelDampening:             m.ComponentLevelDampening.ValueBool(),
 		EnabledConsolidationAlgorithms:      typesListToStrings(m.EnabledConsolidationAlgorithms),
+		MetricCoOccurrenceBufferMs:          m.MetricCoOccurrenceBufferMs.ValueInt64(),
 	}
 
 	if v := m.IncidentCountThreshold.ValueString(); v != "" && v != "null" {
@@ -1147,11 +1176,12 @@ func (r *systemSettingsResource) applyNotificationsSettings(_ context.Context, s
 			tc = r.client.Username
 		}
 		windows = append(windows, client.ProjectLevelDampeningWindow{
-			SourceProject:  w.SourceProject.ValueString(),
-			TargetProject:  w.TargetProject.ValueString(),
-			SourceCustomer: sc,
-			TargetCustomer: tc,
-			Duration:       w.Duration.ValueInt64(),
+			SourceProject:       w.SourceProject.ValueString(),
+			TargetProject:       w.TargetProject.ValueString(),
+			SourceCustomer:      sc,
+			TargetCustomer:      tc,
+			Duration:            w.Duration.ValueInt64(),
+			SimilarityThreshold: w.SimilarityThreshold.ValueFloat64(),
 		})
 	}
 	updates.ProjectLevelDampeningWindows = windows
@@ -1403,8 +1433,10 @@ func (r *systemSettingsResource) readIntoModel(_ context.Context, systemID strin
 			m.NotificationsSettings.IncidentDampeningWindow = types.Int64Value(hvSetting.IncidentDampeningWindow)
 			m.NotificationsSettings.TicketOpenTime = types.Int64Value(hvSetting.TicketOpenTime)
 			m.NotificationsSettings.ComponentLevelIncidentConsolidation = types.BoolValue(hvSetting.ComponentLevelIncidentConsolidation)
+			m.NotificationsSettings.ComponentLevelDampening = types.BoolValue(hvSetting.ComponentLevelDampening)
 			m.NotificationsSettings.EnabledConsolidationAlgorithms = stringsToTypesList(hvSetting.EnabledConsolidationAlgorithms)
 			m.NotificationsSettings.MaxNotificationDelayTolerance = types.Int64Value(hvSetting.MaxNotificationDelayTolerance)
+			m.NotificationsSettings.MetricCoOccurrenceBufferMs = types.Int64Value(hvSetting.MetricCoOccurrenceBufferMs)
 
 			// Custom consolidation rules
 			newRules := make([]customConsolidationRuleModel, 0, len(hvSetting.CustomConsolidationRules))
@@ -1468,11 +1500,12 @@ func (r *systemSettingsResource) readIntoModel(_ context.Context, systemID strin
 				newWindows := make([]projectLevelDampeningWindowModel, 0, len(hvSetting.ProjectLevelDampeningWindows))
 				for _, w := range hvSetting.ProjectLevelDampeningWindows {
 					newWindows = append(newWindows, projectLevelDampeningWindowModel{
-						SourceProject:  types.StringValue(w.SourceProject),
-						TargetProject:  types.StringValue(w.TargetProject),
-						SourceCustomer: types.StringValue(w.SourceCustomer),
-						TargetCustomer: types.StringValue(w.TargetCustomer),
-						Duration:       types.Int64Value(w.Duration),
+						SourceProject:       types.StringValue(w.SourceProject),
+						TargetProject:       types.StringValue(w.TargetProject),
+						SourceCustomer:      types.StringValue(w.SourceCustomer),
+						TargetCustomer:      types.StringValue(w.TargetCustomer),
+						Duration:            types.Int64Value(w.Duration),
+						SimilarityThreshold: types.Float64Value(w.SimilarityThreshold),
 					})
 				}
 				m.NotificationsSettings.ProjectLevelDampeningWindows = newWindows

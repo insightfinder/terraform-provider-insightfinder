@@ -536,6 +536,7 @@ All attributes are Optional and Computed (server defaults are used when omitted)
 | Attribute | Type | Description |
 |-----------|------|-------------|
 | `component_level_incident_consolidation` | Boolean | Enable component-level incident consolidation. When enabled, incidents from different components are consolidated before alerting. Maps to `componentLevelIncidentConsolidation` in the health view API. |
+| `component_level_dampening` | Boolean | Enable component-level dampening. Maps to `componentLevelDampening` in the health view API. |
 | `enabled_consolidation_algorithms` | List of String | Consolidation algorithms to apply. Supported values: `"derivedIncidents"`, `"rcaChain"`, `"contentBased"`, `"metricInstanceTimestamp"`. Example: `["derivedIncidents", "rcaChain", "contentBased", "metricInstanceTimestamp"]`. |
 
 #### System Down Notification
@@ -590,12 +591,14 @@ A set of project-pair dampening window rules stored in the health view setting. 
 | `source_customer` | String | Customer (username) of the source project (`cs`). Defaults to the provider username when omitted. |
 | `target_customer` | String | Customer (username) of the target project (`ct`). Defaults to the provider username when omitted. |
 | `duration` | Number (Required) | Dampening duration in milliseconds (`d`). |
+| `similarity_threshold` | Number | Similarity threshold for this dampening window (`st`). |
 
 #### Max Notification Delay Tolerance
 
 | Attribute | Type | Description |
 |-----------|------|-------------|
 | `max_notification_delay_tolerance` | Number | Maximum delay in milliseconds before a notification must fire regardless of dampening windows (e.g. `10800000` = 3 hours). Maps to `maxNotificationDelayTolerance`. |
+| `metric_co_occurrence_buffer_ms` | Number | Metric co-occurrence buffer window in milliseconds. Maps to `metricCoOccurrenceBufferMs`. |
 
 #### Custom Consolidation Rules
 
