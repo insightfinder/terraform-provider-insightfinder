@@ -160,6 +160,13 @@ resource "insightfinder_system_settings" "with_dampening_windows" {
         duration        = 28800000
       }
     ]
+
+    project_level_dampening_periods = [
+      {
+        project  = "change-detection-project"
+        duration = 3600000
+      }
+    ]
   }
 }
 ```
@@ -593,6 +600,16 @@ A set of project-pair dampening window rules stored in the health view setting. 
 | `duration` | Number (Required) | Dampening duration in milliseconds (`d`). |
 | `similarity_threshold` | Number | Similarity threshold for this dampening window (`st`). |
 
+#### Project Level Dampening Periods
+
+A set of per-project dampening period rules stored in the health view setting, distinct from `project_level_dampening_windows`. Each rule overrides the system-level `incident_dampening_window` for a specific project, without a target project or similarity threshold.
+
+| Attribute | Type | Description |
+|-----------|------|-------------|
+| `project` | String (Required) | The project name (`p`). |
+| `customer` | String | Customer (username) of the project (`c`). Defaults to the provider username when omitted. |
+| `duration` | Number (Required) | Dampening duration in milliseconds (`d`). |
+
 #### Max Notification Delay Tolerance
 
 | Attribute | Type | Description |
@@ -659,6 +676,7 @@ After import, run `terraform plan` to review which computed fields will be popul
 - **`satellite_system_set`**: Must be provided as a JSON-encoded string using `jsonencode(...)`. The value is semantically compared during plan/apply to avoid spurious diffs caused by JSON key ordering.
 - **`incident_count_threshold` and `assignment_map`**: Must be provided as JSON-encoded strings using `jsonencode(...)`. These fields are stored as serialized JSON in Terraform state and compared semantically to avoid key-ordering diffs.
 - **`project_level_dampening_windows`**: Optional and Computed list. When omitted, the server value is preserved in state. When set (even to `[]`), the declared list replaces any existing rules on the server. `source_customer` and `target_customer` default to the provider username when not specified.
+- **`project_level_dampening_periods`**: Optional list, separate from `project_level_dampening_windows` (the API tracks them independently). When set (even to `[]`), the declared list replaces any existing rules on the server. `customer` defaults to the provider username when not specified.
 - **`enabled_consolidation_algorithms`**: Optional and Computed list of strings. Supported algorithm names are `"derivedIncidents"`, `"rcaChain"`, `"contentBased"`, `"metricInstanceTimestamp"`, and `"consolidationCustom"`. When omitted, the server value is preserved in state.
 - **`max_notification_delay_tolerance`**: Optional and Computed number (milliseconds). When omitted, the server value is preserved in state.
 - **`custom_consolidation_rules`**: Optional and Computed list of rule objects. Always read back from the API on refresh. Include `"consolidationCustom"` in `enabled_consolidation_algorithms` to activate these rules. For `"content"` type `project_field_keys` entries, `field_key` can be omitted or set to `null`.

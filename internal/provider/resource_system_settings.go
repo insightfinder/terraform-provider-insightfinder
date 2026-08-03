@@ -117,6 +117,7 @@ type notificationsSettingsModel struct {
 	WeeklyReportNotification      *insightsReportNotificationModel    `tfsdk:"weekly_report_notification"`
 	InstanceDownNotification      []instanceDownNotificationModel     `tfsdk:"instance_down_notification"`
 	ProjectLevelDampeningWindows  []projectLevelDampeningWindowModel  `tfsdk:"project_level_dampening_windows"`
+	ProjectLevelDampeningPeriods  []projectLevelDampeningPeriodModel  `tfsdk:"project_level_dampening_periods"`
 	MaxNotificationDelayTolerance types.Int64                         `tfsdk:"max_notification_delay_tolerance"`
 	CustomConsolidationRules      []customConsolidationRuleModel      `tfsdk:"custom_consolidation_rules"`
 	MetricLogConsolidationConfigs []metricLogConsolidationConfigModel `tfsdk:"metric_log_consolidation_configs"`
@@ -154,6 +155,13 @@ type projectLevelDampeningWindowModel struct {
 	TargetCustomer      types.String  `tfsdk:"target_customer"`
 	Duration            types.Int64   `tfsdk:"duration"`
 	SimilarityThreshold types.Float64 `tfsdk:"similarity_threshold"`
+}
+
+// projectLevelDampeningPeriodModel holds a single project-level dampening period entry
+type projectLevelDampeningPeriodModel struct {
+	Project  types.String `tfsdk:"project"`
+	Customer types.String `tfsdk:"customer"`
+	Duration types.Int64  `tfsdk:"duration"`
 }
 
 // conditionModel holds a single matching condition in a custom consolidation rule project entry
@@ -753,6 +761,27 @@ func (r *systemSettingsResource) Schema(_ context.Context, _ resource.SchemaRequ
 							},
 						},
 					},
+					"project_level_dampening_periods": schema.SetNestedAttribute{
+						Description: "Project-level dampening period rules. Each rule overrides the system-level incident dampening window for a specific project.",
+						Optional:    true,
+						NestedObject: schema.NestedAttributeObject{
+							Attributes: map[string]schema.Attribute{
+								"project": schema.StringAttribute{
+									Description: "The project name.",
+									Required:    true,
+								},
+								"customer": schema.StringAttribute{
+									Description: "The customer (username) of the project. Defaults to the provider username.",
+									Optional:    true,
+									Computed:    true,
+								},
+								"duration": schema.Int64Attribute{
+									Description: "Dampening duration in milliseconds.",
+									Required:    true,
+								},
+							},
+						},
+					},
 					"max_notification_delay_tolerance": schema.Int64Attribute{
 						Description: "Maximum notification delay tolerance in milliseconds.",
 						Optional:    true,
@@ -1186,6 +1215,20 @@ func (r *systemSettingsResource) applyNotificationsSettings(_ context.Context, s
 	}
 	updates.ProjectLevelDampeningWindows = windows
 
+	periods := make([]client.ProjectLevelDampeningPeriod, 0, len(m.ProjectLevelDampeningPeriods))
+	for _, p := range m.ProjectLevelDampeningPeriods {
+		c := p.Customer.ValueString()
+		if c == "" {
+			c = r.client.Username
+		}
+		periods = append(periods, client.ProjectLevelDampeningPeriod{
+			Project:  p.Project.ValueString(),
+			Customer: c,
+			Duration: p.Duration.ValueInt64(),
+		})
+	}
+	updates.ProjectLevelDampeningPeriods = periods
+
 	updates.MaxNotificationDelayTolerance = m.MaxNotificationDelayTolerance.ValueInt64()
 
 	rules := make([]client.CustomConsolidationRule, 0, len(m.CustomConsolidationRules))
@@ -1509,6 +1552,18 @@ func (r *systemSettingsResource) readIntoModel(_ context.Context, systemID strin
 					})
 				}
 				m.NotificationsSettings.ProjectLevelDampeningWindows = newWindows
+			}
+
+			if m.NotificationsSettings.ProjectLevelDampeningPeriods != nil {
+				newPeriods := make([]projectLevelDampeningPeriodModel, 0, len(hvSetting.ProjectLevelDampeningPeriods))
+				for _, p := range hvSetting.ProjectLevelDampeningPeriods {
+					newPeriods = append(newPeriods, projectLevelDampeningPeriodModel{
+						Project:  types.StringValue(p.Project),
+						Customer: types.StringValue(p.Customer),
+						Duration: types.Int64Value(p.Duration),
+					})
+				}
+				m.NotificationsSettings.ProjectLevelDampeningPeriods = newPeriods
 			}
 		}
 
