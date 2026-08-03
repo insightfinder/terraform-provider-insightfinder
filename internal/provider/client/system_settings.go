@@ -155,6 +155,7 @@ type HealthViewSetting struct {
 	EnabledConsolidationAlgorithms      []string                       `json:"enabledConsolidationAlgorithms"`
 	MaxNotificationDelayTolerance       int64                          `json:"maxNotificationDelayTolerance"`
 	ProjectLevelDampeningWindows        []ProjectLevelDampeningWindow  `json:"projectLevelDampeningWindows"`
+	ProjectLevelDampeningPeriods        []ProjectLevelDampeningPeriod  `json:"projectLevelDampeningPeriods"`
 	CustomConsolidationRules            []CustomConsolidationRule      `json:"customConsolidationRules"`
 	MetricLogConsolidationConfigs       []MetricLogConsolidationConfig `json:"metricLogConsolidationConfigs"`
 	MetricCoOccurrenceBufferMs          int64                          `json:"metricCoOccurrenceBufferMs"`
@@ -170,6 +171,13 @@ type ProjectLevelDampeningWindow struct {
 	TargetCustomer      string  `json:"ct"`
 	Duration            int64   `json:"d"`
 	SimilarityThreshold float64 `json:"st"`
+}
+
+// ProjectLevelDampeningPeriod represents a project-level dampening period entry
+type ProjectLevelDampeningPeriod struct {
+	Project  string `json:"p"`
+	Customer string `json:"c"`
+	Duration int64  `json:"d"`
 }
 
 // SystemDownSetting represents system down notification settings for a system
@@ -966,6 +974,7 @@ func (c *Client) SetHealthViewSetting(systemID string, updates *HealthViewSettin
 	current.EnabledConsolidationAlgorithms = updates.EnabledConsolidationAlgorithms
 	current.MaxNotificationDelayTolerance = updates.MaxNotificationDelayTolerance
 	current.ProjectLevelDampeningWindows = updates.ProjectLevelDampeningWindows
+	current.ProjectLevelDampeningPeriods = updates.ProjectLevelDampeningPeriods
 	current.CustomConsolidationRules = updates.CustomConsolidationRules
 	current.MetricLogConsolidationConfigs = updates.MetricLogConsolidationConfigs
 	current.MetricCoOccurrenceBufferMs = updates.MetricCoOccurrenceBufferMs

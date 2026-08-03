@@ -73,6 +73,8 @@ targets a system by display name.
        metric project with a log project and list the field keys used to correlate them.
    - **[Project-level dampening windows](#project_level_dampening_windows-block)** — override
      the system-level dampening window for a specific source → target project pair.
+   - **[Project-level dampening periods](#project_level_dampening_periods-block)** — override
+     the system-level dampening window for a single project, independent of dampening windows.
    - **[System-down notification](#system_down_notification-block)** — email alerting when
      the system as a whole stops reporting. Managed through its own API.
    - **[Instance-down notification](#instance_down_notification-block)** — per-project
@@ -1982,6 +1984,18 @@ window for a specific source → target project pair.
 | `target_customer` | String | No | Username of the target project owner. Defaults to the provider username. |
 | `similarity_threshold` | Float | No | Similarity threshold (`st`) for this dampening window. |
 
+##### project_level_dampening_periods Block
+
+Optional set of nested blocks, distinct from `project_level_dampening_windows`. Each block
+overrides the system-level incident dampening window for a single project, without a target
+project or similarity threshold.
+
+| Argument | Type | Required | Description |
+|---|---|---|---|
+| `project` | String | Yes | The project name. |
+| `duration` | Integer | Yes | Dampening duration in milliseconds. |
+| `customer` | String | No | Username of the project owner. Defaults to the provider username. |
+
 ##### custom_consolidation_rules Block
 
 Optional list of nested blocks defining custom incident consolidation rules.
@@ -2088,6 +2102,13 @@ resource "insightfinder_system_settings" "prod" {
         source_project = "app-logs"
         target_project = "app-metrics"
         duration       = 1800000
+      }
+    ]
+
+    project_level_dampening_periods = [
+      {
+        project  = "app-logs"
+        duration = 1800000
       }
     ]
   }

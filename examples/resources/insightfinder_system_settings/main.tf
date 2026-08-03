@@ -127,6 +127,14 @@ resource "insightfinder_system_settings" "with_notifications" {
         duration        = 28800000
       }
     ]
+
+    # Project-level dampening period overrides
+    project_level_dampening_periods = [
+      {
+        project  = "change-detection-project"
+        duration = 3600000
+      }
+    ]
   }
 }
 
