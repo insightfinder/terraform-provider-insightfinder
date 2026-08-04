@@ -5,6 +5,11 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.10.7] - 2026-08-04
+
+### Added
+- **insightfinder_servicenow**: New `resolution_code_rules` attribute (List of Object, Optional) — ordered list of pattern-based rules that classify ServiceNow resolution/close codes as positive (`like`) or negative (`disLike`) feedback. Each entry has `pattern` (Required) and `outcome` (Required). Maps to the `resolutionCodeRules` field, which was previously absent from the `ServiceNowConfig` client struct and unsupported by the resource despite being accepted and returned by the `service-integration` API.
+
 ## [1.10.6] - 2026-08-03
 
 ### Added

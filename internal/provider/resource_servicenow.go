@@ -49,6 +49,12 @@ type projectConfigModel struct {
 	ConfigurationItem                     types.String `tfsdk:"configuration_item"`
 }
 
+// resolutionCodeRuleModel maps a single pattern-based resolution code classification rule.
+type resolutionCodeRuleModel struct {
+	Pattern types.String `tfsdk:"pattern"`
+	Outcome types.String `tfsdk:"outcome"`
+}
+
 // servicenowResourceModel maps the resource schema data.
 type servicenowResourceModel struct {
 	ID                         types.String `tfsdk:"id"`
@@ -72,6 +78,7 @@ type servicenowResourceModel struct {
 	DepartmentID               types.String `tfsdk:"department_id"`
 	ProjectConfigs             types.Map    `tfsdk:"project_configs"`
 	TableMapping               types.Map    `tfsdk:"table_mapping"`
+	ResolutionCodeRules        types.List   `tfsdk:"resolution_code_rules"`
 }
 
 // Metadata returns the resource type name.
@@ -222,6 +229,22 @@ func (r *servicenowResource) Schema(_ context.Context, _ resource.SchemaRequest,
 				Optional:    true,
 				ElementType: types.StringType,
 			},
+			"resolution_code_rules": schema.ListNestedAttribute{
+				Description: "Ordered list of pattern-based rules used to classify ServiceNow resolution/close codes as positive (\"like\") or negative (\"disLike\") feedback.",
+				Optional:    true,
+				NestedObject: schema.NestedAttributeObject{
+					Attributes: map[string]schema.Attribute{
+						"pattern": schema.StringAttribute{
+							Description: "Regular expression matched against the ServiceNow resolution/close code (e.g., '^Solved').",
+							Required:    true,
+						},
+						"outcome": schema.StringAttribute{
+							Description: "Feedback outcome when the pattern matches. Must be 'like' or 'disLike'.",
+							Required:    true,
+						},
+					},
+				},
+			},
 		},
 	}
 }
@@ -330,6 +353,12 @@ func (r *servicenowResource) Create(ctx context.Context, req resource.CreateRequ
 		return
 	}
 
+	resolutionCodeRules, err := resolutionCodeRulesFromTF(ctx, plan.ResolutionCodeRules)
+	if err != nil {
+		resp.Diagnostics.AddError("Error Reading resolution_code_rules", err.Error())
+		return
+	}
+
 	config := &client.ServiceNowConfig{
 		Account:                    plan.Account.ValueString(),
 		ServiceHost:                plan.ServiceHost.ValueString(),
@@ -350,6 +379,7 @@ func (r *servicenowResource) Create(ctx context.Context, req resource.CreateRequ
 		ConfigurationItem:          plan.ConfigurationItem.ValueString(),
 		DepartmentID:               plan.DepartmentID.ValueString(),
 		ProjectConfigs:             projectConfigs,
+		ResolutionCodeRules:        resolutionCodeRules,
 	}
 
 	err = r.client.CreateOrUpdateServiceNowConfig(config, r.client.Username, true)
@@ -532,6 +562,17 @@ func (r *servicenowResource) Read(ctx context.Context, req resource.ReadRequest,
 		state.ProjectConfigs = types.MapNull(projectConfigAttrTypes())
 	}
 
+	if len(config.ResolutionCodeRules) > 0 {
+		resolutionCodeRulesList, d := resolutionCodeRulesToTF(ctx, config.ResolutionCodeRules)
+		resp.Diagnostics.Append(d...)
+		if resp.Diagnostics.HasError() {
+			return
+		}
+		state.ResolutionCodeRules = resolutionCodeRulesList
+	} else {
+		state.ResolutionCodeRules = types.ListNull(resolutionCodeRuleObjectType())
+	}
+
 	if len(config.TableMapping) > 0 {
 		tableMappingValues := make(map[string]attr.Value, len(config.TableMapping))
 		for _, row := range config.TableMapping {
@@ -657,6 +698,12 @@ func (r *servicenowResource) Update(ctx context.Context, req resource.UpdateRequ
 		return
 	}
 
+	resolutionCodeRules, err := resolutionCodeRulesFromTF(ctx, plan.ResolutionCodeRules)
+	if err != nil {
+		resp.Diagnostics.AddError("Error Reading resolution_code_rules", err.Error())
+		return
+	}
+
 	config := &client.ServiceNowConfig{
 		Account:                    plan.Account.ValueString(),
 		ServiceHost:                plan.ServiceHost.ValueString(),
@@ -677,6 +724,7 @@ func (r *servicenowResource) Update(ctx context.Context, req resource.UpdateRequ
 		ConfigurationItem:          plan.ConfigurationItem.ValueString(),
 		DepartmentID:               plan.DepartmentID.ValueString(),
 		ProjectConfigs:             projectConfigs,
+		ResolutionCodeRules:        resolutionCodeRules,
 	}
 
 	err = r.client.CreateOrUpdateServiceNowConfig(config, r.client.Username, true)
@@ -857,6 +905,54 @@ func projectConfigsToTF(ctx context.Context, configs map[string]client.ServiceNo
 		elements[projectName] = obj
 	}
 	return types.MapValue(types.ObjectType{AttrTypes: attrTypes}, elements)
+}
+
+// resolutionCodeRuleObjectType returns the attr.Type for a resolutionCodeRuleModel object.
+func resolutionCodeRuleObjectType() types.ObjectType {
+	return types.ObjectType{
+		AttrTypes: map[string]attr.Type{
+			"pattern": types.StringType,
+			"outcome": types.StringType,
+		},
+	}
+}
+
+// resolutionCodeRulesFromTF converts a Terraform types.List into a client.ServiceNowResolutionCodeRule slice.
+// Returns nil (not an error) when the list is null or unknown.
+func resolutionCodeRulesFromTF(ctx context.Context, l types.List) ([]client.ServiceNowResolutionCodeRule, error) {
+	if l.IsNull() || l.IsUnknown() {
+		return nil, nil
+	}
+	var models []resolutionCodeRuleModel
+	diags := l.ElementsAs(ctx, &models, false)
+	if diags.HasError() {
+		return nil, fmt.Errorf("failed to read resolution_code_rules: %s", diags[0].Detail())
+	}
+	result := make([]client.ServiceNowResolutionCodeRule, 0, len(models))
+	for _, m := range models {
+		result = append(result, client.ServiceNowResolutionCodeRule{
+			Pattern: m.Pattern.ValueString(),
+			Outcome: m.Outcome.ValueString(),
+		})
+	}
+	return result, nil
+}
+
+// resolutionCodeRulesToTF converts a ServiceNowResolutionCodeRule slice into a Terraform types.List.
+func resolutionCodeRulesToTF(ctx context.Context, rules []client.ServiceNowResolutionCodeRule) (types.List, diag.Diagnostics) {
+	objType := resolutionCodeRuleObjectType()
+	elements := make([]attr.Value, 0, len(rules))
+	for _, rule := range rules {
+		obj, d := types.ObjectValue(objType.AttrTypes, map[string]attr.Value{
+			"pattern": types.StringValue(rule.Pattern),
+			"outcome": types.StringValue(rule.Outcome),
+		})
+		if d.HasError() {
+			return types.ListNull(objType), d
+		}
+		elements = append(elements, obj)
+	}
+	return types.ListValue(objType, elements)
 }
 
 // tableMappingFromTF converts a Terraform types.Map to [][]string for the API

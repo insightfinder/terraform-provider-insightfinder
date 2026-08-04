@@ -19,6 +19,13 @@ type ServiceNowProjectConfig struct {
 	ConfigurationItem                     string `json:"configurationItem,omitempty"`
 }
 
+// ServiceNowResolutionCodeRule represents a pattern-based rule that classifies a
+// ServiceNow resolution/close code as positive ("like") or negative ("disLike") feedback.
+type ServiceNowResolutionCodeRule struct {
+	Pattern string `json:"pattern"`
+	Outcome string `json:"outcome"`
+}
+
 // ServiceNowConfig represents ServiceNow integration configuration
 type ServiceNowConfig struct {
 	Account                    string                             `json:"account"`
@@ -42,6 +49,7 @@ type ServiceNowConfig struct {
 	DepartmentID               string                             `json:"department_id,omitempty"`
 	ProjectConfigs             map[string]ServiceNowProjectConfig `json:"project_configs,omitempty"`
 	TableMapping               [][]string                         `json:"table_mapping,omitempty"`
+	ResolutionCodeRules        []ServiceNowResolutionCodeRule     `json:"resolution_code_rules,omitempty"`
 }
 
 // ServiceNowResponse represents the API response for ServiceNow operations
@@ -76,6 +84,26 @@ func parseProjectConfigs(raw map[string]interface{}) map[string]ServiceNowProjec
 			pc.ConfigurationItem = s
 		}
 		result[projectName] = pc
+	}
+	return result
+}
+
+// parseResolutionCodeRules converts a raw []interface{} into a typed ResolutionCodeRule slice
+func parseResolutionCodeRules(raw []interface{}) []ServiceNowResolutionCodeRule {
+	result := make([]ServiceNowResolutionCodeRule, 0, len(raw))
+	for _, v := range raw {
+		ruleMap, ok := v.(map[string]interface{})
+		if !ok {
+			continue
+		}
+		rule := ServiceNowResolutionCodeRule{}
+		if s, ok := ruleMap["pattern"].(string); ok {
+			rule.Pattern = s
+		}
+		if s, ok := ruleMap["outcome"].(string); ok {
+			rule.Outcome = s
+		}
+		result = append(result, rule)
 	}
 	return result
 }
@@ -180,6 +208,11 @@ func (c *Client) GetServiceNowConfig(account, serviceHost, username string) (*Se
 		config.ProjectConfigs = parseProjectConfigs(projectConfigsRaw)
 	}
 
+	// Parse resolutionCodeRules from root level
+	if resolutionRulesRaw, ok := entry["resolutionCodeRules"].([]interface{}); ok {
+		config.ResolutionCodeRules = parseResolutionCodeRules(resolutionRulesRaw)
+	}
+
 	// Parse configs JSON string for systemIds, contentOption, triggerWindowInMills, and fallback fields
 	if configsStr, ok := entry["configs"].(string); ok && configsStr != "" {
 		var configs map[string]interface{}
@@ -236,6 +269,12 @@ func (c *Client) GetServiceNowConfig(account, serviceHost, username string) (*Se
 			if config.ProjectConfigs == nil {
 				if pcRaw, ok := configs["projectConfigs"].(map[string]interface{}); ok {
 					config.ProjectConfigs = parseProjectConfigs(pcRaw)
+				}
+			}
+			// Fall back to resolutionCodeRules from configs JSON if not found at root level
+			if config.ResolutionCodeRules == nil {
+				if rrRaw, ok := configs["resolutionCodeRules"].([]interface{}); ok {
+					config.ResolutionCodeRules = parseResolutionCodeRules(rrRaw)
 				}
 			}
 		}
@@ -342,6 +381,13 @@ func (c *Client) CreateOrUpdateServiceNowConfig(config *ServiceNowConfig, userna
 				return fmt.Errorf("failed to marshal project configs: %w", err)
 			}
 			formData.Set("projectConfigs", string(projectConfigsJSON))
+		}
+		if len(config.ResolutionCodeRules) > 0 {
+			resolutionCodeRulesJSON, err := json.Marshal(config.ResolutionCodeRules)
+			if err != nil {
+				return fmt.Errorf("failed to marshal resolution code rules: %w", err)
+			}
+			formData.Set("resolutionCodeRules", string(resolutionCodeRulesJSON))
 		}
 	}
 
