@@ -103,6 +103,18 @@ resource "insightfinder_servicenow" "full" {
     "my-project"      = "incident"
     "another-project" = "problem"
   }
+
+  # Classify resolution codes as positive/negative feedback
+  resolution_code_rules = [
+    {
+      pattern = "^(Could Not Replicate|No Fault Found|No Trouble Found)"
+      outcome = "disLike"
+    },
+    {
+      pattern = "^Solved"
+      outcome = "like"
+    },
+  ]
 }
 ```
 
@@ -138,6 +150,9 @@ resource "insightfinder_servicenow" "full" {
   - `enable_incident_resolve_update` (Boolean, Computed) Whether to enable incident resolve updates for this project. Defaults to `false`.
   - `configuration_item` (String) ServiceNow CMDB configuration item for this specific project. Overrides the top-level `configuration_item` when set.
 - `table_mapping` (Map of String) Mapping of InsightFinder project names to ServiceNow table names (e.g., `{ "my-project" = "incident" }`).
+- `resolution_code_rules` (List of Object) Ordered list of pattern-based rules used to classify ServiceNow resolution/close codes as positive or negative feedback. Each object has:
+  - `pattern` (String, Required) Regular expression matched against the ServiceNow resolution/close code (e.g., `^Solved`).
+  - `outcome` (String, Required) Feedback outcome when the pattern matches. Must be `like` or `disLike`.
 
 ### Read-Only
 

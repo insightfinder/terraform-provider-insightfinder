@@ -87,6 +87,18 @@ resource "insightfinder_servicenow" "full" {
     "my-project"      = "incident"
     "another-project" = "problem"
   }
+
+  # Classify resolution codes as positive/negative feedback
+  resolution_code_rules = [
+    {
+      pattern = "^(Could Not Replicate|No Fault Found|No Trouble Found)"
+      outcome = "disLike"
+    },
+    {
+      pattern = "^Solved"
+      outcome = "like"
+    },
+  ]
 }
 
 variable "servicenow_password" {
