@@ -46,6 +46,7 @@ type ProjectSettings struct {
 	SimilaritySensitivity     string  `json:"similaritySensitivity,omitempty"`
 	CollectAllRareEventsFlag  bool    `json:"collectAllRareEventsFlag,omitempty"`
 	RareEventAlertThresholds  int     `json:"rareEventAlertThresholds"`
+	RareEventAutoIncidentFlag bool    `json:"rareEventAutoIncidentFlag,omitempty"`
 	LogAnomalyEventBaseScore  string  `json:"logAnomalyEventBaseScore,omitempty"`
 	RareNumberLimit           int     `json:"rareNumberLimit,omitempty"`
 	WhitelistNumberLimit      int     `json:"whitelistNumberLimit,omitempty"`

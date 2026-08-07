@@ -138,14 +138,15 @@ type projectResourceModel struct {
 	RootCauseRankSetting                 types.Int64   `tfsdk:"root_cause_rank_setting"`
 
 	// Pattern and Rare Event Settings
-	ProjectModelFlag         types.Bool   `tfsdk:"project_model_flag"`
-	Proxy                    types.String `tfsdk:"proxy"`
-	RareAnomalyType          types.Int64  `tfsdk:"rare_anomaly_type"`
-	RareEventAlertThresholds types.Int64  `tfsdk:"rare_event_alert_thresholds"`
-	RareNumberLimit          types.Int64  `tfsdk:"rare_number_limit"`
-	RetentionTime            types.Int64  `tfsdk:"retention_time"`
-	SimilaritySensitivity    types.String `tfsdk:"similarity_sensitivity"`
-	TrainingFilter           types.Bool   `tfsdk:"training_filter"`
+	ProjectModelFlag          types.Bool   `tfsdk:"project_model_flag"`
+	Proxy                     types.String `tfsdk:"proxy"`
+	RareAnomalyType           types.Int64  `tfsdk:"rare_anomaly_type"`
+	RareEventAlertThresholds  types.Int64  `tfsdk:"rare_event_alert_thresholds"`
+	RareEventAutoIncidentFlag types.Bool   `tfsdk:"rare_event_auto_incident_flag"`
+	RareNumberLimit           types.Int64  `tfsdk:"rare_number_limit"`
+	RetentionTime             types.Int64  `tfsdk:"retention_time"`
+	SimilaritySensitivity     types.String `tfsdk:"similarity_sensitivity"`
+	TrainingFilter            types.Bool   `tfsdk:"training_filter"`
 
 	// Webhook Settings
 	MaxWebHookRequestSize        types.Int64  `tfsdk:"max_web_hook_request_size"`
@@ -784,6 +785,11 @@ func (r *projectResource) Schema(_ context.Context, _ resource.SchemaRequest, re
 			},
 			"rare_event_alert_thresholds": schema.Int64Attribute{
 				Description: "Alert thresholds for rare events",
+				Optional:    true,
+				Computed:    true,
+			},
+			"rare_event_auto_incident_flag": schema.BoolAttribute{
+				Description: "Automatically create an incident for detected rare events",
 				Optional:    true,
 				Computed:    true,
 			},
@@ -1446,6 +1452,9 @@ func populateSettings(plan *projectResourceModel) map[string]interface{} {
 	if !plan.RareEventAlertThresholds.IsNull() {
 		s["rareEventAlertThresholds"] = int(plan.RareEventAlertThresholds.ValueInt64())
 	}
+	if !plan.RareEventAutoIncidentFlag.IsNull() {
+		s["rareEventAutoIncidentFlag"] = plan.RareEventAutoIncidentFlag.ValueBool()
+	}
 	if !plan.LogAnomalyEventBaseScore.IsNull() {
 		s["logAnomalyEventBaseScore"] = plan.LogAnomalyEventBaseScore.ValueString()
 	}
@@ -1912,6 +1921,7 @@ func (r *projectResource) Create(ctx context.Context, req resource.CreateRequest
 		// Rare Event Settings
 		plan.RareAnomalyType = getInt64("rareAnomalyType")
 		plan.RareEventAlertThresholds = getInt64("rareEventAlertThresholds")
+		plan.RareEventAutoIncidentFlag = getBool("rareEventAutoIncidentFlag")
 		plan.RareNumberLimit = getInt64("rareNumberLimit")
 		plan.RetentionTime = getInt64("retentionTime")
 
@@ -2183,6 +2193,9 @@ func (r *projectResource) Create(ctx context.Context, req resource.CreateRequest
 	}
 	if !config.RareEventAlertThresholds.IsNull() {
 		plan.RareEventAlertThresholds = config.RareEventAlertThresholds
+	}
+	if !config.RareEventAutoIncidentFlag.IsNull() {
+		plan.RareEventAutoIncidentFlag = config.RareEventAutoIncidentFlag
 	}
 	if !config.RareNumberLimit.IsNull() {
 		plan.RareNumberLimit = config.RareNumberLimit
@@ -2816,6 +2829,7 @@ func (r *projectResource) Read(ctx context.Context, req resource.ReadRequest, re
 	// Rare Event Settings
 	state.RareAnomalyType = getInt64("rareAnomalyType")
 	state.RareEventAlertThresholds = getInt64("rareEventAlertThresholds")
+	state.RareEventAutoIncidentFlag = getBool("rareEventAutoIncidentFlag")
 	state.RareNumberLimit = getInt64("rareNumberLimit")
 	state.RetentionTime = getInt64("retentionTime")
 
@@ -3375,6 +3389,7 @@ func (r *projectResource) Update(ctx context.Context, req resource.UpdateRequest
 		// Rare Event Settings
 		plan.RareAnomalyType = getInt64("rareAnomalyType")
 		plan.RareEventAlertThresholds = getInt64("rareEventAlertThresholds")
+		plan.RareEventAutoIncidentFlag = getBool("rareEventAutoIncidentFlag")
 		plan.RareNumberLimit = getInt64("rareNumberLimit")
 		plan.RetentionTime = getInt64("retentionTime")
 
