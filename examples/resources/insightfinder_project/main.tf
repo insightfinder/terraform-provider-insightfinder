@@ -55,6 +55,9 @@ resource "insightfinder_project" "advanced_logs" {
   hot_event_threshold       = 10
   hot_number_limit          = 20
 
+  # Rare event handling
+  rare_event_auto_incident_flag = true
+
   # Email alerts
   enable_new_alert_email = true
   email_setting = jsonencode({

@@ -5,6 +5,11 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.10.8] - 2026-08-07
+
+### Added
+- **insightfinder_project**: New `rare_event_auto_incident_flag` attribute (Boolean, Optional, Computed) — automatically creates an incident for detected rare events. Maps to the `rareEventAutoIncidentFlag` field, which was previously absent from the `ProjectSettings` client struct and unsupported by the resource despite being accepted and returned by the project settings API.
+
 ## [1.10.7] - 2026-08-04
 
 ### Added

@@ -344,6 +344,7 @@ resource "insightfinder_project" "loki_logs" {
 - `anomaly_detection_mode` (Number) Anomaly detection mode. Default: `0`
 - `component_name_auto_overwrite` (Boolean) Enable automatic overwrite of component names
 - `enable_hot_event` (Boolean) Enable hot event detection. Default: `true`
+- `rare_event_auto_incident_flag` (Boolean, Optional, Computed) Automatically create an incident for detected rare events
 - `enable_new_alert_email` (Boolean) Enable email alerts. Default: `false`
 - `email_setting` (String) JSON-encoded email configuration
 - `webhook_url` (String) Webhook URL for notifications
