@@ -5,6 +5,11 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.10.9] - 2026-08-18
+
+### Added
+- **insightfinder_metric_project**: New `fetch_all_metrics_at_once` attribute (Boolean, Optional, Computed, default `false`) controlling how `metric_configurations` alert settings are refreshed on read. Previously, reading `metric_configurations` always called `GetAllMetricSettings`, an unfiltered paginated sweep of every metric alert setting in the project, even when only one or two metrics were tracked — causing slow `plan`/`apply` on large projects. When `false` (the default), the provider now issues one `metricFilter`-scoped `componentmetricupdate` request per tracked metric instead, dispatched concurrently. Set to `true` to restore the old unfiltered-sweep behavior, which is faster when `metric_configurations` tracks most or all of the project's metrics.
+
 ## [1.10.8] - 2026-08-07
 
 ### Added
