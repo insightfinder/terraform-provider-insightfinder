@@ -443,6 +443,7 @@ resource "insightfinder_metric_project" "alerted_metrics" {
     - `enable_baseline_near_constance` (Boolean, Optional) Enable near-constance baseline detection.
     - `compute_difference` (Boolean, Optional) Compute derivative (difference) of this metric before detection.
     - `anomaly_gap_tolerance_duration` (Number, Optional, Computed) Anomaly gap tolerance in milliseconds. Internally converted to a count using the project `sampling_interval` before being sent to the API.
+- `fetch_all_metrics_at_once` (Boolean, Optional, Computed) Controls how `metric_configurations` alert settings are refreshed on read. When `false` (the default), the provider issues one `metricFilter`-scoped request per metric listed in `metric_configurations` — much faster when only a handful of metrics are tracked in a large project. When `true`, the provider fetches alert settings for every metric in the project in a single paginated sweep instead; only enable this when `metric_configurations` tracks most or all of the project's metrics.
 
 ### Read-Only
 

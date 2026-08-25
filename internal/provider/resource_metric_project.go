@@ -17,6 +17,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema/booldefault"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/types"
@@ -175,7 +176,8 @@ type metricProjectResourceModel struct {
 	HolidaySettings types.List `tfsdk:"holiday_settings"`
 
 	// Metric configurations (per-metric alert thresholds + component operations)
-	MetricConfigurations types.Map `tfsdk:"metric_configurations"`
+	MetricConfigurations  types.Map  `tfsdk:"metric_configurations"`
+	FetchAllMetricsAtOnce types.Bool `tfsdk:"fetch_all_metrics_at_once"`
 
 	Mode                                  types.Int64  `tfsdk:"mode"`
 	IncidentPriorityByAnomalyScoreSetting types.String `tfsdk:"incident_priority_by_anomaly_score_setting"`
@@ -901,6 +903,12 @@ func (r *metricProjectResource) Schema(_ context.Context, _ resource.SchemaReque
 					},
 				},
 			},
+			"fetch_all_metrics_at_once": schema.BoolAttribute{
+				Description: "When reading metric_configurations, fetch alert settings for every metric in the project in one paginated sweep instead of one filtered request per tracked metric. Enable this only when metric_configurations tracks most/all of the project's metrics; for a small number of tracked metrics, per-metric requests (the default) are far faster.",
+				Optional:    true,
+				Computed:    true,
+				Default:     booldefault.StaticBool(false),
+			},
 		},
 	}
 }
@@ -1545,6 +1553,11 @@ func (r *metricProjectResource) Create(ctx context.Context, req resource.CreateR
 		}
 	}
 
+	// fetch_all_metrics_at_once is Optional+Computed with a schema default and is never
+	// returned by the API, so it must be carried over from the plan (where the default
+	// was already applied) rather than taken from config, which is null when unset.
+	fetchAllMetricsAtOnce := plan.FetchAllMetricsAtOnce
+
 	var config metricProjectResourceModel
 	diags = req.Config.Get(ctx, &config)
 	resp.Diagnostics.Append(diags...)
@@ -1556,6 +1569,7 @@ func (r *metricProjectResource) Create(ctx context.Context, req resource.CreateR
 	if err != nil {
 		tflog.Warn(ctx, "Could not read metric project after creation", map[string]any{"error": err.Error()})
 		config.ID = plan.ProjectName
+		config.FetchAllMetricsAtOnce = fetchAllMetricsAtOnce
 		resp.State.Set(ctx, config)
 		return
 	}
@@ -1563,6 +1577,7 @@ func (r *metricProjectResource) Create(ctx context.Context, req resource.CreateR
 	if project != nil {
 		plan = config
 		plan.ID = plan.ProjectName
+		plan.FetchAllMetricsAtOnce = fetchAllMetricsAtOnce
 
 		apiSettings := project.Settings
 		if apiSettings == nil {
@@ -1751,7 +1766,7 @@ func (r *metricProjectResource) Read(ctx context.Context, req resource.ReadReque
 		existingConfigs, mcDiags := metricConfigsFromMap(ctx, state.MetricConfigurations)
 		resp.Diagnostics.Append(mcDiags...)
 		if !resp.Diagnostics.HasError() {
-			updatedConfigs, readDiags := readMetricConfigurationsFromAPI(ctx, r.client, state.ProjectName.ValueString(), existingConfigs)
+			updatedConfigs, readDiags := readMetricConfigurationsFromAPI(ctx, r.client, state.ProjectName.ValueString(), existingConfigs, state.FetchAllMetricsAtOnce.ValueBool())
 			resp.Diagnostics.Append(readDiags...)
 			if !resp.Diagnostics.HasError() && len(updatedConfigs) > 0 {
 				setVal, d := metricConfigsToMap(ctx, updatedConfigs)
@@ -2081,11 +2096,45 @@ func buildSingleMetricAlertSettingPost(metricName string, s metricAlertSettingMo
 	}
 }
 
+// getMetricSettingsForConfigs fetches alert settings for exactly the metrics listed in
+// existingConfigs, one metricFilter-scoped request per metric, dispatched concurrently.
+func getMetricSettingsForConfigs(c *client.Client, projectName string, existingConfigs []metricConfigurationModel) (map[string]*client.MetricSettingEntry, error) {
+	result := make(map[string]*client.MetricSettingEntry)
+	var mu sync.Mutex
+	var wg sync.WaitGroup
+	var firstErr error
+
+	for _, cfg := range existingConfigs {
+		metricName := cfg.MetricName.ValueString()
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			entry, err := c.GetMetricSettings(projectName, metricName)
+			mu.Lock()
+			defer mu.Unlock()
+			if err != nil {
+				if firstErr == nil {
+					firstErr = err
+				}
+				return
+			}
+			if entry != nil {
+				result[metricName] = entry
+			}
+		}()
+	}
+	wg.Wait()
+
+	return result, firstErr
+}
+
 // readMetricConfigurationsFromAPI reads current metric configuration state from the API
 // for all metrics listed in existingConfigs.
-// Component maps are fetched in two bulk calls. Alert settings are fetched in a single
-// paginated sweep (GetAllMetricSettings) instead of one request per metric.
-func readMetricConfigurationsFromAPI(ctx context.Context, c *client.Client, projectName string, existingConfigs []metricConfigurationModel) ([]metricConfigurationModel, diag.Diagnostics) {
+// Component maps are fetched in two bulk calls. Alert settings are fetched either as a
+// single unfiltered paginated sweep (fetchAllAtOnce=true, GetAllMetricSettings) or as one
+// metricFilter-scoped request per tracked metric (fetchAllAtOnce=false, the default) —
+// the latter is much faster when only a handful of metrics are tracked in a large project.
+func readMetricConfigurationsFromAPI(ctx context.Context, c *client.Client, projectName string, existingConfigs []metricConfigurationModel, fetchAllAtOnce bool) ([]metricConfigurationModel, diag.Diagnostics) {
 	var diags diag.Diagnostics
 	if len(existingConfigs) == 0 {
 		return nil, diags
@@ -2102,12 +2151,19 @@ func readMetricConfigurationsFromAPI(ctx context.Context, c *client.Client, proj
 		ignoredMap = make(map[string][]string)
 	}
 
-	// Fetch all metric alert settings in one (or a few paginated) request(s) instead
-	// of making a separate filtered request per metric.
-	allSettings, err := c.GetAllMetricSettings(projectName)
-	if err != nil {
-		diags.AddWarning("Could not read metric settings", err.Error())
-		allSettings = make(map[string]*client.MetricSettingEntry)
+	var allSettings map[string]*client.MetricSettingEntry
+	if fetchAllAtOnce {
+		allSettings, err = c.GetAllMetricSettings(projectName)
+		if err != nil {
+			diags.AddWarning("Could not read metric settings", err.Error())
+			allSettings = make(map[string]*client.MetricSettingEntry)
+		}
+	} else {
+		allSettings, err = getMetricSettingsForConfigs(c, projectName, existingConfigs)
+		if err != nil {
+			diags.AddWarning("Could not read metric settings", err.Error())
+			allSettings = make(map[string]*client.MetricSettingEntry)
+		}
 	}
 
 	var result []metricConfigurationModel

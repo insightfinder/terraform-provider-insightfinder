@@ -5,6 +5,17 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.10.10] - 2026-08-25
+
+### Fixed
+- **insightfinder_metric_project**: Fixed `metric_configurations` alert settings silently failing to apply. `SetMetricSettings` treated a persistent HTTP 204 from the batch `componentmetricupdate` request as success and returned without ever writing the settings; it now falls back to sending each entry individually (as it already did for 502), and that one-by-one fallback no longer skips entries that come back 204 — a real failure is now surfaced as an error instead of being silently dropped. Batch/fallback retries were also reduced from 5 attempts with `attempt*3s` backoff to 3 attempts with a flat 1s backoff.
+- **insightfinder_metric_project**: Fixed `Provider produced inconsistent result after apply` on `fetch_all_metrics_at_once` when the attribute was omitted from config. `Create` copied `req.Config` over the plan wholesale, which overwrote the schema-computed default (`false`) with `null` since the attribute is never returned by the API; the computed value from the plan is now preserved through that copy.
+
+## [1.10.9] - 2026-08-18
+
+### Added
+- **insightfinder_metric_project**: New `fetch_all_metrics_at_once` attribute (Boolean, Optional, Computed, default `false`) controlling how `metric_configurations` alert settings are refreshed on read. Previously, reading `metric_configurations` always called `GetAllMetricSettings`, an unfiltered paginated sweep of every metric alert setting in the project, even when only one or two metrics were tracked — causing slow `plan`/`apply` on large projects. When `false` (the default), the provider now issues one `metricFilter`-scoped `componentmetricupdate` request per tracked metric instead, dispatched concurrently. Set to `true` to restore the old unfiltered-sweep behavior, which is faster when `metric_configurations` tracks most or all of the project's metrics.
+
 ## [1.10.8] - 2026-08-07
 
 ### Added
