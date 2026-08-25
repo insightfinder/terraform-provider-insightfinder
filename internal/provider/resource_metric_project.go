@@ -1553,6 +1553,11 @@ func (r *metricProjectResource) Create(ctx context.Context, req resource.CreateR
 		}
 	}
 
+	// fetch_all_metrics_at_once is Optional+Computed with a schema default and is never
+	// returned by the API, so it must be carried over from the plan (where the default
+	// was already applied) rather than taken from config, which is null when unset.
+	fetchAllMetricsAtOnce := plan.FetchAllMetricsAtOnce
+
 	var config metricProjectResourceModel
 	diags = req.Config.Get(ctx, &config)
 	resp.Diagnostics.Append(diags...)
@@ -1564,6 +1569,7 @@ func (r *metricProjectResource) Create(ctx context.Context, req resource.CreateR
 	if err != nil {
 		tflog.Warn(ctx, "Could not read metric project after creation", map[string]any{"error": err.Error()})
 		config.ID = plan.ProjectName
+		config.FetchAllMetricsAtOnce = fetchAllMetricsAtOnce
 		resp.State.Set(ctx, config)
 		return
 	}
@@ -1571,6 +1577,7 @@ func (r *metricProjectResource) Create(ctx context.Context, req resource.CreateR
 	if project != nil {
 		plan = config
 		plan.ID = plan.ProjectName
+		plan.FetchAllMetricsAtOnce = fetchAllMetricsAtOnce
 
 		apiSettings := project.Settings
 		if apiSettings == nil {
