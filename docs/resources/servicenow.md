@@ -87,6 +87,8 @@ resource "insightfinder_servicenow" "full" {
       enable_ticket_update                      = true
       enable_incident_consolidation_info_update = false
       enable_incident_resolve_update            = true
+      enable_incident_field_sync                = true
+      enable_metric_value_update                = true
       configuration_item                        = "My-Server-CI"
     }
     "another-project" = {
@@ -94,6 +96,8 @@ resource "insightfinder_servicenow" "full" {
       enable_ticket_update                      = false
       enable_incident_consolidation_info_update = true
       enable_incident_resolve_update            = false
+      enable_incident_field_sync                = false
+      enable_metric_value_update                = false
       configuration_item                        = "Another-Server-CI"
     }
   }
@@ -148,6 +152,8 @@ resource "insightfinder_servicenow" "full" {
   - `enable_ticket_update` (Boolean, Computed) Whether to enable ticket updates for this project. Defaults to `false`.
   - `enable_incident_consolidation_info_update` (Boolean, Computed) Whether to enable incident consolidation info updates for this project. Defaults to `false`.
   - `enable_incident_resolve_update` (Boolean, Computed) Whether to enable incident resolve updates for this project. Defaults to `false`.
+  - `enable_incident_field_sync` (Boolean, Computed) Whether to enable syncing incident field updates for this project. Defaults to `false`.
+  - `enable_metric_value_update` (Boolean, Computed) Whether to enable syncing metric value updates for this project. Defaults to `false`.
   - `configuration_item` (String) ServiceNow CMDB configuration item for this specific project. Overrides the top-level `configuration_item` when set.
 - `table_mapping` (Map of String) Mapping of InsightFinder project names to ServiceNow table names (e.g., `{ "my-project" = "incident" }`).
 - `resolution_code_rules` (List of Object) Ordered list of pattern-based rules used to classify ServiceNow resolution/close codes as positive or negative feedback. Each object has:

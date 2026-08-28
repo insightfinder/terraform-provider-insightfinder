@@ -7,6 +7,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"strings"
 
 	"github.com/hashicorp/terraform-plugin-framework/attr"
 	"github.com/hashicorp/terraform-plugin-framework/path"
@@ -112,16 +113,20 @@ type notificationsSettingsModel struct {
 	ComponentLevelDampening             types.Bool    `tfsdk:"component_level_dampening"`
 	EnabledConsolidationAlgorithms      types.List    `tfsdk:"enabled_consolidation_algorithms"`
 	// New notification settings
-	SystemDownNotification        *systemDownNotificationModel        `tfsdk:"system_down_notification"`
-	DailyReportNotification       *insightsReportNotificationModel    `tfsdk:"daily_report_notification"`
-	WeeklyReportNotification      *insightsReportNotificationModel    `tfsdk:"weekly_report_notification"`
-	InstanceDownNotification      []instanceDownNotificationModel     `tfsdk:"instance_down_notification"`
-	ProjectLevelDampeningWindows  []projectLevelDampeningWindowModel  `tfsdk:"project_level_dampening_windows"`
-	ProjectLevelDampeningPeriods  []projectLevelDampeningPeriodModel  `tfsdk:"project_level_dampening_periods"`
-	MaxNotificationDelayTolerance types.Int64                         `tfsdk:"max_notification_delay_tolerance"`
-	CustomConsolidationRules      []customConsolidationRuleModel      `tfsdk:"custom_consolidation_rules"`
-	MetricLogConsolidationConfigs []metricLogConsolidationConfigModel `tfsdk:"metric_log_consolidation_configs"`
-	MetricCoOccurrenceBufferMs    types.Int64                         `tfsdk:"metric_co_occurrence_buffer_ms"`
+	SystemDownNotification              *systemDownNotificationModel        `tfsdk:"system_down_notification"`
+	DailyReportNotification             *insightsReportNotificationModel    `tfsdk:"daily_report_notification"`
+	WeeklyReportNotification            *insightsReportNotificationModel    `tfsdk:"weekly_report_notification"`
+	InstanceDownNotification            []instanceDownNotificationModel     `tfsdk:"instance_down_notification"`
+	ProjectLevelDampeningWindows        []projectLevelDampeningWindowModel  `tfsdk:"project_level_dampening_windows"`
+	ProjectLevelDampeningPeriods        []projectLevelDampeningPeriodModel  `tfsdk:"project_level_dampening_periods"`
+	MaxNotificationDelayTolerance       types.Int64                         `tfsdk:"max_notification_delay_tolerance"`
+	CustomConsolidationRules            []customConsolidationRuleModel      `tfsdk:"custom_consolidation_rules"`
+	MetricLogConsolidationConfigs       []metricLogConsolidationConfigModel `tfsdk:"metric_log_consolidation_configs"`
+	MetricCoOccurrenceBufferMs          types.Int64                         `tfsdk:"metric_co_occurrence_buffer_ms"`
+	LocalKbSensitivities                types.String                        `tfsdk:"local_kb_sensitivities"`
+	AnomalyScoreNotificationMinDelta    types.Int64                         `tfsdk:"anomaly_score_notification_min_delta"`
+	AnomalyScoreNotificationSensitivity types.String                        `tfsdk:"anomaly_score_notification_sensitivity"`
+	NotificationDelayConfig             types.String                        `tfsdk:"notification_delay_config"`
 }
 
 // systemDownNotificationModel holds system down notification settings
@@ -798,6 +803,41 @@ func (r *systemSettingsResource) Schema(_ context.Context, _ resource.SchemaRequ
 							int64planmodifier.UseStateForUnknown(),
 						},
 					},
+					"local_kb_sensitivities": schema.StringAttribute{
+						Description: "JSON array of per-project knowledge base sensitivity overrides, mirroring the API's internal format: " +
+							"p (project name), u (user), s (sensitivity), m (mode), d (delta), sa (bool), cc (map), udc (list), crp (list), sc (list). " +
+							"Example: jsonencode([{p=\"MyProject\",u=\"user\",s=2,m=0,d=43,sa=false,cc={},udc=[],crp=[],sc=[]}])",
+						Optional: true,
+						Computed: true,
+						PlanModifiers: []planmodifier.String{
+							stringplanmodifier.UseStateForUnknown(),
+						},
+					},
+					"anomaly_score_notification_min_delta": schema.Int64Attribute{
+						Description: "Minimum delta threshold for anomaly score notifications.",
+						Optional:    true,
+						Computed:    true,
+						PlanModifiers: []planmodifier.Int64{
+							int64planmodifier.UseStateForUnknown(),
+						},
+					},
+					"anomaly_score_notification_sensitivity": schema.StringAttribute{
+						Description: "Anomaly score notification sensitivity, derived server-side from local_kb_sensitivities. Read-only.",
+						Computed:    true,
+						PlanModifiers: []planmodifier.String{
+							stringplanmodifier.UseStateForUnknown(),
+						},
+					},
+					"notification_delay_config": schema.StringAttribute{
+						Description: "JSON object configuring per-project notification delay overrides. Fields: e (enabled bool), d (delay in milliseconds), " +
+							"u (username), p (map of project name to {d: delay in milliseconds}). " +
+							"Example: jsonencode({e=true,d=3300000,u=\"user\",p={\"MyProject\"={d=3300000}}})",
+						Optional: true,
+						Computed: true,
+						PlanModifiers: []planmodifier.String{
+							stringplanmodifier.UseStateForUnknown(),
+						},
+					},
 					"custom_consolidation_rules": schema.ListNestedAttribute{
 						Description: "Custom incident consolidation rules.",
 						Optional:    true,
@@ -1176,6 +1216,21 @@ func (r *systemSettingsResource) applyNotificationsSettings(_ context.Context, s
 		ComponentLevelDampening:             m.ComponentLevelDampening.ValueBool(),
 		EnabledConsolidationAlgorithms:      typesListToStrings(m.EnabledConsolidationAlgorithms),
 		MetricCoOccurrenceBufferMs:          m.MetricCoOccurrenceBufferMs.ValueInt64(),
+		AnomalyScoreNotificationMinDelta:    m.AnomalyScoreNotificationMinDelta.ValueInt64(),
+	}
+
+	if v := m.LocalKbSensitivities.ValueString(); v != "" && v != "null" {
+		if !json.Valid([]byte(v)) {
+			return fmt.Errorf("local_kb_sensitivities is not valid JSON: %s", v)
+		}
+		updates.LocalKbSensitivities = json.RawMessage(v)
+	}
+
+	if v := m.NotificationDelayConfig.ValueString(); v != "" && v != "null" {
+		if !json.Valid([]byte(v)) {
+			return fmt.Errorf("notification_delay_config is not valid JSON: %s", v)
+		}
+		updates.NotificationDelayConfig = json.RawMessage(v)
 	}
 
 	if v := m.IncidentCountThreshold.ValueString(); v != "" && v != "null" {
@@ -1480,6 +1535,34 @@ func (r *systemSettingsResource) readIntoModel(_ context.Context, systemID strin
 			m.NotificationsSettings.EnabledConsolidationAlgorithms = stringsToTypesList(hvSetting.EnabledConsolidationAlgorithms)
 			m.NotificationsSettings.MaxNotificationDelayTolerance = types.Int64Value(hvSetting.MaxNotificationDelayTolerance)
 			m.NotificationsSettings.MetricCoOccurrenceBufferMs = types.Int64Value(hvSetting.MetricCoOccurrenceBufferMs)
+			m.NotificationsSettings.AnomalyScoreNotificationMinDelta = types.Int64Value(hvSetting.AnomalyScoreNotificationMinDelta)
+			m.NotificationsSettings.AnomalyScoreNotificationSensitivity = types.StringValue(rawJSONToPlainString(hvSetting.AnomalyScoreNotificationSensitivity))
+
+			var apiLKS string
+			if len(hvSetting.LocalKbSensitivities) > 0 {
+				apiLKS = string(hvSetting.LocalKbSensitivities)
+			} else {
+				apiLKS = "[]"
+			}
+			existingLKS := m.NotificationsSettings.LocalKbSensitivities.ValueString()
+			if normalizeJSONString(existingLKS) == normalizeJSONString(apiLKS) && existingLKS != "" {
+				// Keep existing state value
+			} else {
+				m.NotificationsSettings.LocalKbSensitivities = types.StringValue(apiLKS)
+			}
+
+			var apiNDC string
+			if len(hvSetting.NotificationDelayConfig) > 0 {
+				apiNDC = string(hvSetting.NotificationDelayConfig)
+			} else {
+				apiNDC = "{}"
+			}
+			existingNDC := m.NotificationsSettings.NotificationDelayConfig.ValueString()
+			if normalizeJSONString(existingNDC) == normalizeJSONString(apiNDC) && existingNDC != "" {
+				// Keep existing state value
+			} else {
+				m.NotificationsSettings.NotificationDelayConfig = types.StringValue(apiNDC)
+			}
 
 			// Custom consolidation rules
 			newRules := make([]customConsolidationRuleModel, 0, len(hvSetting.CustomConsolidationRules))
@@ -1664,6 +1747,21 @@ func typesListToStrings(l types.List) []string {
 		}
 	}
 	return result
+}
+
+// rawJSONToPlainString converts a raw JSON scalar (string or number) into a plain Go string
+// for display, unwrapping quotes from JSON string values. The API returns
+// anomalyScoreNotificationSensitivity typed inconsistently (e.g. a quoted "2"), so this
+// normalizes it to a bare value regardless of the JSON type used on the wire.
+func rawJSONToPlainString(raw json.RawMessage) string {
+	if len(raw) == 0 {
+		return ""
+	}
+	var s string
+	if err := json.Unmarshal(raw, &s); err == nil {
+		return s
+	}
+	return strings.TrimSpace(string(raw))
 }
 
 // normalizeJSONString parses and re-marshals a JSON string via interface{} so that

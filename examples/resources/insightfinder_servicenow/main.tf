@@ -71,6 +71,8 @@ resource "insightfinder_servicenow" "full" {
       enable_ticket_update                      = true
       enable_incident_consolidation_info_update = false
       enable_incident_resolve_update            = true
+      enable_incident_field_sync                = true
+      enable_metric_value_update                = true
       configuration_item                        = "My-Server-CI"
     }
     "another-project" = {
@@ -78,6 +80,8 @@ resource "insightfinder_servicenow" "full" {
       enable_ticket_update                      = false
       enable_incident_consolidation_info_update = true
       enable_incident_resolve_update            = false
+      enable_incident_field_sync                = false
+      enable_metric_value_update                = false
       configuration_item                        = "Another-Server-CI"
     }
   }

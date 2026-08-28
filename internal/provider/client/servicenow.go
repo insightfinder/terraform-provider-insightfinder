@@ -16,6 +16,8 @@ type ServiceNowProjectConfig struct {
 	EnableTicketUpdate                    bool   `json:"enableTicketUpdate"`
 	EnableIncidentConsolidationInfoUpdate bool   `json:"enableIncidentConsolidationInfoUpdate"`
 	EnableIncidentResolveUpdate           bool   `json:"enableIncidentResolveUpdate"`
+	EnableIncidentFieldSync               bool   `json:"enableIncidentFieldSync"`
+	EnableMetricValueUpdate               bool   `json:"enableMetricValueUpdate"`
 	ConfigurationItem                     string `json:"configurationItem,omitempty"`
 }
 
@@ -79,6 +81,12 @@ func parseProjectConfigs(raw map[string]interface{}) map[string]ServiceNowProjec
 		}
 		if b, ok := pcMap["enableIncidentResolveUpdate"].(bool); ok {
 			pc.EnableIncidentResolveUpdate = b
+		}
+		if b, ok := pcMap["enableIncidentFieldSync"].(bool); ok {
+			pc.EnableIncidentFieldSync = b
+		}
+		if b, ok := pcMap["enableMetricValueUpdate"].(bool); ok {
+			pc.EnableMetricValueUpdate = b
 		}
 		if s, ok := pcMap["configurationItem"].(string); ok {
 			pc.ConfigurationItem = s
