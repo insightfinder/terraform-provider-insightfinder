@@ -617,6 +617,25 @@ A set of per-project dampening period rules stored in the health view setting, d
 | `max_notification_delay_tolerance` | Number | Maximum delay in milliseconds before a notification must fire regardless of dampening windows (e.g. `10800000` = 3 hours). Maps to `maxNotificationDelayTolerance`. |
 | `metric_co_occurrence_buffer_ms` | Number | Metric co-occurrence buffer window in milliseconds. Maps to `metricCoOccurrenceBufferMs`. |
 
+#### Anomaly Score Notifications
+
+| Attribute | Type | Description |
+|-----------|------|-------------|
+| `anomaly_score_notification_min_delta` | Number | Minimum delta threshold for anomaly score notifications. Maps to `anomalyScoreNotificationMinDelta`. |
+| `anomaly_score_notification_sensitivity` | String (Read-Only) | Anomaly score notification sensitivity, derived server-side from `local_kb_sensitivities`. Maps to `anomalyScoreNotificationSensitivity`. |
+
+#### Local KB Sensitivities
+
+| Attribute | Type | Description |
+|-----------|------|-------------|
+| `local_kb_sensitivities` | String | JSON-encoded array of per-project knowledge base sensitivity overrides, mirroring the API's internal format: `p` (project name), `u` (user), `s` (sensitivity), `m` (mode), `d` (delta), `sa` (bool), `cc` (map), `udc` (list), `crp` (list), `sc` (list). Maps to `localKbSensitivities`. Example: `jsonencode([{p = "MyProject", u = "user", s = 2, m = 0, d = 43, sa = false, cc = {}, udc = [], crp = [], sc = []}])`. Use `jsonencode([])` for no overrides. |
+
+#### Notification Delay Config
+
+| Attribute | Type | Description |
+|-----------|------|-------------|
+| `notification_delay_config` | String | JSON-encoded object configuring per-project notification delay overrides. Fields: `e` (enabled bool), `d` (delay in milliseconds), `u` (username), `p` (map of project name to `{d: delay in milliseconds}`). Maps to `notificationDelayConfig`. Example: `jsonencode({e = true, d = 3300000, u = "admin", p = {"MyProject" = {d = 3300000}}})`. Use `jsonencode({})` to clear. |
+
 #### Custom Consolidation Rules
 
 A list of custom incident consolidation rules. When `consolidationCustom` is included in `enabled_consolidation_algorithms`, these rules control which incidents from different projects are consolidated into a single notification. Each rule has two sub-blocks:

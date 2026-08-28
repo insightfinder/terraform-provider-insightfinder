@@ -46,6 +46,8 @@ type projectConfigModel struct {
 	EnableTicketUpdate                    types.Bool   `tfsdk:"enable_ticket_update"`
 	EnableIncidentConsolidationInfoUpdate types.Bool   `tfsdk:"enable_incident_consolidation_info_update"`
 	EnableIncidentResolveUpdate           types.Bool   `tfsdk:"enable_incident_resolve_update"`
+	EnableIncidentFieldSync               types.Bool   `tfsdk:"enable_incident_field_sync"`
+	EnableMetricValueUpdate               types.Bool   `tfsdk:"enable_metric_value_update"`
 	ConfigurationItem                     types.String `tfsdk:"configuration_item"`
 }
 
@@ -213,6 +215,18 @@ func (r *servicenowResource) Schema(_ context.Context, _ resource.SchemaRequest,
 						},
 						"enable_incident_resolve_update": schema.BoolAttribute{
 							Description: "Whether to enable incident resolve updates for this project.",
+							Optional:    true,
+							Computed:    true,
+							Default:     booldefault.StaticBool(false),
+						},
+						"enable_incident_field_sync": schema.BoolAttribute{
+							Description: "Whether to enable syncing incident field updates for this project.",
+							Optional:    true,
+							Computed:    true,
+							Default:     booldefault.StaticBool(false),
+						},
+						"enable_metric_value_update": schema.BoolAttribute{
+							Description: "Whether to enable syncing metric value updates for this project.",
 							Optional:    true,
 							Computed:    true,
 							Default:     booldefault.StaticBool(false),
@@ -835,6 +849,8 @@ func projectConfigAttrTypes() attr.Type {
 			"enable_ticket_update":                      types.BoolType,
 			"enable_incident_consolidation_info_update": types.BoolType,
 			"enable_incident_resolve_update":            types.BoolType,
+			"enable_incident_field_sync":                types.BoolType,
+			"enable_metric_value_update":                types.BoolType,
 			"configuration_item":                        types.StringType,
 		},
 	}
@@ -858,6 +874,8 @@ func projectConfigsFromTF(ctx context.Context, m types.Map) (map[string]client.S
 			EnableTicketUpdate:                    pc.EnableTicketUpdate.ValueBool(),
 			EnableIncidentConsolidationInfoUpdate: pc.EnableIncidentConsolidationInfoUpdate.ValueBool(),
 			EnableIncidentResolveUpdate:           pc.EnableIncidentResolveUpdate.ValueBool(),
+			EnableIncidentFieldSync:               pc.EnableIncidentFieldSync.ValueBool(),
+			EnableMetricValueUpdate:               pc.EnableMetricValueUpdate.ValueBool(),
 			ConfigurationItem:                     pc.ConfigurationItem.ValueString(),
 		}
 	}
@@ -873,6 +891,7 @@ func projectConfigsToTF(ctx context.Context, configs map[string]client.ServiceNo
 		"enable_ticket_update":                      types.BoolType,
 		"enable_incident_consolidation_info_update": types.BoolType,
 		"enable_incident_resolve_update":            types.BoolType,
+		"enable_incident_field_sync":                types.BoolType,
 		"configuration_item":                        types.StringType,
 	}
 
@@ -897,6 +916,8 @@ func projectConfigsToTF(ctx context.Context, configs map[string]client.ServiceNo
 			"enable_ticket_update":                      types.BoolValue(pc.EnableTicketUpdate),
 			"enable_incident_consolidation_info_update": types.BoolValue(pc.EnableIncidentConsolidationInfoUpdate),
 			"enable_incident_resolve_update":            types.BoolValue(pc.EnableIncidentResolveUpdate),
+			"enable_incident_field_sync":                types.BoolValue(pc.EnableIncidentFieldSync),
+			"enable_metric_value_update":                types.BoolValue(pc.EnableMetricValueUpdate),
 			"configuration_item":                        configItem,
 		})
 		if d.HasError() {

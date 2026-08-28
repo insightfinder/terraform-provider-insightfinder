@@ -174,6 +174,35 @@ resource "insightfinder_system_settings" "with_consolidation" {
     # Maximum delay before a notification must be sent regardless of dampening
     max_notification_delay_tolerance = 10800000
 
+    # Per-project knowledge base sensitivity overrides
+    local_kb_sensitivities = jsonencode([
+      {
+        p   = "backend-metrics"
+        u   = "admin"
+        s   = 2
+        m   = 0
+        d   = 43
+        sa  = false
+        cc  = {}
+        udc = []
+        crp = []
+        sc  = []
+      }
+    ])
+
+    # Minimum delta threshold for anomaly score notifications
+    anomaly_score_notification_min_delta = 43
+
+    # Per-project notification delay overrides
+    notification_delay_config = jsonencode({
+      e = true
+      d = 3300000
+      u = "admin"
+      p = {
+        "backend-metrics" = { d = 3300000 }
+      }
+    })
+
     # Custom rules that consolidate incidents from specific projects when conditions match
     custom_consolidation_rules = [
       {

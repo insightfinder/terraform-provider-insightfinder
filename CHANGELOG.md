@@ -5,6 +5,17 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.11.0] - 2026-08-27
+
+### Added
+- **insightfinder_servicenow**: New `enable_incident_field_sync` attribute (Boolean, Optional, Computed, default `false`) inside each `project_configs` entry — enables syncing incident field updates for that project. Maps to `enableIncidentFieldSync`, which was previously absent from the `ServiceNowProjectConfig` client struct and unsupported by the resource despite being accepted and returned by the `service-integration` API.
+- **insightfinder_servicenow**: New `enable_metric_value_update` attribute (Boolean, Optional, Computed, default `false`) inside each `project_configs` entry — enables syncing metric value updates for that project. Maps to `enableMetricValueUpdate`, which was previously absent from the `ServiceNowProjectConfig` client struct and unsupported by the resource despite being accepted and returned by the `service-integration` API.
+- **insightfinder_system_settings**: Four new fields in `notifications_settings` to match previously-missing API fields in the `healthviewsetting` API:
+  - `local_kb_sensitivities` (String/JSON, Optional, Computed) — per-project knowledge base sensitivity overrides. Maps to `localKbSensitivities`. Modeled as raw JSON (rather than a typed nested block) because the API types its `s`/`m` sub-fields inconsistently between reads and writes.
+  - `anomaly_score_notification_min_delta` (Number, Optional, Computed) — minimum delta threshold for anomaly score notifications. Maps to `anomalyScoreNotificationMinDelta`.
+  - `anomaly_score_notification_sensitivity` (String, Read-Only) — anomaly score notification sensitivity, derived server-side from `local_kb_sensitivities`. Maps to `anomalyScoreNotificationSensitivity`.
+  - `notification_delay_config` (String/JSON, Optional, Computed) — per-project notification delay overrides. Maps to `notificationDelayConfig`.
+
 ## [1.10.10] - 2026-08-25
 
 ### Fixed

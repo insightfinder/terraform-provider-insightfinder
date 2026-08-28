@@ -159,8 +159,17 @@ type HealthViewSetting struct {
 	CustomConsolidationRules            []CustomConsolidationRule      `json:"customConsolidationRules"`
 	MetricLogConsolidationConfigs       []MetricLogConsolidationConfig `json:"metricLogConsolidationConfigs"`
 	MetricCoOccurrenceBufferMs          int64                          `json:"metricCoOccurrenceBufferMs"`
-	SystemID                            string                         `json:"systemId,omitempty"`
-	ID                                  string                         `json:"id,omitempty"`
+	// LocalKbSensitivities is a per-project knowledge base sensitivity override list. Its
+	// element fields ("s", "m") are typed inconsistently by the API (int on write, string on
+	// read), so it is carried as raw JSON rather than a typed Go struct.
+	LocalKbSensitivities                json.RawMessage `json:"localKbSensitivities,omitempty"`
+	AnomalyScoreNotificationMinDelta    int64           `json:"anomalyScoreNotificationMinDelta"`
+	AnomalyScoreNotificationSensitivity json.RawMessage `json:"anomalyScoreNotificationSensitivity,omitempty"`
+	// NotificationDelayConfig is a per-project notification delay override object, carried as
+	// raw JSON: {"e": bool, "d": int64, "u": string, "p": {"<project>": {"d": int64}}}.
+	NotificationDelayConfig json.RawMessage `json:"notificationDelayConfig,omitempty"`
+	SystemID                string          `json:"systemId,omitempty"`
+	ID                      string          `json:"id,omitempty"`
 }
 
 // ProjectLevelDampeningWindow represents a project-level dampening window entry
@@ -978,6 +987,9 @@ func (c *Client) SetHealthViewSetting(systemID string, updates *HealthViewSettin
 	current.CustomConsolidationRules = updates.CustomConsolidationRules
 	current.MetricLogConsolidationConfigs = updates.MetricLogConsolidationConfigs
 	current.MetricCoOccurrenceBufferMs = updates.MetricCoOccurrenceBufferMs
+	current.LocalKbSensitivities = updates.LocalKbSensitivities
+	current.AnomalyScoreNotificationMinDelta = updates.AnomalyScoreNotificationMinDelta
+	current.NotificationDelayConfig = updates.NotificationDelayConfig
 	current.SystemID = systemID
 	current.ID = systemID
 
