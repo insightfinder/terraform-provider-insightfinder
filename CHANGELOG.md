@@ -5,6 +5,11 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.11.2] - 2026-09-02
+
+### Fixed
+- **insightfinder_metric_project**: Fixed `metric_configurations` alert settings always failing with `failed to set metric settings: HTTP 404 - {"success":false,"message":"Project not found"}` on `apply`. `SetMetricSettings` sent `projectName`/`patternIdGenerationRule`/`customerName`/`data` as `multipart/form-data` fields to `componentmetricupdate`, but that endpoint's multipart parser doesn't read `projectName` correctly and 404s regardless of whether the project exists (confirmed via direct API calls against a live host, including on long-established projects). The request now sends `projectName`/`patternIdGenerationRule`/`customerName` as URL query parameters and the metric settings array as a raw `application/json` body instead; the one-by-one fallback (`setMetricSettingsOneByOne`) was updated the same way. The now-unused `DoMultipartFormRequest` client helper was removed.
+
 ## [1.11.1] - 2026-08-28
 
 ### Fixed

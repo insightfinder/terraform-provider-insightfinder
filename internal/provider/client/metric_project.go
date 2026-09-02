@@ -355,15 +355,13 @@ func (c *Client) GetAllMetricSettings(projectName string) (map[string]*MetricSet
 
 // SetMetricSettings sends a pre-serialized JSON array of MetricAlertSettingPost entries for a project.
 // data is the raw JSON bytes (built by the resource layer to handle rougeValue properly).
+//
+// componentmetricupdate expects projectName/patternIdGenerationRule/customerName as URL query
+// parameters and the metric settings array as the raw JSON request body (NOT multipart/form-data —
+// the endpoint's multipart parser doesn't read the projectName field correctly and 404s with
+// "Project not found" for every project, confirmed via curl against a live host).
 func (c *Client) SetMetricSettings(projectName string, patternIdGenerationRule int, data []byte) error {
-	fields := map[string]string{
-		"projectName":             projectName + "@" + c.Username,
-		"patternIdGenerationRule": fmt.Sprintf("%d", patternIdGenerationRule),
-		"customerName":            c.Username,
-	}
-	fileParts := map[string][]byte{
-		"data": data,
-	}
+	path := "/api/external/v1/componentmetricupdate?" + metricUpdateQueryParams(c.Username, projectName, patternIdGenerationRule).Encode()
 
 	_ = os.WriteFile("/tmp/tf_metric_payload.json", data, 0644)
 
@@ -373,7 +371,7 @@ func (c *Client) SetMetricSettings(projectName string, patternIdGenerationRule i
 	var statusCode int
 	var err error
 	for attempt := 1; attempt <= 3; attempt++ {
-		body, statusCode, err = c.DoMultipartFormRequest("POST", "/api/external/v1/componentmetricupdate", fields, fileParts)
+		body, statusCode, err = c.DoRequest("POST", path, json.RawMessage(data))
 		if err != nil {
 			return err
 		}
@@ -411,11 +409,7 @@ func (c *Client) setMetricSettingsOneByOne(projectName string, patternIdGenerati
 		return fmt.Errorf("failed to parse metric settings for one-by-one fallback: %w", err)
 	}
 
-	fields := map[string]string{
-		"projectName":             projectName + "@" + c.Username,
-		"patternIdGenerationRule": fmt.Sprintf("%d", patternIdGenerationRule),
-		"customerName":            c.Username,
-	}
+	path := "/api/external/v1/componentmetricupdate?" + metricUpdateQueryParams(c.Username, projectName, patternIdGenerationRule).Encode()
 
 	for i, entry := range entries {
 		entryBytes, _ := json.Marshal([]json.RawMessage{entry})
@@ -423,7 +417,7 @@ func (c *Client) setMetricSettingsOneByOne(projectName string, patternIdGenerati
 		var statusCode int
 		var err error
 		for attempt := 1; attempt <= 3; attempt++ {
-			body, statusCode, err = c.DoMultipartFormRequest("POST", "/api/external/v1/componentmetricupdate", fields, map[string][]byte{"data": entryBytes})
+			body, statusCode, err = c.DoRequest("POST", path, json.RawMessage(entryBytes))
 			if err != nil {
 				return fmt.Errorf("failed to set metric setting [%d]: %w", i, err)
 			}
@@ -444,6 +438,16 @@ func (c *Client) setMetricSettingsOneByOne(projectName string, patternIdGenerati
 		}
 	}
 	return nil
+}
+
+// metricUpdateQueryParams builds the query string shared by SetMetricSettings and its
+// one-by-one fallback.
+func metricUpdateQueryParams(username, projectName string, patternIdGenerationRule int) url.Values {
+	params := url.Values{}
+	params.Set("projectName", projectName+"@"+username)
+	params.Set("patternIdGenerationRule", fmt.Sprintf("%d", patternIdGenerationRule))
+	params.Set("customerName", username)
+	return params
 }
 
 // GetMetricComponents returns a map[metricName][]componentName for the given operation
