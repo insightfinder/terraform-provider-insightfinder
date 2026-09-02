@@ -892,6 +892,7 @@ func projectConfigsToTF(ctx context.Context, configs map[string]client.ServiceNo
 		"enable_incident_consolidation_info_update": types.BoolType,
 		"enable_incident_resolve_update":            types.BoolType,
 		"enable_incident_field_sync":                types.BoolType,
+		"enable_metric_value_update":                types.BoolType,
 		"configuration_item":                        types.StringType,
 	}
 

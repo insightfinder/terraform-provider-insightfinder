@@ -8,7 +8,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"mime/multipart"
 	"net/http"
 	"net/url"
 	"time"
@@ -172,59 +171,6 @@ func (c *Client) DoFormRequest(method, path string, formData url.Values) ([]byte
 		return nil, resp.StatusCode, fmt.Errorf("failed to read response body: %w", err)
 	}
 
-	return respBody, resp.StatusCode, nil
-}
-
-// DoMultipartFormRequest performs an HTTP request with multipart/form-data.
-// fields contains plain-text form fields; fileParts contains file-like parts sent as file uploads.
-func (c *Client) DoMultipartFormRequest(method, path string, fields map[string]string, fileParts map[string][]byte) ([]byte, int, error) {
-	var buf bytes.Buffer
-	w := multipart.NewWriter(&buf)
-
-	// Add authentication fields
-	if err := w.WriteField("userName", c.Username); err != nil {
-		return nil, 0, fmt.Errorf("failed to write userName field: %w", err)
-	}
-	if err := w.WriteField("licenseKey", c.LicenseKey); err != nil {
-		return nil, 0, fmt.Errorf("failed to write licenseKey field: %w", err)
-	}
-
-	for k, v := range fields {
-		if err := w.WriteField(k, v); err != nil {
-			return nil, 0, fmt.Errorf("failed to write field %s: %w", k, err)
-		}
-	}
-	for fieldName, data := range fileParts {
-		part, err := w.CreateFormFile(fieldName, fieldName+".json")
-		if err != nil {
-			return nil, 0, fmt.Errorf("failed to create form file part: %w", err)
-		}
-		if _, err := part.Write(data); err != nil {
-			return nil, 0, fmt.Errorf("failed to write file data for part %s: %w", fieldName, err)
-		}
-	}
-	w.Close()
-
-	fullURL := fmt.Sprintf("%s%s", c.BaseURL, path)
-	req, err := http.NewRequest(method, fullURL, &buf)
-	if err != nil {
-		return nil, 0, fmt.Errorf("failed to create request: %w", err)
-	}
-
-	req.Header.Set("X-User-Name", c.Username)
-	req.Header.Set("X-API-Key", c.LicenseKey)
-	req.Header.Set("Content-Type", w.FormDataContentType())
-
-	resp, err := c.HTTPClient.Do(req)
-	if err != nil {
-		return nil, 0, fmt.Errorf("failed to execute request: %w", err)
-	}
-	defer resp.Body.Close()
-
-	respBody, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return nil, resp.StatusCode, fmt.Errorf("failed to read response body: %w", err)
-	}
 	return respBody, resp.StatusCode, nil
 }
 
