@@ -69,6 +69,15 @@ resource "insightfinder_project" "advanced_logs" {
     awSeverityLevel                    = "Major"
   })
 
+  # Arbitrary customer-specific settings
+  custom_setting = jsonencode({
+    nbc = {
+      global_commerce = {
+        flow = "enabled"
+      }
+    }
+  })
+
   # Webhook configuration
   webhook_url = "https://hooks.example.com/incident"
   webhook_type_set_str = jsonencode([

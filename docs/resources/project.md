@@ -66,6 +66,15 @@ resource "insightfinder_project" "advanced" {
     emailDampeningPeriod               = 3600000
     awSeverityLevel                    = "Major"
   })
+
+  # Arbitrary customer-specific settings
+  custom_setting = jsonencode({
+    nbc = {
+      global_commerce = {
+        flow = "enabled"
+      }
+    }
+  })
   
   # Webhook
   webhook_url = "https://hooks.example.com/incidents"
@@ -347,6 +356,7 @@ resource "insightfinder_project" "loki_logs" {
 - `rare_event_auto_incident_flag` (Boolean, Optional, Computed) Automatically create an incident for detected rare events
 - `enable_new_alert_email` (Boolean) Enable email alerts. Default: `false`
 - `email_setting` (String) JSON-encoded email configuration
+- `custom_setting` (String, Optional, Computed) Arbitrary customer-specific settings (JSON object). Accepts any nested structure of string values.
 - `webhook_url` (String) Webhook URL for notifications
 - `webhook_type_set_str` (String) JSON array of webhook event types
 - `log_label_settings` (List of Objects) List of log label settings for the project

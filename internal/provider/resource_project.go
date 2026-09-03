@@ -177,6 +177,7 @@ type projectResourceModel struct {
 	Mode                                  types.Int64  `tfsdk:"mode"`
 	IncidentPriorityByAnomalyScoreSetting types.String `tfsdk:"incident_priority_by_anomaly_score_setting"`
 	IncidentPriorityCapSetting            types.String `tfsdk:"incident_priority_cap_setting"`
+	CustomSetting                         types.String `tfsdk:"custom_setting"`
 }
 
 type holidaySettingModel struct {
@@ -1071,6 +1072,11 @@ func (r *projectResource) Schema(_ context.Context, _ resource.SchemaRequest, re
 				Optional:    true,
 				Computed:    true,
 			},
+			"custom_setting": schema.StringAttribute{
+				Description: "Arbitrary customer-specific settings (JSON object). Accepts any nested structure of string values (e.g. '{\"nbc\":{\"global_commerce\":{\"flow\":\"enabled\"}}}').",
+				Optional:    true,
+				Computed:    true,
+			},
 			"l2m_settings": schema.SetNestedAttribute{
 				Description: "Log-to-metric settings. Each entry maps this log project to a target metric project.",
 				Optional:    true,
@@ -1670,6 +1676,11 @@ func populateSettings(plan *projectResourceModel) map[string]interface{} {
 			s["incidentPriorityCapSetting"] = parsed
 		}
 	}
+	if !plan.CustomSetting.IsNull() {
+		if parsed := parseJSONField(plan.CustomSetting.ValueString()); parsed != nil {
+			s["customSetting"] = parsed
+		}
+	}
 
 	return s
 }
@@ -1959,6 +1970,7 @@ func (r *projectResource) Create(ctx context.Context, req resource.CreateRequest
 		plan.SharedUsernames = getJSONString("sharedUsernames")
 		plan.IncidentPriorityByAnomalyScoreSetting = getJSONString("incidentPriorityByAnomalyScoreSetting")
 		plan.IncidentPriorityCapSetting = getJSONString("incidentPriorityCapSetting")
+		plan.CustomSetting = getJSONString("customSetting")
 	}
 
 	// Always preserve config values over API values for fields explicitly set by user
@@ -2274,6 +2286,9 @@ func (r *projectResource) Create(ctx context.Context, req resource.CreateRequest
 	}
 	if !config.IncidentPriorityCapSetting.IsNull() {
 		plan.IncidentPriorityCapSetting = config.IncidentPriorityCapSetting
+	}
+	if !config.CustomSetting.IsNull() {
+		plan.CustomSetting = config.CustomSetting
 	}
 
 	// Process log_label_settings if provided - each setting must be applied individually
@@ -2866,6 +2881,7 @@ func (r *projectResource) Read(ctx context.Context, req resource.ReadRequest, re
 	state.SharedUsernames = getJSONString("sharedUsernames")
 	state.IncidentPriorityByAnomalyScoreSetting = getJSONString("incidentPriorityByAnomalyScoreSetting")
 	state.IncidentPriorityCapSetting = getJSONString("incidentPriorityCapSetting")
+	state.CustomSetting = getJSONString("customSetting")
 
 	// Read log label settings from API
 	logLabels, err := r.client.GetLogLabels(state.ProjectName.ValueString(), r.client.Username)
@@ -3427,6 +3443,7 @@ func (r *projectResource) Update(ctx context.Context, req resource.UpdateRequest
 		plan.SharedUsernames = getJSONString("sharedUsernames")
 		plan.IncidentPriorityByAnomalyScoreSetting = getJSONString("incidentPriorityByAnomalyScoreSetting")
 		plan.IncidentPriorityCapSetting = getJSONString("incidentPriorityCapSetting")
+		plan.CustomSetting = getJSONString("customSetting")
 	}
 
 	// Process log_label_settings if provided - each setting must be applied individually
