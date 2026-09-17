@@ -8,6 +8,7 @@ The Terraform InsightFinder provider allows you to manage InsightFinder resource
 
 - **Project Management**: Create and manage InsightFinder projects with comprehensive configuration options
 - **ServiceNow Integration**: Configure ServiceNow integrations with OAuth/Basic authentication
+- **Jira Integration**: Configure Jira Cloud integrations for automatic incident ticketing
 - **JWT Configuration**: Manage system-level JWT authentication tokens
 - **Log Labels**: Configure log filtering, whitelisting, and pattern naming rules
 - **Data Sources**: Query existing projects and systems
@@ -114,6 +115,28 @@ resource "insightfinder_servicenow" "incident_management" {
 }
 ```
 
+### Example: Jira Integration
+
+```hcl
+resource "insightfinder_jira" "incident_ticketing" {
+  account      = "user@company.com"
+  service_host = "https://company.atlassian.net/"
+  api_token    = var.jira_api_token
+
+  system_names     = ["Production"]
+  jira_project_key = "OPS"
+  jira_reporter_id = var.jira_reporter_id
+
+  options        = ["Detected Incident", "Root Cause"]
+  content_option = ["SUMMARY", "RECOMMENDATION"]
+}
+```
+
+`api_token` is a Jira API token (`id.atlassian.com` > Security > API tokens), not the
+account password. `jira_reporter_id` is a Jira account ID — look it up with
+`GET /rest/api/3/myself`. See [the resource docs](docs/resources/jira.md) for the full
+field list.
+
 ### Example: JWT Configuration
 
 ```hcl
@@ -171,6 +194,7 @@ output "system_names" {
 
 - [`insightfinder_project`](docs/resources/project.md) - Manage InsightFinder projects
 - [`insightfinder_servicenow`](docs/resources/servicenow.md) - Configure ServiceNow integrations
+- [`insightfinder_jira`](docs/resources/jira.md) - Configure Jira integrations
 - [`insightfinder_jwt_config`](docs/resources/jwt_config.md) - Manage JWT authentication
 - [`insightfinder_log_labels`](docs/resources/log_labels.md) - Configure log filtering and labeling
 

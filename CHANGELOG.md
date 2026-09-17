@@ -5,6 +5,14 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.12.0] - 2026-09-17
+
+### Added
+- **insightfinder_jira**: New resource for managing Jira external service integrations, alongside the existing Slack and ServiceNow resources. A minimal configuration needs only `account` (the Jira account email), `api_token`, `service_host`, `system_names`, `jira_project_key` and `jira_reporter_id`; `options`, `content_option`, `jira_assignee_id`, `jira_issue_fields`, `jira_close_status_id`, `description_template`, `template_field_mapping` and `field_update_rules` are optional. Supports import via `account@service_host`. No backend change was required — `ExtServiceIntegrationServlet` already exposes the full Jira API.
+  - `service_host` is sent with a trailing slash, because `JiraHelper.getJiraBaseURL` appends `rest/api/` to it by plain string concatenation; without the slash the resulting host is malformed and every Jira call fails as if the credentials were wrong.
+  - `Read` normalizes the host on both sides before matching, since the backend stores the value *after* appending `rest/api/`. Without this the lookup never matches and refresh reports the integration as deleted on every run.
+  - `storedHost` and the delete `service_id` use that same derived form, matching what the UI sends, so the backend's key-change detection does not misfire on a plain in-place edit and delete addresses the row that actually exists.
+
 ## [1.11.3] - 2026-09-03
 
 ### Added

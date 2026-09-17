@@ -221,6 +221,7 @@ func (p *insightfinderProvider) Resources(_ context.Context) []func() resource.R
 		NewJWTConfigResource,
 		NewServiceNowResource,
 		NewSlackResource,
+		NewJiraResource,
 		NewSystemSettingsResource,
 	}
 }
