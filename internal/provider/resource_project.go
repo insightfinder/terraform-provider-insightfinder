@@ -4070,28 +4070,29 @@ func convertLogLabelsToState(apiLabels map[string]string, existingState []logLab
 
 	// Map from API field names to label types
 	apiFieldToLabelType := map[string]string{
-		"whitelist":                       "whitelist",
-		"trainingWhitelist":               "trainingWhitelist",
-		"trainingBlacklistLabels":         "blacklist",
-		"featurelist":                     "featurelist",
-		"incidentlist":                    "incidentlist",
-		"triagelist":                      "triagelist",
-		"patternNameLabels":               "patternName",
-		"patternSignatureLabels":          "patternSignature",
-		"patternMatchRegexLabels":         "patternMatchRegex",
-		"patternIgnoreRegexLabels":        "patternIgnoreRegex",
-		"customActionLabels":              "customAction",
-		"logEventIDLabels":                "logEventID",
-		"logSeverityLabels":               "logSeverity",
-		"logStatusCodeLabels":             "logStatusCode",
-		"alertEventTypeLabels":            "alertEventType",
-		"anomalyFeatureLabels":            "anomalyFeature",
-		"dataFilterLabels":                "dataFilter",
-		"instanceNameLabels":              "instanceName",
-		"dataQualityCheckLabels":          "dataQualityCheck",
-		"incidentFieldVerificationLabels": "incidentFieldVerification",
-		"incidentPriorityLabels":          "incidentPriority",
-		"extractionBlacklist":             "extractionBlacklist",
+		"whitelist":                          "whitelist",
+		"trainingWhitelist":                  "trainingWhitelist",
+		"trainingBlacklistLabels":            "blacklist",
+		"featurelist":                        "featurelist",
+		"incidentlist":                       "incidentlist",
+		"triagelist":                         "triagelist",
+		"patternNameLabels":                  "patternName",
+		"patternSignatureLabels":             "patternSignature",
+		"patternMatchRegexLabels":            "patternMatchRegex",
+		"patternIgnoreRegexLabels":           "patternIgnoreRegex",
+		"customActionLabels":                 "customAction",
+		"logEventIDLabels":                   "logEventID",
+		"logSeverityLabels":                  "logSeverity",
+		"logStatusCodeLabels":                "logStatusCode",
+		"alertEventTypeLabels":               "alertEventType",
+		"anomalyFeatureLabels":               "anomalyFeature",
+		"dataFilterLabels":                   "dataFilter",
+		"instanceNameLabels":                 "instanceName",
+		"dataQualityCheckLabels":             "dataQualityCheck",
+		"incidentFieldVerificationLabels":    "incidentFieldVerification",
+		"incidentPriorityLabels":             "incidentPriority",
+		"extractionBlacklist":                "extractionBlacklist",
+		"rareEventEscalationExclusionLabels": "rareEventEscalationExclusion",
 	}
 
 	// Reverse map for looking up API fields from label types
@@ -4176,6 +4177,7 @@ func convertLogLabelsToState(apiLabels map[string]string, existingState []logLab
 			"incidentFieldVerification",
 			"incidentPriority",
 			"extractionBlacklist",
+			"rareEventEscalationExclusion",
 		}
 
 		for _, labelType := range defaultOrder {
@@ -4213,6 +4215,7 @@ func convertLogLabelsToState(apiLabels map[string]string, existingState []logLab
 			"incidentFieldVerification",
 			"incidentPriority",
 			"extractionBlacklist",
+			"rareEventEscalationExclusion",
 		}
 
 		for _, labelType := range labelTypeOrder {
