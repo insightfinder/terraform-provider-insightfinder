@@ -141,6 +141,7 @@ type metricProjectResourceModel struct {
 	DynamicBaselineDetectionFlag        types.Bool    `tfsdk:"dynamic_baseline_detection_flag"`
 	PositiveBaselineViolationFactor     types.Float64 `tfsdk:"positive_baseline_violation_factor"`
 	NegativeBaselineViolationFactor     types.Float64 `tfsdk:"negative_baseline_violation_factor"`
+	ShortTermWeight                     types.Float64 `tfsdk:"short_term_weight"`
 	EnablePeriodAnomalyFilter           types.Bool    `tfsdk:"enable_period_anomaly_filter"`
 	EnableUBLDetect                     types.Bool    `tfsdk:"enable_ubl_detect"`
 	EnableCumulativeDetect              types.Bool    `tfsdk:"enable_cumulative_detect"`
@@ -649,6 +650,11 @@ func (r *metricProjectResource) Schema(_ context.Context, _ resource.SchemaReque
 				Optional:    true,
 				Computed:    true,
 			},
+			"short_term_weight": schema.Float64Attribute{
+				Description: "Weight given to short-term data in baseline anomaly detection (0.0-1.0). Maps to shortTermWeight.",
+				Optional:    true,
+				Computed:    true,
+			},
 			"enable_period_anomaly_filter": schema.BoolAttribute{
 				Description: "Enable period anomaly filter.",
 				Optional:    true,
@@ -1114,6 +1120,9 @@ func populateMetricSettings(plan *metricProjectResourceModel) map[string]interfa
 	if !plan.NegativeBaselineViolationFactor.IsNull() {
 		s["negativeBaselineViolationFactor"] = plan.NegativeBaselineViolationFactor.ValueFloat64()
 	}
+	if !plan.ShortTermWeight.IsNull() {
+		s["shortTermWeight"] = plan.ShortTermWeight.ValueFloat64()
+	}
 	if !plan.EnablePeriodAnomalyFilter.IsNull() {
 		s["enablePeriodAnomalyFilter"] = plan.EnablePeriodAnomalyFilter.ValueBool()
 	}
@@ -1354,6 +1363,7 @@ func populateMetricStateFromSettings(m *metricProjectResourceModel, settings map
 	m.DynamicBaselineDetectionFlag = getBool("dynamicBaselineDetectionFlag")
 	m.PositiveBaselineViolationFactor = getFloat64("positiveBaselineViolationFactor")
 	m.NegativeBaselineViolationFactor = getFloat64("negativeBaselineViolationFactor")
+	m.ShortTermWeight = getFloat64("shortTermWeight")
 	m.EnablePeriodAnomalyFilter = getBool("enablePeriodAnomalyFilter")
 	m.EnableUBLDetect = getBool("enableUBLDetect")
 	m.EnableCumulativeDetect = getBool("enableCumulativeDetect")
@@ -1472,6 +1482,7 @@ func preserveMetricConfigValues(plan *metricProjectResourceModel, config *metric
 	preserveBool(&plan.DynamicBaselineDetectionFlag, &config.DynamicBaselineDetectionFlag)
 	preserveFloat(&plan.PositiveBaselineViolationFactor, &config.PositiveBaselineViolationFactor)
 	preserveFloat(&plan.NegativeBaselineViolationFactor, &config.NegativeBaselineViolationFactor)
+	preserveFloat(&plan.ShortTermWeight, &config.ShortTermWeight)
 	preserveBool(&plan.EnablePeriodAnomalyFilter, &config.EnablePeriodAnomalyFilter)
 	preserveBool(&plan.EnableUBLDetect, &config.EnableUBLDetect)
 	preserveBool(&plan.EnableCumulativeDetect, &config.EnableCumulativeDetect)
