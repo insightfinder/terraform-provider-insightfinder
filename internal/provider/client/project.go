@@ -112,7 +112,7 @@ type ProjectSettings struct {
 		IsPoliticalBiasEvaluation     bool `json:"isPoliticalBiasEvaluation,omitempty"`
 		IsDisabilityBiasEvaluation    bool `json:"isDisabilityBiasEvaluation,omitempty"`
 		IsAgeBiasEvaluation           bool `json:"isAgeBiasEvaluation,omitempty"`
-	} `json:"llmEvaluationSetting,,omitempty"`
+	} `json:"llmEvaluationSetting,omitempty"`
 	IsEdgeBrain                          bool          `json:"isEdgeBrain,omitempty"`
 	ProjectName                          string        `json:"projectName,omitempty"`
 	CValue                               int           `json:"cValue,omitempty"`
