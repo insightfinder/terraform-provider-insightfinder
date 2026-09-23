@@ -83,6 +83,7 @@ resource "insightfinder_metric_project" "tuned_metrics" {
   baseline_duration                    = 14400000
   positive_baseline_violation_factor   = 2.0
   negative_baseline_violation_factor   = 2.0
+  short_term_weight                    = 0.65
   enable_period_anomaly_filter         = false
   enable_ubl_detect                    = true
   enable_cumulative_detect             = true
@@ -297,6 +298,7 @@ resource "insightfinder_metric_project" "alerted_metrics" {
 - `baseline_duration` (Number, Computed) Baseline duration in milliseconds.
 - `positive_baseline_violation_factor` (Number, Computed) Positive violation factor.
 - `negative_baseline_violation_factor` (Number, Computed) Negative violation factor.
+- `short_term_weight` (Number, Optional, Computed) Weight given to short-term data in baseline anomaly detection (0.0-1.0). Maps to `shortTermWeight`.
 - `enable_period_anomaly_filter` (Boolean, Computed) Enable period anomaly filter.
 - `enable_ubl_detect` (Boolean, Computed) Enable UBL detection.
 - `enable_cumulative_detect` (Boolean, Computed) Enable cumulative detection.

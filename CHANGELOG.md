@@ -5,6 +5,16 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.12.1] - 2026-09-23
+
+### Added
+- **insightfinder_project**: New `slack_block_template` attribute (String, Optional) alongside `json_key_settings` — Slack block template string used for Slack notifications on JSON log keys. Maps to `slackNotificationAdditionalSetting.slackBlockTemplate` on the `logsummarysettings` API, which was previously absent from the resource and the Go client despite being accepted and returned by that API. Because `UpdateJsonKeySummarySettings` POSTs the full settings object on every apply, the missing field meant any Slack template configured outside Terraform was silently wiped out whenever `json_key_settings` was updated through this resource.
+- **insightfinder_metric_project**: New `short_term_weight` attribute (Number, Optional, Computed) in the "Detection tuning" section — weight given to short-term data in baseline anomaly detection. Maps to `shortTermWeight`, which was the one detection-tuning field missing from `MetricProjectSettings` and the resource despite sitting alongside `high_ratio_c_value`, `dynamic_baseline_detection_flag`, `anomaly_gap_tolerance_count`, and `anomaly_dampening`, which were already supported.
+- **insightfinder_log_labels**: New `rareEventEscalationExclusion` alias in `MapLabelTypeToAPIField`, mapping to the `rareEventEscalationExclusionLabels` API field returned by `projectkeywords`/`watch-tower-setting`, alongside the existing `patternName`, `incidentlist`, and `trainingWhitelist` aliases. Previously this label type could only be targeted by passing the raw API field name as `label_type` directly.
+
+### Fixed
+- **insightfinder_project**: Fixed `log_label_settings` entries with `label_type = "rareEventEscalationExclusion"` showing a perpetual diff (re-added on every `apply` even though already applied). `convertLogLabelsToState` keeps its own independently-duplicated copy of the API-field-to-label-type mapping (separate from `client.MapLabelTypeToAPIField`, which is only used by the standalone `insightfinder_log_labels` resource), and that copy — along with its two `defaultOrder`/`labelTypeOrder` fallback lists — was missing the `rareEventEscalationExclusionLabels` → `rareEventEscalationExclusion` entry. On `Read`, the API's `rareEventEscalationExclusionLabels` key was silently dropped instead of being matched back to state, so Terraform always planned to add it again.
+
 ## [1.12.0] - 2026-09-17
 
 ### Added

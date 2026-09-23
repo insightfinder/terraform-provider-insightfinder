@@ -26,6 +26,7 @@ type MetricProjectSettings struct {
 	DynamicBaselineDetectionFlag        bool    `json:"dynamicBaselineDetectionFlag,omitempty"`
 	PositiveBaselineViolationFactor     float64 `json:"positiveBaselineViolationFactor,omitempty"`
 	NegativeBaselineViolationFactor     float64 `json:"negativeBaselineViolationFactor,omitempty"`
+	ShortTermWeight                     float64 `json:"shortTermWeight,omitempty"`
 	EnablePeriodAnomalyFilter           bool    `json:"enablePeriodAnomalyFilter,omitempty"`
 	EnableUBLDetect                     bool    `json:"enableUBLDetect,omitempty"`
 	EnableCumulativeDetect              bool    `json:"enableCumulativeDetect,omitempty"`

@@ -171,6 +171,7 @@ type projectResourceModel struct {
 	JsonKeySettings                       types.Set    `tfsdk:"json_key_settings"`
 	ServiceNowShortDescriptionFormat      types.String `tfsdk:"service_now_short_description_format"`
 	ServiceNowDescriptionFormat           types.String `tfsdk:"service_now_description_format"`
+	SlackBlockTemplate                    types.String `tfsdk:"slack_block_template"`
 	ProjectServiceNowSettings             types.Object `tfsdk:"project_servicenow_settings"`
 	HolidaySettings                       types.Set    `tfsdk:"holiday_settings"`
 	L2MSettings                           types.Set    `tfsdk:"l2m_settings"`
@@ -1055,6 +1056,10 @@ func (r *projectResource) Schema(_ context.Context, _ resource.SchemaRequest, re
 			},
 			"service_now_description_format": schema.StringAttribute{
 				Description: "Description format string for ServiceNow notifications.",
+				Optional:    true,
+			},
+			"slack_block_template": schema.StringAttribute{
+				Description: "Slack block template string used for Slack notifications.",
 				Optional:    true,
 			},
 			"mode": schema.Int64Attribute{
@@ -2569,8 +2574,11 @@ func (r *projectResource) Create(ctx context.Context, req resource.CreateRequest
 			ShortDescriptionFormat: plan.ServiceNowShortDescriptionFormat.ValueString(),
 			DescriptionFormat:      plan.ServiceNowDescriptionFormat.ValueString(),
 		}
+		slackAdditional := &client.SlackNotificationAdditionalSetting{
+			SlackBlockTemplate: plan.SlackBlockTemplate.ValueString(),
+		}
 
-		err := r.client.UpdateJsonKeySummarySettings(plan.ProjectName.ValueString(), summaryKeys, metafieldKeys, dampeningFieldKeys, notificationSettings, serviceNowNotificationSettings, snAdditional)
+		err := r.client.UpdateJsonKeySummarySettings(plan.ProjectName.ValueString(), summaryKeys, metafieldKeys, dampeningFieldKeys, notificationSettings, serviceNowNotificationSettings, snAdditional, slackAdditional)
 		if err != nil {
 			resp.Diagnostics.AddError(
 				"Error updating JSON key summary and metafield settings",
@@ -3120,6 +3128,14 @@ func (r *projectResource) Read(ctx context.Context, req resource.ReadRequest, re
 			state.ServiceNowDescriptionFormat = types.StringNull()
 		}
 
+		// Populate top-level Slack additional setting field; treat empty string as null
+		// to avoid perpetual diff when the user has not set this field in config.
+		if s := summarySettingsResp.SlackNotificationAdditionalSetting; s != nil && s.SlackBlockTemplate != "" {
+			state.SlackBlockTemplate = types.StringValue(s.SlackBlockTemplate)
+		} else {
+			state.SlackBlockTemplate = types.StringNull()
+		}
+
 		// Convert to types.Set
 		if len(jsonKeySettings) > 0 {
 			setValue, diags := types.SetValueFrom(ctx, types.ObjectType{AttrTypes: jsonKeySettingAttrTypes()}, jsonKeySettings)
@@ -3134,6 +3150,7 @@ func (r *projectResource) Read(ctx context.Context, req resource.ReadRequest, re
 		state.JsonKeySettings = types.SetNull(types.ObjectType{AttrTypes: jsonKeySettingAttrTypes()})
 		state.ServiceNowShortDescriptionFormat = types.StringNull()
 		state.ServiceNowDescriptionFormat = types.StringNull()
+		state.SlackBlockTemplate = types.StringNull()
 	}
 
 	// Read L2M settings from API
@@ -3879,8 +3896,11 @@ func (r *projectResource) Update(ctx context.Context, req resource.UpdateRequest
 			ShortDescriptionFormat: plan.ServiceNowShortDescriptionFormat.ValueString(),
 			DescriptionFormat:      plan.ServiceNowDescriptionFormat.ValueString(),
 		}
+		slackAdditional := &client.SlackNotificationAdditionalSetting{
+			SlackBlockTemplate: plan.SlackBlockTemplate.ValueString(),
+		}
 
-		err := r.client.UpdateJsonKeySummarySettings(plan.ProjectName.ValueString(), summaryKeys, metafieldKeys, dampeningFieldKeys, notificationSettings, serviceNowNotificationSettings, snAdditional)
+		err := r.client.UpdateJsonKeySummarySettings(plan.ProjectName.ValueString(), summaryKeys, metafieldKeys, dampeningFieldKeys, notificationSettings, serviceNowNotificationSettings, snAdditional, slackAdditional)
 		if err != nil {
 			resp.Diagnostics.AddError(
 				"Error updating JSON key summary and metafield settings",
@@ -4050,28 +4070,29 @@ func convertLogLabelsToState(apiLabels map[string]string, existingState []logLab
 
 	// Map from API field names to label types
 	apiFieldToLabelType := map[string]string{
-		"whitelist":                       "whitelist",
-		"trainingWhitelist":               "trainingWhitelist",
-		"trainingBlacklistLabels":         "blacklist",
-		"featurelist":                     "featurelist",
-		"incidentlist":                    "incidentlist",
-		"triagelist":                      "triagelist",
-		"patternNameLabels":               "patternName",
-		"patternSignatureLabels":          "patternSignature",
-		"patternMatchRegexLabels":         "patternMatchRegex",
-		"patternIgnoreRegexLabels":        "patternIgnoreRegex",
-		"customActionLabels":              "customAction",
-		"logEventIDLabels":                "logEventID",
-		"logSeverityLabels":               "logSeverity",
-		"logStatusCodeLabels":             "logStatusCode",
-		"alertEventTypeLabels":            "alertEventType",
-		"anomalyFeatureLabels":            "anomalyFeature",
-		"dataFilterLabels":                "dataFilter",
-		"instanceNameLabels":              "instanceName",
-		"dataQualityCheckLabels":          "dataQualityCheck",
-		"incidentFieldVerificationLabels": "incidentFieldVerification",
-		"incidentPriorityLabels":          "incidentPriority",
-		"extractionBlacklist":             "extractionBlacklist",
+		"whitelist":                          "whitelist",
+		"trainingWhitelist":                  "trainingWhitelist",
+		"trainingBlacklistLabels":            "blacklist",
+		"featurelist":                        "featurelist",
+		"incidentlist":                       "incidentlist",
+		"triagelist":                         "triagelist",
+		"patternNameLabels":                  "patternName",
+		"patternSignatureLabels":             "patternSignature",
+		"patternMatchRegexLabels":            "patternMatchRegex",
+		"patternIgnoreRegexLabels":           "patternIgnoreRegex",
+		"customActionLabels":                 "customAction",
+		"logEventIDLabels":                   "logEventID",
+		"logSeverityLabels":                  "logSeverity",
+		"logStatusCodeLabels":                "logStatusCode",
+		"alertEventTypeLabels":               "alertEventType",
+		"anomalyFeatureLabels":               "anomalyFeature",
+		"dataFilterLabels":                   "dataFilter",
+		"instanceNameLabels":                 "instanceName",
+		"dataQualityCheckLabels":             "dataQualityCheck",
+		"incidentFieldVerificationLabels":    "incidentFieldVerification",
+		"incidentPriorityLabels":             "incidentPriority",
+		"extractionBlacklist":                "extractionBlacklist",
+		"rareEventEscalationExclusionLabels": "rareEventEscalationExclusion",
 	}
 
 	// Reverse map for looking up API fields from label types
@@ -4156,6 +4177,7 @@ func convertLogLabelsToState(apiLabels map[string]string, existingState []logLab
 			"incidentFieldVerification",
 			"incidentPriority",
 			"extractionBlacklist",
+			"rareEventEscalationExclusion",
 		}
 
 		for _, labelType := range defaultOrder {
@@ -4193,6 +4215,7 @@ func convertLogLabelsToState(apiLabels map[string]string, existingState []logLab
 			"incidentFieldVerification",
 			"incidentPriority",
 			"extractionBlacklist",
+			"rareEventEscalationExclusion",
 		}
 
 		for _, labelType := range labelTypeOrder {

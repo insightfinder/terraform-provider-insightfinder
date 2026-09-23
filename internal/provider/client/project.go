@@ -112,7 +112,7 @@ type ProjectSettings struct {
 		IsPoliticalBiasEvaluation     bool `json:"isPoliticalBiasEvaluation,omitempty"`
 		IsDisabilityBiasEvaluation    bool `json:"isDisabilityBiasEvaluation,omitempty"`
 		IsAgeBiasEvaluation           bool `json:"isAgeBiasEvaluation,omitempty"`
-	} `json:"llmEvaluationSetting,,omitempty"`
+	} `json:"llmEvaluationSetting,omitempty"`
 	IsEdgeBrain                          bool          `json:"isEdgeBrain,omitempty"`
 	ProjectName                          string        `json:"projectName,omitempty"`
 	CValue                               int           `json:"cValue,omitempty"`
@@ -506,6 +506,11 @@ type ServiceNowNotificationAdditionalSetting struct {
 	DescriptionFormat      string `json:"descriptionFormat"`
 }
 
+// SlackNotificationAdditionalSetting holds the Slack notification template string
+type SlackNotificationAdditionalSetting struct {
+	SlackBlockTemplate string `json:"slackBlockTemplate"`
+}
+
 // JsonKeySummarySettings represents the response from logsummarysettings API
 type JsonKeySummarySettings struct {
 	SummarySetting                          []string                                 `json:"summarySetting"`
@@ -514,6 +519,7 @@ type JsonKeySummarySettings struct {
 	NotificationSetting                     map[string]NotificationSettingEntry      `json:"notificationSetting"`
 	ServiceNowNotificationSetting           map[string]NotificationSettingEntry      `json:"serviceNowNotificationSetting"`
 	ServiceNowNotificationAdditionalSetting *ServiceNowNotificationAdditionalSetting `json:"serviceNowNotificationAdditionalSetting"`
+	SlackNotificationAdditionalSetting      *SlackNotificationAdditionalSetting      `json:"slackNotificationAdditionalSetting"`
 }
 
 // GetJsonKeySummarySettings retrieves which JSON keys have summary and metafield settings enabled
@@ -584,6 +590,7 @@ func (c *Client) UpdateJsonKeySummarySettings(
 	notificationSettings map[string]NotificationSettingEntry,
 	serviceNowNotificationSettings map[string]NotificationSettingEntry,
 	serviceNowAdditionalSetting *ServiceNowNotificationAdditionalSetting,
+	slackAdditionalSetting *SlackNotificationAdditionalSetting,
 ) error {
 	projectQualifiedName := fmt.Sprintf("%s@%s", projectName, c.Username)
 	path := fmt.Sprintf("/api/external/v1/logsummarysettings?projectName=%s", url.QueryEscape(projectQualifiedName))
@@ -595,6 +602,7 @@ func (c *Client) UpdateJsonKeySummarySettings(
 		"notificationSetting":                     notificationSettings,
 		"serviceNowNotificationSetting":           serviceNowNotificationSettings,
 		"serviceNowNotificationAdditionalSetting": serviceNowAdditionalSetting,
+		"slackNotificationAdditionalSetting":      slackAdditionalSetting,
 	}
 
 	body, statusCode, err := c.DoRequest("POST", path, payload)

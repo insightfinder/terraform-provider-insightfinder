@@ -233,6 +233,9 @@ resource "insightfinder_project" "json_logs_example" {
   # ServiceNow notification format strings
   service_now_short_description_format = "Alert: {service} anomaly detected"
   service_now_description_format       = "Detailed description: {service} reported anomaly at {timestamp}"
+
+  # Slack notification template
+  slack_block_template = "${suggestedPriority}, {service} anomaly detected"
 }
 ```
 ### Project with Log-to-Metric Settings
@@ -392,6 +395,7 @@ resource "insightfinder_project" "loki_logs" {
   - `service_now_notification_setting_display_name` (String, Optional) Display name for this key in ServiceNow notification settings. Defaults to the `json_key` value when not specified.
 - `service_now_short_description_format` (String, Optional) Short description format string for ServiceNow notifications. Maps to `serviceNowNotificationAdditionalSetting.shortDescriptionFormat`.
 - `service_now_description_format` (String, Optional) Description format string for ServiceNow notifications. Maps to `serviceNowNotificationAdditionalSetting.descriptionFormat`.
+- `slack_block_template` (String, Optional) Slack block template string used for Slack notifications. Maps to `slackNotificationAdditionalSetting.slackBlockTemplate`.
 - `l2m_settings` (Set of Objects, Optional) — Log-to-metric settings. Each entry defines how log data from this project is parsed and converted into metrics for a target metric project. Stored as a set so order does not matter.
   - `metric_project_name` (String, Required) Name of the target metric project that receives the converted metrics
   - `json_flag` (Boolean, Optional) When `true`, use JSON parsers; when `false` (default), use regex parsers
