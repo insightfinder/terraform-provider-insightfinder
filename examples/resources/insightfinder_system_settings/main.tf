@@ -203,6 +203,12 @@ resource "insightfinder_system_settings" "with_consolidation" {
       }
     })
 
+    # Dependency-based incident consolidation (sn = enabled, lw = lookback window in ms)
+    dependency_consolidation_setting = jsonencode({
+      sn = true
+      lw = 1020000
+    })
+
     # Custom rules that consolidate incidents from specific projects when conditions match
     custom_consolidation_rules = [
       {

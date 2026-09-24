@@ -5,6 +5,11 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.12.2] - 2026-09-24
+
+### Added
+- **insightfinder_system_settings**: New `dependency_consolidation_setting` attribute (String/JSON, Optional, Computed) in `notifications_settings` — configures dependency-based incident consolidation. Fields: `sn` (enabled bool), `lw` (lookback window in milliseconds). Maps to `dependencyConsolidationSetting` on the `healthviewsetting` API, which was previously absent from the `HealthViewSetting` Go struct and the resource despite being accepted and returned by that API. Because `SetHealthViewSetting` fetches all systems' settings, mutates the target, and posts the full set back, the missing field meant any value configured outside Terraform was silently wiped out for that system on every apply. Modeled as raw JSON (like `notification_delay_config`) since the field uses opaque short API keys.
+
 ## [1.12.1] - 2026-09-23
 
 ### Added

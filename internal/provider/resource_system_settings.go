@@ -127,6 +127,7 @@ type notificationsSettingsModel struct {
 	AnomalyScoreNotificationMinDelta    types.Int64                         `tfsdk:"anomaly_score_notification_min_delta"`
 	AnomalyScoreNotificationSensitivity types.String                        `tfsdk:"anomaly_score_notification_sensitivity"`
 	NotificationDelayConfig             types.String                        `tfsdk:"notification_delay_config"`
+	DependencyConsolidationSetting      types.String                        `tfsdk:"dependency_consolidation_setting"`
 }
 
 // systemDownNotificationModel holds system down notification settings
@@ -838,6 +839,15 @@ func (r *systemSettingsResource) Schema(_ context.Context, _ resource.SchemaRequ
 							stringplanmodifier.UseStateForUnknown(),
 						},
 					},
+					"dependency_consolidation_setting": schema.StringAttribute{
+						Description: "JSON object configuring dependency-based incident consolidation. Fields: sn (enabled bool), " +
+							"lw (lookback window in milliseconds). Example: jsonencode({sn=true,lw=1020000})",
+						Optional: true,
+						Computed: true,
+						PlanModifiers: []planmodifier.String{
+							stringplanmodifier.UseStateForUnknown(),
+						},
+					},
 					"custom_consolidation_rules": schema.ListNestedAttribute{
 						Description: "Custom incident consolidation rules.",
 						Optional:    true,
@@ -1233,6 +1243,13 @@ func (r *systemSettingsResource) applyNotificationsSettings(_ context.Context, s
 		updates.NotificationDelayConfig = json.RawMessage(v)
 	}
 
+	if v := m.DependencyConsolidationSetting.ValueString(); v != "" && v != "null" {
+		if !json.Valid([]byte(v)) {
+			return fmt.Errorf("dependency_consolidation_setting is not valid JSON: %s", v)
+		}
+		updates.DependencyConsolidationSetting = json.RawMessage(v)
+	}
+
 	if v := m.IncidentCountThreshold.ValueString(); v != "" && v != "null" {
 		var ict map[string]int64
 		if err := json.Unmarshal([]byte(v), &ict); err != nil {
@@ -1562,6 +1579,19 @@ func (r *systemSettingsResource) readIntoModel(_ context.Context, systemID strin
 				// Keep existing state value
 			} else {
 				m.NotificationsSettings.NotificationDelayConfig = types.StringValue(apiNDC)
+			}
+
+			var apiDCS string
+			if len(hvSetting.DependencyConsolidationSetting) > 0 {
+				apiDCS = string(hvSetting.DependencyConsolidationSetting)
+			} else {
+				apiDCS = "{}"
+			}
+			existingDCS := m.NotificationsSettings.DependencyConsolidationSetting.ValueString()
+			if normalizeJSONString(existingDCS) == normalizeJSONString(apiDCS) && existingDCS != "" {
+				// Keep existing state value
+			} else {
+				m.NotificationsSettings.DependencyConsolidationSetting = types.StringValue(apiDCS)
 			}
 
 			// Custom consolidation rules
