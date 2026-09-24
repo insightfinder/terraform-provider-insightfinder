@@ -205,7 +205,7 @@ resource "insightfinder_system_settings" "with_consolidation" {
 
     # Dependency-based incident consolidation (sn = enabled, lw = lookback window in ms)
     dependency_consolidation_setting = jsonencode({
-      sn = true
+      sn = false
       lw = 1020000
     })
 
