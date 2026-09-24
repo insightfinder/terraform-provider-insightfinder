@@ -636,6 +636,12 @@ A set of per-project dampening period rules stored in the health view setting, d
 |-----------|------|-------------|
 | `notification_delay_config` | String | JSON-encoded object configuring per-project notification delay overrides. Fields: `e` (enabled bool), `d` (delay in milliseconds), `u` (username), `p` (map of project name to `{d: delay in milliseconds}`). Maps to `notificationDelayConfig`. Example: `jsonencode({e = true, d = 3300000, u = "admin", p = {"MyProject" = {d = 3300000}}})`. Use `jsonencode({})` to clear. |
 
+#### Dependency Consolidation Setting
+
+| Attribute | Type | Description |
+|-----------|------|-------------|
+| `dependency_consolidation_setting` | String | JSON-encoded object configuring dependency-based incident consolidation. Fields: `sn` (enabled bool), `lw` (lookback window in milliseconds). Maps to `dependencyConsolidationSetting`. Example: `jsonencode({sn = true, lw = 1020000})`. Use `jsonencode({})` to clear. |
+
 #### Custom Consolidation Rules
 
 A list of custom incident consolidation rules. When `consolidationCustom` is included in `enabled_consolidation_algorithms`, these rules control which incidents from different projects are consolidated into a single notification. Each rule has two sub-blocks:

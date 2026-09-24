@@ -168,8 +168,11 @@ type HealthViewSetting struct {
 	// NotificationDelayConfig is a per-project notification delay override object, carried as
 	// raw JSON: {"e": bool, "d": int64, "u": string, "p": {"<project>": {"d": int64}}}.
 	NotificationDelayConfig json.RawMessage `json:"notificationDelayConfig,omitempty"`
-	SystemID                string          `json:"systemId,omitempty"`
-	ID                      string          `json:"id,omitempty"`
+	// DependencyConsolidationSetting configures dependency-based incident consolidation, carried
+	// as raw JSON: {"sn": bool, "lw": int64} (sn = enabled, lw = lookback window in milliseconds).
+	DependencyConsolidationSetting json.RawMessage `json:"dependencyConsolidationSetting,omitempty"`
+	SystemID                       string          `json:"systemId,omitempty"`
+	ID                             string          `json:"id,omitempty"`
 }
 
 // ProjectLevelDampeningWindow represents a project-level dampening window entry
@@ -990,6 +993,7 @@ func (c *Client) SetHealthViewSetting(systemID string, updates *HealthViewSettin
 	current.LocalKbSensitivities = updates.LocalKbSensitivities
 	current.AnomalyScoreNotificationMinDelta = updates.AnomalyScoreNotificationMinDelta
 	current.NotificationDelayConfig = updates.NotificationDelayConfig
+	current.DependencyConsolidationSetting = updates.DependencyConsolidationSetting
 	current.SystemID = systemID
 	current.ID = systemID
 
