@@ -84,4 +84,4 @@ outputs/
 # Environment files
 .env
 .env.local
-
+.claude
