@@ -548,8 +548,8 @@ These attributes accept JSON-encoded strings (use `jsonencode(...)`).
 
 Required:
 
-- `data_type` (String) Type of data (e.g., `Log`, `Metric`, `Trace`).
-- `instance_type` (String) Instance type (e.g., `PrivateCloud`, `AWS`, `Azure`, `ServiceNow`).
+- `data_type` (String) Type of data (e.g., `Log`, `Metric`, `Trace`, `Alert`).
+- `instance_type` (String) Instance type (e.g., `PrivateCloud`, `AWS`, `Azure`, `GCP`, `OnPremise`, `ServiceNow`).
 - `project_cloud_type` (String) Cloud type for the project (usually the same as `instance_type`, e.g. `PrivateCloud`).
 
 Optional:
@@ -578,9 +578,9 @@ Optional:
 
 - `client_id` (String) OAuth client ID for ServiceNow.
 - `client_secret` (String, Sensitive) OAuth client secret for ServiceNow.
-- `instance_field` (String) Field in the ServiceNow record that contains the instance name (e.g., `short_description`).
+- `instance_field` (String) Field in the ServiceNow record that contains the instance name (e.g., `short_description`; typical default: `short_description`).
 - `instance_field_regex` (String) Regex applied to `instance_field` to extract the instance name.
-- `timestamp_format` (String) Java SimpleDateFormat used to parse ServiceNow timestamps (e.g., `yyyy-MM-dd HH:mm:ss`).
+- `timestamp_format` (String) Java SimpleDateFormat used to parse ServiceNow timestamps (default: `yyyy-MM-dd HH:mm:ss`).
 - `sysparm_query` (String) ServiceNow filter query used to limit the fetched records. Default: empty.
 - `proxy` (String) Proxy URL for the ServiceNow connection. Default: empty.
 - `additional_fields` (List of String) Additional fields to fetch from ServiceNow records.
@@ -623,8 +623,8 @@ Required:
 
 Optional:
 
-- `json_flag` (Boolean) When `true`, use `json_parsers`; when `false`, use `regexs`.
-- `enable_mapping` (Boolean) Whether to enable mapping.
+- `json_flag` (Boolean) When `true`, use `json_parsers`; when `false` (default), use `regexs`.
+- `enable_mapping` (Boolean) Enable key mapping for derived value transformations.
 - `regexs` (List of Objects) Regex-based parser entries. Used when `json_flag` is `false`. See [below for nested schema](#nestedatt--l2m_settings--regexs).
 - `json_parsers` (List of Objects) JSON-based parser entries. Used when `json_flag` is `true`. See [below for nested schema](#nestedatt--l2m_settings--json_parsers).
 
@@ -678,6 +678,8 @@ Optional:
 - `actual_value` (String) Actual value expression.
 - `operation` (Number) Derived value operation type.
 - `mapping_id_list` (List of String) List of JSON path keys used for mapping.
+
+See full schema in the [complete example](https://github.com/insightfinder/terraform-provider-insightfinder/tree/main/examples/resources/insightfinder_project).
 
 ## Import
 
