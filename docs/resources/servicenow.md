@@ -138,7 +138,7 @@ resource "insightfinder_servicenow" "full" {
 - `app_id` (String) ServiceNow OAuth application ID (required when `auth_type = "oauth"`).
 - `app_key` (String, Sensitive) ServiceNow OAuth application key (required when `auth_type = "oauth"`).
 - `proxy` (String, Computed) Proxy server URL if required.
-- `system_names` (List of String) List of InsightFinder system names to integrate.
+- `system_names` (Set of String) InsightFinder system names to integrate.
 - `service_now_field` (String) ServiceNow field to write integration content to (e.g., `u_probable_cause`).
 - `content_source` (String, Computed) ServiceNow field to write incident notes to (e.g., `work_notes`, `comments`). Defaults to `work_notes`.
 - `trigger_window_in_mills` (Number) Time window in milliseconds within which events are correlated into a single incident (e.g., `604800000` for 7 days).
