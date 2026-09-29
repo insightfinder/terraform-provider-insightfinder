@@ -431,7 +431,7 @@ resource "insightfinder_system_settings" "with_satellite" {
 
 ### Required
 
-- `system_name` (String) The name of the InsightFinder system to configure.
+- `system_name` (String) The display name of the InsightFinder system to configure. Used to resolve the system ID. Forces replacement if changed.
 
 ### Optional
 
@@ -447,7 +447,7 @@ resource "insightfinder_system_settings" "with_satellite" {
 
 ### Nested Schema for `knowledgebase_settings`
 
-All attributes are Optional and Computed (server defaults are used when omitted).
+All attributes are Optional and Computed. The block is written to the API as a whole on every apply: an attribute left unset re-sends its prior state value on update (on the initial create, where there is no prior state, the type's zero value is sent), so set explicitly every value you want to control.
 
 #### Global Knowledge Base
 
@@ -457,7 +457,7 @@ All attributes are Optional and Computed (server defaults are used when omitted)
 | `composite_valid_threshold` | Number | Minimum validity threshold (milliseconds) for composite knowledge base entries. |
 | `timeline_top_k` | Number | Number of top-K timeline entries to retain in the knowledge base. |
 | `enable_ignore_instance_prediction` | Boolean | When enabled, instance-level predictions are excluded from the knowledge base. |
-| `prediction_source` | Number | Source of predictions used for knowledge base training (`0` = default). |
+| `prediction_source` | Number | Prediction source type (`0` = default, `1` = custom). |
 | `share_system_type` | Number | Sharing type for the knowledge base across systems (`0` = disabled, `1` = shared). |
 | `action_execution_time` | Number | Time window (minutes) for executing automated actions. |
 | `auto_fix_validation_window` | Number | Validation window (hours) for auto-fix actions. |
@@ -469,9 +469,9 @@ All attributes are Optional and Computed (server defaults are used when omitted)
 
 | Attribute | Type | Description |
 |-----------|------|-------------|
-| `rule_active_threshold` | Number | Score threshold (0.0–1.0) above which a prediction rule is considered active. |
-| `rule_inactive_threshold` | Number | Score threshold (0.0–1.0) below which a prediction rule is deactivated. |
-| `rule_active_condition` | Number | Condition type for rule activation (`0` = default). |
+| `rule_active_threshold` | Number | Minimum probability (0.0–1.0) to promote a causal prediction rule to active status. |
+| `rule_inactive_threshold` | Number | Probability (0.0–1.0) below which a prediction rule is demoted. Should be less than or equal to `rule_active_threshold` (not validated by the provider). |
+| `rule_active_condition` | Number | Prerequisite a rule must meet before generating alerts (`0` = unfiltered, `1` = verified only). |
 | `false_positive_tolerance` | Number | Number of allowed false positives before a rule is deactivated. |
 | `kb_training_length` | Number | Training window length for KB rules in milliseconds (e.g., `172800000` = 2 days). |
 | `tolerance` | Number | Tolerance value for incident prediction scoring (0.0–1.0). |
@@ -481,7 +481,10 @@ All attributes are Optional and Computed (server defaults are used when omitted)
 
 ### Nested Schema for `notifications_settings`
 
-All attributes are Optional and Computed (server defaults are used when omitted).
+Unless stated otherwise below, attributes are Optional and Computed. The health view portion of this block is written to the API as a whole on every apply: a scalar attribute left unset re-sends its prior state value on update (on the initial create the type's zero value is sent), so set explicitly every value you want to control. Exceptions:
+
+- `anomaly_score_notification_sensitivity` is Read-Only (Computed only).
+- `system_down_notification`, `daily_report_notification`, `weekly_report_notification`, `instance_down_notification`, `project_level_dampening_windows`, and `project_level_dampening_periods` are Optional only (not Computed).
 
 #### Health View Display
 
@@ -507,7 +510,7 @@ All attributes are Optional and Computed (server defaults are used when omitted)
 | `alerts_email_dampening_period` | Number | Dampening period for alert emails in milliseconds. |
 | `prediction_email_dampening_period` | Number | Dampening period for prediction emails in milliseconds. |
 | `incident_dampening_window` | Number | Dampening window for incident notification emails in milliseconds. |
-| `ticket_open_time` | Number | Time window in milliseconds for keeping a ticket open. |
+| `ticket_open_time` | Number | Time window in milliseconds to keep a ticket open after an incident resolves. |
 
 #### Email Alert Toggles
 
@@ -544,11 +547,11 @@ All attributes are Optional and Computed (server defaults are used when omitted)
 |-----------|------|-------------|
 | `component_level_incident_consolidation` | Boolean | Enable component-level incident consolidation. When enabled, incidents from different components are consolidated before alerting. Maps to `componentLevelIncidentConsolidation` in the health view API. |
 | `component_level_dampening` | Boolean | Enable component-level dampening. Maps to `componentLevelDampening` in the health view API. |
-| `enabled_consolidation_algorithms` | List of String | Consolidation algorithms to apply. Supported values: `"derivedIncidents"`, `"rcaChain"`, `"contentBased"`, `"metricInstanceTimestamp"`. Example: `["derivedIncidents", "rcaChain", "contentBased", "metricInstanceTimestamp"]`. |
+| `enabled_consolidation_algorithms` | List of String | Consolidation algorithms to apply. Supported values: `"derivedIncidents"`, `"rcaChain"`, `"contentBased"`, `"metricInstanceTimestamp"`, `"consolidationCustom"` (not validated by the provider). Example: `["derivedIncidents", "rcaChain", "contentBased", "metricInstanceTimestamp"]`. |
 
 #### System Down Notification
 
-Configures system-down alerts via a dedicated API (`/api/external/v2/systemdownsetting`). All attributes are Optional and Computed.
+`system_down_notification` (Attributes, Optional) — configures system-down alerts via a dedicated API (`/api/external/v2/systemdownsetting`). Only read and written when the block is configured. All nested attributes are Optional and Computed.
 
 | Attribute | Type | Description |
 |-----------|------|-------------|
@@ -558,7 +561,7 @@ Configures system-down alerts via a dedicated API (`/api/external/v2/systemdowns
 
 #### Daily Report Notification
 
-Configures daily insights report emails via `/api/external/v1/insightsreportsetting`. All attributes are Optional and Computed.
+`daily_report_notification` (Attributes, Optional) — configures daily insights report emails via `/api/external/v1/insightsreportsetting`. Only read and written when the block is configured. All nested attributes are Optional and Computed.
 
 | Attribute | Type | Description |
 |-----------|------|-------------|
@@ -567,7 +570,7 @@ Configures daily insights report emails via `/api/external/v1/insightsreportsett
 
 #### Weekly Report Notification
 
-Configures weekly insights report emails (same API as daily, `isDaily=false`). All attributes are Optional and Computed.
+`weekly_report_notification` (Attributes, Optional) — configures weekly insights report emails (same API as daily, `isDaily=false`). Only read and written when the block is configured. All nested attributes are Optional and Computed.
 
 | Attribute | Type | Description |
 |-----------|------|-------------|
@@ -576,7 +579,7 @@ Configures weekly insights report emails (same API as daily, `isDaily=false`). A
 
 #### Instance Down Notification
 
-A list of per-project instance-down alert configurations via `/api/external/v1/projects/update`. Each entry configures one project.
+`instance_down_notification` (List of Attributes, Optional) — a list of per-project instance-down alert configurations via `/api/external/v1/projects/update` (one API call per entry). Each entry configures one project; only the listed projects are read back. All nested attributes other than `project_name` are Optional and Computed.
 
 | Attribute | Type | Description |
 |-----------|------|-------------|
@@ -584,30 +587,30 @@ A list of per-project instance-down alert configurations via `/api/external/v1/p
 | `instance_down_enable` | Boolean | Enable instance-down detection for this project. |
 | `instance_down_dampening` | Number | Dampening window in milliseconds between repeated instance-down alerts. |
 | `instance_down_threshold` | Number | Duration in milliseconds before an instance is considered down. |
-| `instance_down_report_number` | Number | Number of instances that must be down before an alert is sent. |
+| `instance_down_report_number` | Number | Number of instance-down events to include in the report. |
 | `instance_down_emails` | List of String | Email addresses to notify when instances go down. |
 
 #### Project Level Dampening Windows
 
-A set of project-pair dampening window rules stored in the health view setting. Each rule overrides the system-level `incident_dampening_window` for a specific source→target project relationship. Order does not matter — Terraform compares entries by value regardless of the order returned by the API.
+`project_level_dampening_windows` (Set of Attributes, Optional) — a set of project-pair dampening window rules stored in the health view setting. Each rule overrides the system-level `incident_dampening_window` for a specific source→target project relationship. Order does not matter — Terraform compares entries by value regardless of the order returned by the API.
 
 | Attribute | Type | Description |
 |-----------|------|-------------|
 | `source_project` | String (Required) | The source project name (`ps`). |
 | `target_project` | String (Required) | The target project name (`pt`). |
-| `source_customer` | String | Customer (username) of the source project (`cs`). Defaults to the provider username when omitted. |
-| `target_customer` | String | Customer (username) of the target project (`ct`). Defaults to the provider username when omitted. |
+| `source_customer` | String (Optional, Computed) | Customer (username) of the source project (`cs`). Defaults to the provider username when omitted. |
+| `target_customer` | String (Optional, Computed) | Customer (username) of the target project (`ct`). Defaults to the provider username when omitted. |
 | `duration` | Number (Required) | Dampening duration in milliseconds (`d`). |
-| `similarity_threshold` | Number | Similarity threshold for this dampening window (`st`). |
+| `similarity_threshold` | Number (Optional, Computed) | Similarity threshold for this dampening window (`st`). |
 
 #### Project Level Dampening Periods
 
-A set of per-project dampening period rules stored in the health view setting, distinct from `project_level_dampening_windows`. Each rule overrides the system-level `incident_dampening_window` for a specific project, without a target project or similarity threshold.
+`project_level_dampening_periods` (Set of Attributes, Optional) — a set of per-project dampening period rules stored in the health view setting, distinct from `project_level_dampening_windows`. Each rule overrides the system-level `incident_dampening_window` for a specific project, without a target project or similarity threshold.
 
 | Attribute | Type | Description |
 |-----------|------|-------------|
 | `project` | String (Required) | The project name (`p`). |
-| `customer` | String | Customer (username) of the project (`c`). Defaults to the provider username when omitted. |
+| `customer` | String (Optional, Computed) | Customer (username) of the project (`c`). Defaults to the provider username when omitted. |
 | `duration` | Number (Required) | Dampening duration in milliseconds (`d`). |
 
 #### Max Notification Delay Tolerance
@@ -644,30 +647,30 @@ A set of per-project dampening period rules stored in the health view setting, d
 
 #### Custom Consolidation Rules
 
-A list of custom incident consolidation rules. When `consolidationCustom` is included in `enabled_consolidation_algorithms`, these rules control which incidents from different projects are consolidated into a single notification. Each rule has two sub-blocks:
+`custom_consolidation_rules` (List of Attributes, Optional, Computed) — a list of custom incident consolidation rules. When `consolidationCustom` is included in `enabled_consolidation_algorithms`, these rules control which incidents from different projects are consolidated into a single notification. Each rule has two sub-blocks:
 
-**`project_entries`** — projects and their keyword/field matching conditions (all Optional):
+**`project_entries`** (List of Attributes, Optional) — projects and their keyword/field matching conditions:
 
 | Attribute | Type | Description |
 |-----------|------|-------------|
 | `project_name` | String (Required) | The project this entry applies to. |
-| `conditions` | List of Object | Matching conditions. Each has a `type` (`"fieldName"` or `"content"`) and a `keyword` string. |
+| `conditions` | List of Object (Optional) | Matching conditions. Each has a `type` (String, Required: `"fieldName"` or `"content"`) and a `keyword` (String, Required: the keyword or field expression to match). |
 
-**`field_correlations`** — cross-project field mappings that determine which field values must match for incidents to be consolidated (all Optional):
+**`field_correlations`** (List of Attributes, Optional) — cross-project field mappings that determine which field values must match for incidents to be consolidated:
 
 | Attribute | Type | Description |
 |-----------|------|-------------|
-| `project_field_keys` | List of Object (Required) | One entry per project in the correlation. Each has `project_name`, `type` (`"fieldName"` or `"content"`), and `field_key` (the field path; optional/null for `"content"` type). |
+| `project_field_keys` | List of Object (Required) | One entry per project in the correlation. Each has `project_name` (String, Required), `type` (String, Required: `"fieldName"` or `"content"`), and `field_key` (String, Optional, Computed: the field path; omit or set to `null` for `"content"` type). |
 
 #### Metric-Log Consolidation Configs
 
-A list of metric-to-log project consolidation mappings. Each entry links one metric project with one log project and specifies the field keys used to correlate their incidents.
+`metric_log_consolidation_configs` (List of Attributes, Optional, Computed) — a list of metric-to-log project consolidation mappings. Each entry links one metric project with one log project and specifies the field keys used to correlate their incidents.
 
 | Attribute | Type | Description |
 |-----------|------|-------------|
 | `metric_project_name` | String (Required) | The metric project name. |
 | `log_project_name` | String (Required) | The log project name. |
-| `field_keys` | List of String | Field key paths used to match incidents between the metric and log projects. |
+| `field_keys` | List of String (Optional, Computed) | Field key paths used to match incidents between the metric and log projects. |
 
 ---
 
@@ -700,10 +703,10 @@ After import, run `terraform plan` to review which computed fields will be popul
 - **Delete behavior**: Removing this resource from Terraform state does not change the settings on the InsightFinder server. The settings persist and must be manually reset if needed.
 - **`satellite_system_set`**: Must be provided as a JSON-encoded string using `jsonencode(...)`. The value is semantically compared during plan/apply to avoid spurious diffs caused by JSON key ordering.
 - **`incident_count_threshold` and `assignment_map`**: Must be provided as JSON-encoded strings using `jsonencode(...)`. These fields are stored as serialized JSON in Terraform state and compared semantically to avoid key-ordering diffs.
-- **`project_level_dampening_windows`**: Optional and Computed list. When omitted, the server value is preserved in state. When set (even to `[]`), the declared list replaces any existing rules on the server. `source_customer` and `target_customer` default to the provider username when not specified.
-- **`project_level_dampening_periods`**: Optional list, separate from `project_level_dampening_windows` (the API tracks them independently). When set (even to `[]`), the declared list replaces any existing rules on the server. `customer` defaults to the provider username when not specified.
-- **`enabled_consolidation_algorithms`**: Optional and Computed list of strings. Supported algorithm names are `"derivedIncidents"`, `"rcaChain"`, `"contentBased"`, `"metricInstanceTimestamp"`, and `"consolidationCustom"`. When omitted, the server value is preserved in state.
-- **`max_notification_delay_tolerance`**: Optional and Computed number (milliseconds). When omitted, the server value is preserved in state.
-- **`custom_consolidation_rules`**: Optional and Computed list of rule objects. Always read back from the API on refresh. Include `"consolidationCustom"` in `enabled_consolidation_algorithms` to activate these rules. For `"content"` type `project_field_keys` entries, `field_key` can be omitted or set to `null`.
-- **`metric_log_consolidation_configs`**: Optional and Computed list of metric-log mapping objects. Always read back from the API on refresh.
-- **API endpoints**: `knowledgebase_settings` maps to two separate API calls — `SetGlobalKBSetting` and `SetIncidentPredictionSetting`. `notifications_settings` maps to `SetHealthViewSetting`. `miscellaneous_settings` maps to two calls on `/api/external/v1/systemframework` — `operation=hideOrOrderOrLongTerm` for `healthview_longterm`, and `operation=systemFrameworkSetting` for the remaining three fields. All four fields are read via a single `GET /api/external/v1/systemframework` call.
+- **`project_level_dampening_windows`**: Optional set (not Computed). Whenever `notifications_settings` is applied, the declared set replaces any existing rules on the server — omitting the attribute (or setting it to `[]`) clears them. `source_customer` and `target_customer` default to the provider username when not specified.
+- **`project_level_dampening_periods`**: Optional set (not Computed), separate from `project_level_dampening_windows` (the API tracks them independently). Whenever `notifications_settings` is applied, the declared set replaces any existing rules on the server — omitting the attribute (or setting it to `[]`) clears them. `customer` defaults to the provider username when not specified.
+- **`enabled_consolidation_algorithms`**: Optional and Computed list of strings. Supported algorithm names are `"derivedIncidents"`, `"rcaChain"`, `"contentBased"`, `"metricInstanceTimestamp"`, and `"consolidationCustom"`. The value is always read back from the API on refresh; set it explicitly, because an unset (unknown) value is sent to the API as an empty list on apply.
+- **`max_notification_delay_tolerance`**: Optional and Computed number (milliseconds). When omitted, the prior state value is re-sent on update.
+- **`custom_consolidation_rules`**: Optional and Computed list of rule objects. Always read back from the API on refresh; when set, the declared list replaces the rules on the server. Include `"consolidationCustom"` in `enabled_consolidation_algorithms` to activate these rules. For `"content"` type `project_field_keys` entries, `field_key` can be omitted or set to `null`.
+- **`metric_log_consolidation_configs`**: Optional and Computed list of metric-log mapping objects. Always read back from the API on refresh; when set, the declared list replaces the mappings on the server.
+- **API endpoints**: `knowledgebase_settings` maps to two separate API calls — `SetGlobalKBSetting` and `SetIncidentPredictionSetting`. `notifications_settings` maps to `SetHealthViewSetting`, plus the dedicated system-down, insights-report (daily/weekly), and per-project instance-down APIs for `system_down_notification`, `daily_report_notification`/`weekly_report_notification`, and `instance_down_notification`. `miscellaneous_settings` maps to two calls on `/api/external/v1/systemframework` — `operation=hideOrOrderOrLongTerm` for `healthview_longterm`, and `operation=systemFrameworkSetting` for the remaining three fields. All four fields are read via a single `GET /api/external/v1/systemframework` call.

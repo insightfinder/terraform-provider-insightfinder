@@ -116,7 +116,7 @@ Required:
 Optional:
 
 - `components` (List of String) Root-cause component names this rule matches. Empty/omitted matches all.
-- `enabled` (Boolean) Whether this rule is active.
+- `enabled` (Boolean) Whether this rule is active. Defaults to `true`.
 - `field_name` (String) Human-readable name of the field, for documentation purposes.
 - `metrics` (List of String) Root-cause metric names this rule matches. Empty/omitted matches all.
 - `projects` (List of String) Root-cause project names this rule matches. Empty/omitted matches all.

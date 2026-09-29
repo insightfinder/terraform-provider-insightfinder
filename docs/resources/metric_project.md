@@ -177,7 +177,7 @@ resource "insightfinder_metric_project" "with_metric_config" {
       ignored_components           = ["test-instance"]
       metric_alert_settings = [
         {
-          component_name                          = ""
+          component_name                          = "Global_<hash>" # the project's global component name
           threshold_alert_lower_bound             = ""
           threshold_alert_upper_bound             = "95"
           threshold_alert_lower_bound_negative    = ""
@@ -264,94 +264,95 @@ resource "insightfinder_metric_project" "alerted_metrics" {
 - `project_name` (String) Unique project identifier. Forces replacement if changed.
 - `system_name` (String) Name of the system this project belongs to.
 - `project_creation_config` (Object) Project creation configuration.
-  - `data_type` (String) Type of data — must be `Metric`.
-  - `instance_type` (String) Instance type: `AWS`, `Azure`, `GCP`, `PrivateCloud`, `OnPremise`.
-  - `project_cloud_type` (String) Cloud type (usually same as `instance_type`).
+  - `data_type` (String, Required) Type of data — typically `Metric`.
+  - `instance_type` (String, Required) Instance type (e.g., `PrivateCloud`, `AWS`, `Azure`, `GCP`, `OnPremise`, `LogToMetric`).
+  - `project_cloud_type` (String, Required) Cloud type (usually same as `instance_type`).
   - `insight_agent_type` (String, Optional, Computed) Agent type: `Custom`, `MetricFile`, etc.
 
 ### Optional — Common Settings
 
 - `mode` (Number, Computed) Process mode for the project (set via `logdedicatedmode` API). Common values: `0` = normal, `4` = L2M (log-to-metric). Corresponds to `processMode` in the API payload.
 - `project_display_name` (String, Computed) Display name for the project.
-- `project_time_zone` (String, Computed) Time zone (e.g., `UTC`, `US/Eastern`).
+- `project_time_zone` (String, Computed) Time zone (e.g., `UTC`, `US/Eastern`). Default: `UTC`.
 - `sampling_interval` (Number, Computed) Data sampling interval in seconds.
 - `retention_time` (Number, Computed) Data retention in days.
 - `ubl_retention_time` (Number, Computed) UBL data retention in days.
 - `training_filter` (Boolean, Computed) Enable training filter.
 - `enable_new_alert_email` (Boolean, Computed) Enable email alerts.
-- `large_project` (Boolean, Computed) Mark as a large project.
-- `new_pattern_range` (Number, Computed) Range for new pattern detection.
-- `proxy` (String, Computed) Proxy URL.
-- `ignore_instance_for_kb` (Boolean, Computed) Ignore instance for knowledge base.
+- `large_project` (Boolean, Computed) Mark as a large project (optimizes processing for large-scale data).
+- `new_pattern_range` (Number, Computed) Suppression window for new pattern alerts (in sampling intervals).
+- `proxy` (String, Computed) Proxy server URL for external connections.
+- `ignore_instance_for_kb` (Boolean, Computed) Ignore instance name when matching knowledge base entries.
 - `show_instance_down` (Boolean, Computed) Show instance-down incidents.
-- `avg_per_incident_downtime_cost` (Number, Computed) Average downtime cost per incident.
-- `alert_hourly_cost` (Number, Computed) Alert hourly cost.
-- `alert_average_time` (Number, Computed) Alert average resolution time.
+- `avg_per_incident_downtime_cost` (Number, Computed) Average monetary cost per incident downtime.
+- `alert_hourly_cost` (Number, Computed) Hourly monetary cost for alerts.
+- `alert_average_time` (Number, Computed) Alert average time.
 
 ### Optional — Detection Tuning
 
 - `c_value` (Number, Computed) C value for anomaly sensitivity (typically 2–5).
 - `p_value` (Number, Computed) P value for anomaly probability (0.0–1.0).
-- `high_ratio_c_value` (Number, Computed) C value for high-ratio anomalies.
-- `maximum_hint` (Number, Computed) Maximum hint value.
-- `dynamic_baseline_detection_flag` (Boolean, Computed) Enable dynamic baseline detection.
-- `baseline_duration` (Number, Computed) Baseline duration in milliseconds.
-- `positive_baseline_violation_factor` (Number, Computed) Positive violation factor.
-- `negative_baseline_violation_factor` (Number, Computed) Negative violation factor.
-- `short_term_weight` (Number, Optional, Computed) Weight given to short-term data in baseline anomaly detection (0.0-1.0). Maps to `shortTermWeight`.
-- `enable_period_anomaly_filter` (Boolean, Computed) Enable period anomaly filter.
+- `high_ratio_c_value` (Number, Computed) C value for high-ratio anomalies (metrics that change dramatically).
+- `maximum_hint` (Number, Computed) Maximum hint value for anomaly detection.
+- `dynamic_baseline_detection_flag` (Boolean, Computed) Enable dynamic baseline detection instead of static thresholds.
+- `baseline_duration` (Number, Computed) Duration in milliseconds of the window used to calculate the baseline.
+- `positive_baseline_violation_factor` (Number, Computed) Multiplier for detecting positive (upward) baseline violations.
+- `negative_baseline_violation_factor` (Number, Computed) Multiplier for detecting negative (downward) baseline violations.
+- `short_term_weight` (Number, Computed) Weight given to short-term data in baseline anomaly detection (0.0–1.0). Maps to `shortTermWeight`.
+- `enable_period_anomaly_filter` (Boolean, Computed) Filter out anomalies that follow a known periodic pattern.
 - `enable_ubl_detect` (Boolean, Computed) Enable UBL detection.
-- `enable_cumulative_detect` (Boolean, Computed) Enable cumulative detection.
-- `enable_baseline_detection_double_verify` (Boolean, Computed) Enable double-verify for baseline detection.
-- `filter_by_anomaly_in_baseline_generation` (Boolean, Computed) Filter anomalies during baseline generation.
-- `anomaly_dampening` (Number, Computed) Anomaly dampening window in milliseconds.
-- `anomaly_gap_tolerance_count` (Number, Computed) Number of gaps to tolerate before flagging anomaly.
-- `instance_down_ratio_threshold` (Number, Computed) Ratio of instances down to trigger alert.
-- `model_span` (Number, Computed) Model span.
-- `pattern_id_generation_rule` (Number, Computed) Rule for pattern ID generation.
-- `component_name_auto_overwrite` (Boolean, Computed) Auto-overwrite component names.
-- `enable_stream_detection` (Boolean, Computed) Enable stream detection.
+- `enable_cumulative_detect` (Boolean, Computed) Enable cumulative anomaly detection mode.
+- `enable_component_level_detection` (Boolean, Computed) Enable anomaly detection at the component level. Maps to `enableComponentLevelDetection`.
+- `enable_baseline_detection_double_verify` (Boolean, Computed) Require a second verification pass before flagging a baseline deviation.
+- `filter_by_anomaly_in_baseline_generation` (Boolean, Computed) Exclude anomalous data when building the baseline model.
+- `anomaly_dampening` (Number, Computed) Dampening period in milliseconds between consecutive anomaly alerts for the same metric.
+- `anomaly_gap_tolerance_count` (Number, Computed) Number of consecutive missing data points tolerated before flagging an anomaly.
+- `instance_down_ratio_threshold` (Number, Computed) Fraction (0.0–1.0) of instances that must be down to trigger an alert.
+- `model_span` (Number, Computed) Data span in milliseconds used by the detection model.
+- `pattern_id_generation_rule` (Number, Computed) Rule used to generate internal pattern IDs.
+- `component_name_auto_overwrite` (Boolean, Computed) Automatically overwrite component names with values from the data source.
+- `enable_stream_detection` (Boolean, Computed) Enable the streaming detection pipeline.
 - `enable_anomaly_score_escalation` (Boolean, Computed) Enable anomaly score escalation.
-- `escalation_anomaly_score_threshold` (String, Computed) Escalation threshold.
-- `ignore_anomaly_score_threshold` (String, Computed) Ignore threshold.
+- `escalation_anomaly_score_threshold` (String, Computed) Threshold for anomaly score escalation.
+- `ignore_anomaly_score_threshold` (String, Computed) Ignore anomalies with a score below this threshold.
 
 ### Optional — Gap Filling and Prediction
 
-- `enable_fill_gap` (Boolean, Computed) Enable gap filling.
-- `enable_store_filled_gap` (Boolean, Computed) Store filled gap data.
-- `gap_filling_training_data_length` (Number, Computed) Training data length for gap filling.
-- `enable_metric_data_prediction` (Boolean, Computed) Enable metric data prediction.
-- `prediction_training_data_length` (Number, Computed) Training data length for prediction.
-- `prediction_correlation_sensitivity` (Number, Computed) Correlation sensitivity for prediction.
+- `enable_fill_gap` (Boolean, Computed) Enable automatic gap filling for missing metric data points.
+- `enable_store_filled_gap` (Boolean, Computed) Persist gap-filled data points to storage.
+- `gap_filling_training_data_length` (Number, Computed) Historical data length (ms) used to train the gap-filling model.
+- `enable_metric_data_prediction` (Boolean, Computed) Enable forward prediction of metric data values.
+- `prediction_training_data_length` (Number, Computed) Historical data length (ms) used to train the prediction model.
+- `prediction_correlation_sensitivity` (Number, Computed) Sensitivity for detecting metric correlations in prediction (0.0–1.0).
 - `enable_kpi_prediction` (Boolean, Computed) Enable KPI prediction.
 
 ### Optional — Incident Prediction and RCA
 
-- `incident_prediction_window` (Number, Computed) Incident prediction look-ahead window (hours).
-- `min_incident_prediction_window` (Number, Computed) Minimum prediction window (hours).
-- `incident_relation_search_window` (Number, Computed) Window for relation search (hours).
-- `incident_prediction_event_limit` (Number, Computed) Max events for incident prediction.
-- `root_cause_count_threshold` (Number, Computed) Root cause count threshold.
-- `root_cause_probability_threshold` (Number, Computed) Root cause probability threshold.
+- `incident_prediction_window` (Number, Computed) Incident prediction look-ahead window (minutes).
+- `min_incident_prediction_window` (Number, Computed) Minimum incident prediction window (minutes).
+- `incident_relation_search_window` (Number, Computed) Window for linking predicted incidents to actual incidents (minutes).
+- `incident_prediction_event_limit` (Number, Computed) Maximum number of predicted incidents tracked per processing window.
+- `root_cause_count_threshold` (Number, Computed) Maximum number of root cause candidates returned per incident.
+- `root_cause_probability_threshold` (Number, Computed) Minimum probability for a root cause candidate (0.0–1.0).
 - `composite_rca_limit` (Number, Computed) Composite RCA limit.
 - `root_cause_log_message_search_range` (Number, Computed) Log message search range for RCA (minutes).
-- `causal_prediction_setting` (Number, Computed) Causal prediction mode.
-- `root_cause_rank_setting` (Number, Computed) Root cause ranking setting.
-- `maximum_root_cause_result_size` (Number, Computed) Max root cause results.
-- `multi_hop_search_level` (Number, Computed) Multi-hop causal search depth.
-- `multi_hop_search_limit` (String, Computed) Multi-hop search limit.
-- `prediction_count_threshold` (Number, Computed) Prediction count threshold.
-- `prediction_probability_threshold` (Number, Computed) Prediction probability threshold.
-- `prediction_rule_active_condition` (Number, Computed) Prediction rule activation condition.
-- `prediction_rule_false_positive_threshold` (Number, Computed) False positive threshold for prediction rules.
-- `prediction_rule_active_threshold` (Number, Computed) Active threshold for prediction rules.
-- `prediction_rule_inactive_threshold` (Number, Computed) Inactive threshold for prediction rules.
-- `min_valid_model_span` (Number, Computed) Minimum valid model span in milliseconds.
+- `causal_prediction_setting` (Number, Computed) Causal analysis scope: `0` = all, `1` = within project, `2` = cross project.
+- `root_cause_rank_setting` (Number, Computed) Ranking algorithm for root causes.
+- `maximum_root_cause_result_size` (Number, Computed) Hard limit on the number of RCA entries returned.
+- `multi_hop_search_level` (Number, Computed) Depth of causal graph traversal.
+- `multi_hop_search_limit` (String, Computed) Maximum neighbors explored at each causal hop (string-encoded integer).
+- `prediction_count_threshold` (Number, Computed) Minimum evidence count to trigger a prediction alert.
+- `prediction_probability_threshold` (Number, Computed) Minimum confidence for prediction alerts (0.0–1.0).
+- `prediction_rule_active_condition` (Number, Computed) Maturity filter for causal rules used in prediction.
+- `prediction_rule_false_positive_threshold` (Number, Computed) Maximum false-positive count before a prediction rule is disabled.
+- `prediction_rule_active_threshold` (Number, Computed) Minimum probability to promote a prediction rule to active (0.0–1.0).
+- `prediction_rule_inactive_threshold` (Number, Computed) Probability below which a prediction rule is demoted to inactive (0.0–1.0).
+- `min_valid_model_span` (Number, Computed) Minimum data duration in milliseconds required before a model is used.
 
 ### Optional — Instance Down Detection
 
-- `instance_down_threshold` (Number, Computed) Duration in ms before instance is considered down.
-- `instance_down_report_number` (Number, Computed) Number of instances down before reporting.
+- `instance_down_threshold` (Number, Computed) Silence duration in ms before an instance is considered down.
+- `instance_down_report_number` (Number, Computed) Number of instances that must be down before an alert is generated.
 - `instance_down_enable` (Boolean, Computed) Enable instance down detection.
 
 ### Optional — Webhook
@@ -362,7 +363,7 @@ resource "insightfinder_metric_project" "alerted_metrics" {
 - `webhook_critical_keyword_set_str` (String, Computed) JSON array of critical keywords.
 - `webhook_alert_dampening` (Number, Computed) Webhook alert dampening window in milliseconds.
 - `max_web_hook_request_size` (Number, Computed) Maximum webhook request size in MB.
-- `webhook_header_list` (String, Computed) JSON array of custom webhook headers.
+- `webhook_header_list` (String, Computed) JSON array of custom webhook header objects (`{headerName, headerValue}`).
 
 ### Optional — Email
 
@@ -379,7 +380,7 @@ resource "insightfinder_metric_project" "alerted_metrics" {
 
 ### Optional — Complex / Array Fields
 
-- `linked_log_projects` (String, Computed) JSON array of linked log project names.
+- `linked_log_projects` (String, Computed) JSON array of log project names linked to this metric project for RCA.
 - `component_metric_setting_overall_model_list` (String, Computed) JSON array of component metric model settings.
 - `shared_usernames` (String, Computed) JSON array of usernames to share the project with.
 - `instance_grouping_update` (String, Computed) JSON object for instance grouping settings (e.g., `{"autoFill": false}`).
@@ -400,52 +401,64 @@ resource "insightfinder_metric_project" "alerted_metrics" {
     }
   })
   ```
+- `incident_priority_cap_setting` (String/JSON, Optional, Computed) — Caps applied to incident priority. Accepts a JSON-encoded object with two fields (both String). Maps to `incidentPriorityCapSetting`.
+  - `ticketCreationPriorityCap` (String) — priority cap for ticket creation.
+  - `suggestedPriorityCap` (String) — cap for the suggested priority.
+
+  Example:
+  ```hcl
+  incident_priority_cap_setting = jsonencode({
+    ticketCreationPriorityCap = "5"
+    suggestedPriorityCap      = "3"
+  })
+  ```
 
 ### Optional — Holidays
 
-- `holiday_settings` (List of Objects) Holiday periods that suppress anomaly detection. Each holiday requires:
+- `holiday_settings` (List of Objects, Computed) Holiday periods that suppress anomaly detection. Each holiday requires:
   - `name` (String, Required) Unique holiday name within the project.
   - `start_date` (String, Required) Start date in `MM-DD` format (e.g., `12-25`).
   - `end_date` (String, Required) End date in `MM-DD` format (e.g., `12-26`).
 
 ### Optional — Metric Configurations
 
-- `metric_configurations` (Map of Objects) Per-metric alert threshold settings and component operation rules, **keyed by metric name**. Each map key is the exact metric name (e.g., `"cpu_usage"`); the value object contains:
-  - `escalate_incident_components` (List of String, Optional) Component names that escalate incidents for this metric.
-  - `ignored_components` (List of String, Optional) Component names excluded from anomaly detection for this metric.
-  - `metric_alert_settings` (List of Objects, Optional) Per-component (or global) alert threshold rows. Each row has:
-    - `component_name` (String) Component name, or empty string for the global (project-level) setting.
-    - `threshold_alert_lower_bound` (String) Lower threshold for anomaly alert.
-    - `threshold_alert_upper_bound` (String) Upper threshold for anomaly alert.
-    - `threshold_alert_lower_bound_negative` (String) Negative direction lower alert threshold.
-    - `threshold_alert_upper_bound_negative` (String) Negative direction upper alert threshold.
-    - `threshold_no_alert_lower_bound` (String) Lower threshold below which no alert is raised.
-    - `threshold_no_alert_upper_bound` (String) Upper threshold above which no alert is raised.
-    - `threshold_no_alert_lower_bound_negative` (String) Negative direction lower no-alert threshold.
-    - `threshold_no_alert_upper_bound_negative` (String) Negative direction upper no-alert threshold.
-    - `incident_alert_lower_bound` (String) Lower threshold for incident alert.
-    - `incident_alert_upper_bound` (String) Upper threshold for incident alert.
-    - `incident_alert_lower_bound_negative` (String) Negative direction lower incident alert threshold.
-    - `incident_alert_upper_bound_negative` (String) Negative direction upper incident alert threshold.
-    - `incident_no_alert_lower_bound` (String) Lower threshold below which no incident alert is raised.
-    - `incident_no_alert_upper_bound` (String) Upper threshold above which no incident alert is raised.
-    - `incident_no_alert_lower_bound_negative` (String) Negative direction lower no-incident-alert threshold.
-    - `incident_no_alert_upper_bound_negative` (String) Negative direction upper no-incident-alert threshold.
-    - `is_kpi` (Boolean, Optional) Mark this metric as a KPI metric.
+- `metric_configurations` (Map of Objects, Optional) Per-metric alert threshold settings and component operation rules, **keyed by metric name**. Each map key is the exact metric name (e.g., `"cpu_usage"`); the value object contains:
+  - `escalate_incident_components` (List of String, Optional, Computed) Component names that escalate incidents for this metric. Use `["Global_<hash>"]` to select all components. Drift reported by the API is ignored in plans.
+  - `ignored_components` (List of String, Optional, Computed) Component names excluded from anomaly detection for this metric. Use `["Global_<hash>"]` to select all components. Drift reported by the API is ignored in plans.
+  - `metric_alert_settings` (List of Objects, Optional, Computed) Per-component (or global) alert threshold rows. Each row has:
+    - `component_name` (String, Required) Component name. Use the project's `Global_<hash>` component name for the global (project-level) setting; any name not starting with `Global_` is treated as a component-level setting.
+    - `threshold_alert_lower_bound` (String, Optional, Computed) Lower threshold for anomaly alert.
+    - `threshold_alert_upper_bound` (String, Optional, Computed) Upper threshold for anomaly alert.
+    - `threshold_alert_lower_bound_negative` (String, Optional, Computed) Negative direction lower alert threshold.
+    - `threshold_alert_upper_bound_negative` (String, Optional, Computed) Negative direction upper alert threshold.
+    - `threshold_no_alert_lower_bound` (String, Optional, Computed) Lower threshold below which no alert is raised.
+    - `threshold_no_alert_upper_bound` (String, Optional, Computed) Upper threshold above which no alert is raised.
+    - `threshold_no_alert_lower_bound_negative` (String, Optional, Computed) Negative direction lower no-alert threshold.
+    - `threshold_no_alert_upper_bound_negative` (String, Optional, Computed) Negative direction upper no-alert threshold.
+    - `incident_alert_lower_bound` (String, Optional, Computed) Lower threshold for incident alert.
+    - `incident_alert_upper_bound` (String, Optional, Computed) Upper threshold for incident alert.
+    - `incident_alert_lower_bound_negative` (String, Optional, Computed) Negative direction lower incident alert threshold.
+    - `incident_alert_upper_bound_negative` (String, Optional, Computed) Negative direction upper incident alert threshold.
+    - `incident_no_alert_lower_bound` (String, Optional, Computed) Lower threshold below which no incident alert is raised.
+    - `incident_no_alert_upper_bound` (String, Optional, Computed) Upper threshold above which no incident alert is raised.
+    - `incident_no_alert_lower_bound_negative` (String, Optional, Computed) Negative direction lower no-incident-alert threshold.
+    - `incident_no_alert_upper_bound_negative` (String, Optional, Computed) Negative direction upper no-incident-alert threshold.
+    - `is_kpi` (Boolean, Optional, Computed) Mark this metric as a KPI metric.
     - `is_flapping_result_only` (Boolean, Optional) Only report flapping anomalies.
     - `incident_duration_threshold` (Number, Optional) Minimum incident duration in milliseconds before alerting.
-    - `detection_type` (String, Optional) Detection direction: `positive`, `negative`, or `both`.
-    - `c_value_override` (Number, Optional, Computed) Per-metric override for the C value anomaly sensitivity. Null means use the project default.
-    - `high_c_value_override` (Number, Optional, Computed) Per-metric override for the high-ratio C value anomaly sensitivity. Null means use the project default.
+    - `detection_type` (String, Optional) Detection direction: `positive`, `negative`, or `both`. Sent as `positive` when omitted or empty.
+    - `detection_anomaly_type` (Number, Optional, Computed) Anomaly detection type integer (e.g., `0`, `1`, `2`). Maps to `detectionAnomalyType`.
+    - `c_value_override` (Number, Optional) Per-metric override for the C value anomaly sensitivity. Null means use the project default.
+    - `high_c_value_override` (Number, Optional) Per-metric override for the high-ratio C value anomaly sensitivity. Null means use the project default.
     - `pattern_name_higher` (String, Optional) Pattern name for values above threshold.
     - `pattern_name_lower` (String, Optional) Pattern name for values below threshold.
     - `metric_type` (String, Optional) Metric data type (e.g., `Unknown`, `CPU Utilization`, `Network Utilization`).
     - `fill_zero` (Boolean, Optional, Computed) Fill missing data points with zero.
-    - `rouge_value` (String, Optional) Raw rouge value string from the API (e.g., `{"l":NaN,"s":NaN}`). Set to empty string to clear.
+    - `rouge_value` (String, Optional, Computed) Raw rouge value string from the API (e.g., `{"l":NaN,"s":NaN}`). Null or empty string sends the API default. Drift reported by the API is ignored in plans.
     - `enable_baseline_near_constance` (Boolean, Optional) Enable near-constance baseline detection.
     - `compute_difference` (Boolean, Optional) Compute derivative (difference) of this metric before detection.
-    - `anomaly_gap_tolerance_duration` (Number, Optional, Computed) Anomaly gap tolerance in milliseconds. Internally converted to a count using the project `sampling_interval` before being sent to the API.
-- `fetch_all_metrics_at_once` (Boolean, Optional, Computed) Controls how `metric_configurations` alert settings are refreshed on read. When `false` (the default), the provider issues one `metricFilter`-scoped request per metric listed in `metric_configurations` — much faster when only a handful of metrics are tracked in a large project. When `true`, the provider fetches alert settings for every metric in the project in a single paginated sweep instead; only enable this when `metric_configurations` tracks most or all of the project's metrics.
+    - `anomaly_gap_tolerance_duration` (Number, Optional, Computed) Anomaly gap tolerance in milliseconds. Internally converted to a count (duration ÷ `sampling_interval`, minimum `1`) before being sent to the API.
+- `fetch_all_metrics_at_once` (Boolean, Optional, Computed) Default: `false`. Controls how `metric_configurations` alert settings are refreshed on read. When `false` (the default), the provider issues one `metricFilter`-scoped request per metric listed in `metric_configurations` — much faster when only a handful of metrics are tracked in a large project. When `true`, the provider fetches alert settings for every metric in the project in a single paginated sweep instead; only enable this when `metric_configurations` tracks most or all of the project's metrics.
 
 ### Read-Only
 
