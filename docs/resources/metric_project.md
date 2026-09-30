@@ -423,6 +423,7 @@ resource "insightfinder_metric_project" "alerted_metrics" {
 ### Optional — Metric Configurations
 
 - `metric_configurations` (Map of Objects, Optional) Per-metric alert threshold settings and component operation rules, **keyed by metric name**. Each map key is the exact metric name (e.g., `"cpu_usage"`); the value object contains:
+  - `auto_escalate` (Boolean, Optional) Defaults to `false`. When `true`, the provider looks up the project's `Global_<projectKey>` component id (after the project is created, so it also works for new projects) and uses it in place of empty values: an empty `escalate_incident_components` (omitted, `[]` or `[""]`) escalates `Global_<projectKey>`, and `metric_alert_settings` rows with `component_name = ""` are applied to `Global_<projectKey>`. State keeps the values as written; drift checks compare the API against the resolved `Global_<projectKey>`. Explicit component names are used as-is. Metrics without `auto_escalate` behave exactly as before.
   - `escalate_incident_components` (List of String, Optional, Computed) Component names that escalate incidents for this metric. Use `["Global_<hash>"]` to select all components. Drift reported by the API is ignored in plans.
   - `ignored_components` (List of String, Optional, Computed) Component names excluded from anomaly detection for this metric. Use `["Global_<hash>"]` to select all components. Drift reported by the API is ignored in plans.
   - `metric_alert_settings` (List of Objects, Optional, Computed) Per-component (or global) alert threshold rows. Each row has:

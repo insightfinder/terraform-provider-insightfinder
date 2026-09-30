@@ -225,6 +225,7 @@ type metricAlertSettingModel struct {
 // MetricName holds the map key; used internally and not exposed to tfsdk directly.
 type metricConfigurationModel struct {
 	MetricName                 types.String
+	AutoEscalate               types.Bool
 	EscalateIncidentComponents types.List // list of strings
 	IgnoredComponents          types.List // list of strings
 	MetricAlertSettings        types.List // list of metricAlertSettingModel
@@ -233,6 +234,7 @@ type metricConfigurationModel struct {
 // metricConfigurationValueModel is the tfsdk-facing value type for metric_configurations map entries.
 // The map key is the metric_name.
 type metricConfigurationValueModel struct {
+	AutoEscalate               types.Bool `tfsdk:"auto_escalate"`
 	EscalateIncidentComponents types.List `tfsdk:"escalate_incident_components"`
 	IgnoredComponents          types.List `tfsdk:"ignored_components"`
 	MetricAlertSettings        types.List `tfsdk:"metric_alert_settings"`
@@ -287,6 +289,7 @@ func metricAlertSettingAttrTypes() map[string]attr.Type {
 // (the map value; metric_name is the map key and not repeated here).
 func metricConfigurationValueAttrTypes() map[string]attr.Type {
 	return map[string]attr.Type{
+		"auto_escalate":                types.BoolType,
 		"escalate_incident_components": types.ListType{ElemType: types.StringType},
 		"ignored_components":           types.ListType{ElemType: types.StringType},
 		"metric_alert_settings":        types.ListType{ElemType: types.ObjectType{AttrTypes: metricAlertSettingAttrTypes()}},
@@ -305,6 +308,7 @@ func metricConfigsFromMap(ctx context.Context, m types.Map) ([]metricConfigurati
 	for k, v := range rawMap {
 		result = append(result, metricConfigurationModel{
 			MetricName:                 types.StringValue(k),
+			AutoEscalate:               v.AutoEscalate,
 			EscalateIncidentComponents: v.EscalateIncidentComponents,
 			IgnoredComponents:          v.IgnoredComponents,
 			MetricAlertSettings:        v.MetricAlertSettings,
@@ -320,6 +324,7 @@ func metricConfigsToMap(ctx context.Context, configs []metricConfigurationModel)
 	elements := make(map[string]attr.Value, len(configs))
 	for _, c := range configs {
 		objVal, d := types.ObjectValueFrom(ctx, metricConfigurationValueAttrTypes(), metricConfigurationValueModel{
+			AutoEscalate:               c.AutoEscalate,
 			EscalateIncidentComponents: c.EscalateIncidentComponents,
 			IgnoredComponents:          c.IgnoredComponents,
 			MetricAlertSettings:        c.MetricAlertSettings,
@@ -837,6 +842,13 @@ func (r *metricProjectResource) Schema(_ context.Context, _ resource.SchemaReque
 				Optional:    true,
 				NestedObject: schema.NestedAttributeObject{
 					Attributes: map[string]schema.Attribute{
+						"auto_escalate": schema.BoolAttribute{
+							Description: "When true, the project's Global_<projectKey> component id is resolved automatically: " +
+								"an empty escalate_incident_components (null, [] or [\"\"]) escalates Global_<projectKey>, and " +
+								"metric_alert_settings entries with component_name = \"\" are applied to Global_<projectKey>. " +
+								"Defaults to false (no change in behavior).",
+							Optional: true,
+						},
 						"escalate_incident_components": schema.ListAttribute{
 							Description:   "Components for which incidents are escalated. Use ['Global_<hash>'] to select all.",
 							ElementType:   types.StringType,
@@ -2151,6 +2163,13 @@ func readMetricConfigurationsFromAPI(ctx context.Context, c *client.Client, proj
 		return nil, diags
 	}
 
+	// Only resolved when at least one metric has auto_escalate = true.
+	globalID, d := resolveAutoEscalateGlobalID(c, projectName, existingConfigs)
+	diags.Append(d...)
+	if diags.HasError() {
+		return nil, diags
+	}
+
 	escalateMap, err := c.GetMetricComponents(projectName, "escalateIncident")
 	if err != nil {
 		diags.AddWarning("Could not read escalateIncident components", err.Error())
@@ -2180,6 +2199,10 @@ func readMetricConfigurationsFromAPI(ctx context.Context, c *client.Client, proj
 	var result []metricConfigurationModel
 	for _, existingCfg := range existingConfigs {
 		metricName := existingCfg.MetricName.ValueString()
+		autoGlobalID := ""
+		if isAutoEscalate(existingCfg) {
+			autoGlobalID = globalID
+		}
 
 		// Build a lookup of existing alert settings by component name so we can
 		// preserve null for c_value_override / high_c_value_override when the user
@@ -2195,6 +2218,23 @@ func readMetricConfigurationsFromAPI(ctx context.Context, c *client.Client, proj
 				}
 			}
 		}
+		// auto_escalate: component_name = "" in state stands for Global_<projectKey>, which is
+		// the name the API returns, so look the configured entry up under that name too.
+		blankSetting, hasBlankSetting := existingSettingByComponent[""]
+		if autoGlobalID != "" && hasBlankSetting {
+			if _, exists := existingSettingByComponent[autoGlobalID]; !exists {
+				existingSettingByComponent[autoGlobalID] = blankSetting
+			} else {
+				hasBlankSetting = false
+			}
+		}
+		// restoreBlank maps the API's Global_<projectKey> back to the configured "" so an
+		// in-sync API value produces no diff.
+		restoreBlank := func(m *metricAlertSettingModel) {
+			if autoGlobalID != "" && hasBlankSetting && m.ComponentName.ValueString() == autoGlobalID {
+				m.ComponentName = blankSetting.ComponentName
+			}
+		}
 
 		// Use an explicit empty slice when the metric has no entries so the framework
 		// stores [] (empty list) in state rather than null. This prevents a perpetual
@@ -2205,6 +2245,12 @@ func readMetricConfigurationsFromAPI(ctx context.Context, c *client.Client, proj
 		}
 		escalateListVal, d := types.ListValueFrom(ctx, types.StringType, escalateComps)
 		diags.Append(d...)
+		// auto_escalate: if the API holds exactly [Global_<projectKey>] and the config left the
+		// list empty (null, [] or [""]), keep the configured form so there is no diff.
+		if autoGlobalID != "" && isEmptyOrBlankComponentList(ctx, existingCfg.EscalateIncidentComponents) &&
+			len(escalateComps) == 1 && escalateComps[0] == autoGlobalID {
+			escalateListVal = existingCfg.EscalateIncidentComponents
+		}
 
 		ignoredComps := ignoredMap[metricName]
 		if ignoredComps == nil {
@@ -2217,10 +2263,12 @@ func readMetricConfigurationsFromAPI(ctx context.Context, c *client.Client, proj
 		if settingEntry := allSettings[metricName]; settingEntry != nil {
 			global := buildMetricAlertSettingFromAPI(settingEntry.GlobalSetting)
 			preserveConfiguredNulls(&global, existingSettingByComponent)
+			restoreBlank(&global)
 			alertSettingModels = append(alertSettingModels, global)
 			for _, compSetting := range settingEntry.ComponentLevelSettingList {
 				cm := buildMetricAlertSettingFromAPI(compSetting)
 				preserveConfiguredNulls(&cm, existingSettingByComponent)
+				restoreBlank(&cm)
 				alertSettingModels = append(alertSettingModels, cm)
 			}
 			// Sort component-level entries (index 1+) by component name so the
@@ -2238,6 +2286,7 @@ func readMetricConfigurationsFromAPI(ctx context.Context, c *client.Client, proj
 
 		result = append(result, metricConfigurationModel{
 			MetricName:                 types.StringValue(metricName),
+			AutoEscalate:               existingCfg.AutoEscalate,
 			EscalateIncidentComponents: escalateListVal,
 			IgnoredComponents:          ignoredListVal,
 			MetricAlertSettings:        alertSettingsListVal,
@@ -2303,6 +2352,21 @@ func preserveConfiguredNulls(m *metricAlertSettingModel, existingByComponent map
 func applyMetricConfigurations(ctx context.Context, c *client.Client, projectName string, planConfigs []metricConfigurationModel, patternIdRule int, samplingIntervalS int64) diag.Diagnostics {
 	var diags diag.Diagnostics
 	var allPostData []client.MetricAlertSettingPost
+
+	// auto_escalate = true: substitute the project's Global_<projectKey> id before calling
+	// the API. planConfigs is only used for API payloads; state keeps the configured values.
+	globalID, d := resolveAutoEscalateGlobalID(c, projectName, planConfigs)
+	diags.Append(d...)
+	if diags.HasError() {
+		return diags
+	}
+	if globalID != "" {
+		planConfigs, d = applyAutoEscalate(ctx, planConfigs, globalID)
+		diags.Append(d...)
+		if diags.HasError() {
+			return diags
+		}
+	}
 
 	// compErr holds the result of one concurrent SetMetricComponents call.
 	type compErr struct{ summary, detail string }
@@ -2386,6 +2450,87 @@ func applyMetricConfigurations(ctx context.Context, c *client.Client, projectNam
 	}
 
 	return diags
+}
+
+// isAutoEscalate reports whether auto_escalate = true for a metric configuration.
+func isAutoEscalate(cfg metricConfigurationModel) bool {
+	return !cfg.AutoEscalate.IsNull() && !cfg.AutoEscalate.IsUnknown() && cfg.AutoEscalate.ValueBool()
+}
+
+// resolveAutoEscalateGlobalID returns the project's Global_<projectKey> id when any metric
+// has auto_escalate = true, or "" (without calling the API) otherwise.
+func resolveAutoEscalateGlobalID(c *client.Client, projectName string, configs []metricConfigurationModel) (string, diag.Diagnostics) {
+	var diags diag.Diagnostics
+	for _, cfg := range configs {
+		if !isAutoEscalate(cfg) {
+			continue
+		}
+		globalID, err := c.GetProjectGlobalComponentID(projectName)
+		if err != nil {
+			diags.AddError("Error resolving Global component id for auto_escalate",
+				fmt.Sprintf("Could not resolve Global_<projectKey> for project %s: %s", projectName, err.Error()))
+			return "", diags
+		}
+		return globalID, diags
+	}
+	return "", diags
+}
+
+// isEmptyOrBlankComponentList reports whether a component list is null, [] or contains only
+// empty strings (e.g. [""]).
+func isEmptyOrBlankComponentList(ctx context.Context, l types.List) bool {
+	if l.IsNull() {
+		return true
+	}
+	if l.IsUnknown() {
+		return false
+	}
+	var comps []string
+	if d := l.ElementsAs(ctx, &comps, false); d.HasError() {
+		return false
+	}
+	for _, comp := range comps {
+		if comp != "" {
+			return false
+		}
+	}
+	return true
+}
+
+// applyAutoEscalate returns a copy of configs where, for metrics with auto_escalate = true,
+// an empty escalate_incident_components becomes [globalID] and metric_alert_settings entries
+// with component_name = "" use globalID. Other metrics are returned unchanged.
+func applyAutoEscalate(ctx context.Context, configs []metricConfigurationModel, globalID string) ([]metricConfigurationModel, diag.Diagnostics) {
+	var diags diag.Diagnostics
+	out := make([]metricConfigurationModel, len(configs))
+	copy(out, configs)
+	for i, cfg := range out {
+		if !isAutoEscalate(cfg) {
+			continue
+		}
+		if isEmptyOrBlankComponentList(ctx, cfg.EscalateIncidentComponents) {
+			v, d := types.ListValueFrom(ctx, types.StringType, []string{globalID})
+			diags.Append(d...)
+			out[i].EscalateIncidentComponents = v
+		}
+		if cfg.MetricAlertSettings.IsNull() || cfg.MetricAlertSettings.IsUnknown() {
+			continue
+		}
+		var settings []metricAlertSettingModel
+		diags.Append(cfg.MetricAlertSettings.ElementsAs(ctx, &settings, false)...)
+		if diags.HasError() {
+			return configs, diags
+		}
+		for j := range settings {
+			if settings[j].ComponentName.ValueString() == "" {
+				settings[j].ComponentName = types.StringValue(globalID)
+			}
+		}
+		v, d := types.ListValueFrom(ctx, types.ObjectType{AttrTypes: metricAlertSettingAttrTypes()}, settings)
+		diags.Append(d...)
+		out[i].MetricAlertSettings = v
+	}
+	return out, diags
 }
 
 // normalizeMetricConfigsForState converts null component lists to empty lists so that

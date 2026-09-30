@@ -19,6 +19,10 @@ type Client struct {
 	Username   string
 	LicenseKey string
 	HTTPClient *http.Client
+
+	// projectKeys caches projectName → projectKey from the system framework for the
+	// lifetime of this client (one Terraform run). See GetProjectGlobalComponentID.
+	projectKeys projectKeyCache
 }
 
 // NewClient creates a new InsightFinder API client
