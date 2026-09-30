@@ -5,6 +5,11 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.12.3] - 2026-09-30
+
+### Added
+- **insightfinder_metric_project**: New `auto_escalate` attribute (Bool, Optional, default `false`) in each `metric_configurations` entry. When `true`, the project's `Global_<projectKey>` id is resolved after creation and used for an empty `escalate_incident_components` (omitted, `[]` or `[""]`) and for `metric_alert_settings` rows with `component_name = ""`. State keeps the values as written, and drift checks compare against the resolved id. The id comes from one cached `systemframework` call per run (refetched once for newly created projects). Metrics without `auto_escalate` are unchanged.
+
 ## [1.12.2] - 2026-09-24
 
 ### Added
