@@ -160,6 +160,7 @@ type metricProjectResourceModel struct {
 	PatternIdGenerationRule             types.Int64   `tfsdk:"pattern_id_generation_rule"`
 	AnomalyGapToleranceCount            types.Int64   `tfsdk:"anomaly_gap_tolerance_count"`
 	FilterByAnomalyInBaselineGeneration types.Bool    `tfsdk:"filter_by_anomaly_in_baseline_generation"`
+	EnableEmptyDataBaselineLearning     types.Bool    `tfsdk:"enable_empty_data_baseline_learning"`
 	BaselineDuration                    types.Int64   `tfsdk:"baseline_duration"`
 	AnomalyDampening                    types.Int64   `tfsdk:"anomaly_dampening"`
 	InstanceDownRatioThreshold          types.Float64 `tfsdk:"instance_down_ratio_threshold"`
@@ -750,6 +751,11 @@ func (r *metricProjectResource) Schema(_ context.Context, _ resource.SchemaReque
 				Optional:    true,
 				Computed:    true,
 			},
+			"enable_empty_data_baseline_learning": schema.BoolAttribute{
+				Description: "Learn a day without data as zeros, so the baseline of an entry with no data keeps aging instead of being carried over. Maps to `enableEmptyDataBaselineLearning`.",
+				Optional:    true,
+				Computed:    true,
+			},
 			"baseline_duration": schema.Int64Attribute{
 				Description: "Duration (ms) for baseline calculation.",
 				Optional:    true,
@@ -1189,6 +1195,9 @@ func populateMetricSettings(plan *metricProjectResourceModel) map[string]interfa
 	if !plan.FilterByAnomalyInBaselineGeneration.IsNull() {
 		s["filterByAnomalyInBaselineGeneration"] = plan.FilterByAnomalyInBaselineGeneration.ValueBool()
 	}
+	if !plan.EnableEmptyDataBaselineLearning.IsNull() {
+		s["enableEmptyDataBaselineLearning"] = plan.EnableEmptyDataBaselineLearning.ValueBool()
+	}
 	if !plan.BaselineDuration.IsNull() {
 		s["baselineDuration"] = int(plan.BaselineDuration.ValueInt64())
 	}
@@ -1394,6 +1403,7 @@ func populateMetricStateFromSettings(m *metricProjectResourceModel, settings map
 	m.PatternIdGenerationRule = getInt64("patternIdGenerationRule")
 	m.AnomalyGapToleranceCount = getInt64("anomalyGapToleranceCount")
 	m.FilterByAnomalyInBaselineGeneration = getBool("filterByAnomalyInBaselineGeneration")
+	m.EnableEmptyDataBaselineLearning = getBool("enableEmptyDataBaselineLearning")
 	m.BaselineDuration = getInt64("baselineDuration")
 	m.AnomalyDampening = getInt64("anomalyDampening")
 	m.InstanceDownRatioThreshold = getFloat64("instanceDownRatioThreshold")
@@ -1513,6 +1523,7 @@ func preserveMetricConfigValues(plan *metricProjectResourceModel, config *metric
 	preserveInt(&plan.PatternIdGenerationRule, &config.PatternIdGenerationRule)
 	preserveInt(&plan.AnomalyGapToleranceCount, &config.AnomalyGapToleranceCount)
 	preserveBool(&plan.FilterByAnomalyInBaselineGeneration, &config.FilterByAnomalyInBaselineGeneration)
+	preserveBool(&plan.EnableEmptyDataBaselineLearning, &config.EnableEmptyDataBaselineLearning)
 	preserveInt(&plan.BaselineDuration, &config.BaselineDuration)
 	preserveInt(&plan.AnomalyDampening, &config.AnomalyDampening)
 	preserveFloat(&plan.InstanceDownRatioThreshold, &config.InstanceDownRatioThreshold)

@@ -88,6 +88,7 @@ resource "insightfinder_metric_project" "tuned_metrics" {
   enable_ubl_detect                    = true
   enable_cumulative_detect             = true
   filter_by_anomaly_in_baseline_generation = false
+  enable_empty_data_baseline_learning  = false
   anomaly_dampening                    = 50400000
   anomaly_gap_tolerance_count          = 1
   instance_down_ratio_threshold        = 0.05
@@ -305,6 +306,7 @@ resource "insightfinder_metric_project" "alerted_metrics" {
 - `enable_component_level_detection` (Boolean, Computed) Enable anomaly detection at the component level. Maps to `enableComponentLevelDetection`.
 - `enable_baseline_detection_double_verify` (Boolean, Computed) Require a second verification pass before flagging a baseline deviation.
 - `filter_by_anomaly_in_baseline_generation` (Boolean, Computed) Exclude anomalous data when building the baseline model.
+- `enable_empty_data_baseline_learning` (Boolean, Computed) Learn a day without data as zeros, so the baseline of an instance or component with no data keeps aging instead of being carried over unchanged. Maps to `enableEmptyDataBaselineLearning`.
 - `anomaly_dampening` (Number, Computed) Dampening period in milliseconds between consecutive anomaly alerts for the same metric.
 - `anomaly_gap_tolerance_count` (Number, Computed) Number of consecutive missing data points tolerated before flagging an anomaly.
 - `instance_down_ratio_threshold` (Number, Computed) Fraction (0.0–1.0) of instances that must be down to trigger an alert.

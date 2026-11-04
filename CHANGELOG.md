@@ -5,6 +5,11 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.12.4] - 2026-11-04
+
+### Added
+- **insightfinder_metric_project**: New `enable_empty_data_baseline_learning` attribute (Bool, Optional, Computed) in the "Detection tuning" section, alongside `filter_by_anomaly_in_baseline_generation`. Maps to the `enableEmptyDataBaselineLearning` metric project setting added in II-25470 (UI: II-25453, "Enable empty data baseline learning"). When `true`, a day without data is learned as zeros, so the baseline of an instance or component with no data keeps aging instead of being carried over unchanged. Defaults to `false` on the backend and is only sent when set in config.
+
 ## [1.12.3] - 2026-09-30
 
 ### Added

@@ -40,6 +40,7 @@ type MetricProjectSettings struct {
 	PatternIdGenerationRule             int     `json:"patternIdGenerationRule,omitempty"`
 	AnomalyGapToleranceCount            int     `json:"anomalyGapToleranceCount,omitempty"`
 	FilterByAnomalyInBaselineGeneration bool    `json:"filterByAnomalyInBaselineGeneration,omitempty"`
+	EnableEmptyDataBaselineLearning     bool    `json:"enableEmptyDataBaselineLearning,omitempty"`
 	BaselineDuration                    int     `json:"baselineDuration,omitempty"`
 	AnomalyDampening                    int     `json:"anomalyDampening,omitempty"`
 	InstanceDownRatioThreshold          float64 `json:"instanceDownRatioThreshold,omitempty"`
