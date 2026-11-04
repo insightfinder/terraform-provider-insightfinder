@@ -1371,6 +1371,7 @@ that section for full descriptions.
 | `pattern_id_generation_rule` | Integer | Rule used to generate internal pattern IDs. |
 | `anomaly_gap_tolerance_count` | Integer | Consecutive missing data points tolerated before being counted as an anomaly. |
 | `filter_by_anomaly_in_baseline_generation` | Boolean | Exclude anomalous data when building the baseline model. |
+| `enable_empty_data_baseline_learning` | Boolean | Learn a day without data as zeros, so the baseline keeps aging instead of being carried over unchanged. |
 | `baseline_duration` | Integer | Duration (ms) of the window used to calculate the baseline. |
 | `anomaly_dampening` | Integer | Dampening period (ms) between consecutive anomaly alerts for the same metric. |
 | `component_metric_setting_overall_model_list` | String (JSON) | JSON array specifying the overall model list for component-level metric settings. |

@@ -64,6 +64,7 @@ resource "insightfinder_metric_project" "tuned_metrics" {
   enable_cumulative_detect                 = true
   enable_component_level_detection         = true
   filter_by_anomaly_in_baseline_generation = false
+  enable_empty_data_baseline_learning      = false
   anomaly_dampening                        = 50400000
   anomaly_gap_tolerance_count              = 1
   instance_down_ratio_threshold            = 0.05
