@@ -20,6 +20,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/booldefault"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
+	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 	"github.com/hashicorp/terraform-plugin-log/tflog"
 
@@ -63,6 +64,28 @@ func (m useStateIfConfigNullListModifier) PlanModifyList(_ context.Context, req 
 
 func ignoreListDrift() planmodifier.List {
 	return useStateIfConfigNullListModifier{desc: "Preserves state value when config is null, suppressing API drift."}
+}
+
+type int64BetweenValidator struct{ min, max int64 }
+
+func (v int64BetweenValidator) Description(_ context.Context) string {
+	return fmt.Sprintf("value must be between %d and %d", v.min, v.max)
+}
+func (v int64BetweenValidator) MarkdownDescription(ctx context.Context) string {
+	return v.Description(ctx)
+}
+func (v int64BetweenValidator) ValidateInt64(ctx context.Context, req validator.Int64Request, resp *validator.Int64Response) {
+	if req.ConfigValue.IsNull() || req.ConfigValue.IsUnknown() {
+		return
+	}
+	if val := req.ConfigValue.ValueInt64(); val < v.min || val > v.max {
+		resp.Diagnostics.AddAttributeError(req.Path, "Invalid Attribute Value",
+			fmt.Sprintf("Attribute %s %s, got: %d", req.Path, v.Description(ctx), val))
+	}
+}
+
+func int64Between(min, max int64) validator.Int64 {
+	return int64BetweenValidator{min: min, max: max}
 }
 
 func NewMetricProjectResource() resource.Resource {
@@ -165,6 +188,8 @@ type metricProjectResourceModel struct {
 	AnomalyDampening                    types.Int64   `tfsdk:"anomaly_dampening"`
 	InstanceDownRatioThreshold          types.Float64 `tfsdk:"instance_down_ratio_threshold"`
 	ComponentNameAutoOverwrite          types.Bool    `tfsdk:"component_name_auto_overwrite"`
+	LogToMetricRollingWindowEnabled     types.Bool    `tfsdk:"log_to_metric_rolling_window_enabled"`
+	LogToMetricRollingWindowMinutes     types.Int64   `tfsdk:"log_to_metric_rolling_window_minutes"`
 
 	// Complex JSON fields
 	LinkedLogProjects                      types.String `tfsdk:"linked_log_projects"`
@@ -776,6 +801,17 @@ func (r *metricProjectResource) Schema(_ context.Context, _ resource.SchemaReque
 				Optional:    true,
 				Computed:    true,
 			},
+			"log_to_metric_rolling_window_enabled": schema.BoolAttribute{
+				Description: "Group log-to-metric sampling buckets into rolling windows for detection, baseline generation and training. Maps to `logToMetricRollingWindowEnabled`. The backend rejects enabling it when a log-to-metric mapping averages or takes a median.",
+				Optional:    true,
+				Computed:    true,
+			},
+			"log_to_metric_rolling_window_minutes": schema.Int64Attribute{
+				Description: "Rolling window length in minutes, 1 to 600. Must be a whole multiple of the sampling interval and longer than it, or equal to it for the default. Omit it to use the sampling interval; the window in force is read back either way. Maps to `logToMetricRollingWindowMinutes`.",
+				Optional:    true,
+				Computed:    true,
+				Validators:  []validator.Int64{int64Between(1, 600)},
+			},
 			// Complex JSON fields
 			"linked_log_projects": schema.StringAttribute{
 				Description: "List of linked log projects (JSON array).",
@@ -1210,6 +1246,12 @@ func populateMetricSettings(plan *metricProjectResourceModel) map[string]interfa
 	if !plan.ComponentNameAutoOverwrite.IsNull() {
 		s["componentNameAutoOverwrite"] = plan.ComponentNameAutoOverwrite.ValueBool()
 	}
+	if !plan.LogToMetricRollingWindowEnabled.IsNull() && !plan.LogToMetricRollingWindowEnabled.IsUnknown() {
+		s["logToMetricRollingWindowEnabled"] = plan.LogToMetricRollingWindowEnabled.ValueBool()
+	}
+	if !plan.LogToMetricRollingWindowMinutes.IsNull() && !plan.LogToMetricRollingWindowMinutes.IsUnknown() {
+		s["logToMetricRollingWindowMinutes"] = int(plan.LogToMetricRollingWindowMinutes.ValueInt64())
+	}
 	if !plan.Mode.IsNull() {
 		s["processMode"] = int(plan.Mode.ValueInt64())
 	}
@@ -1408,6 +1450,8 @@ func populateMetricStateFromSettings(m *metricProjectResourceModel, settings map
 	m.AnomalyDampening = getInt64("anomalyDampening")
 	m.InstanceDownRatioThreshold = getFloat64("instanceDownRatioThreshold")
 	m.ComponentNameAutoOverwrite = getBool("componentNameAutoOverwrite")
+	m.LogToMetricRollingWindowEnabled = getBool("logToMetricRollingWindowEnabled")
+	m.LogToMetricRollingWindowMinutes = getInt64("logToMetricRollingWindowMinutes")
 	m.Mode = getInt64("processMode")
 
 	// Complex JSON fields
@@ -1528,6 +1572,8 @@ func preserveMetricConfigValues(plan *metricProjectResourceModel, config *metric
 	preserveInt(&plan.AnomalyDampening, &config.AnomalyDampening)
 	preserveFloat(&plan.InstanceDownRatioThreshold, &config.InstanceDownRatioThreshold)
 	preserveBool(&plan.ComponentNameAutoOverwrite, &config.ComponentNameAutoOverwrite)
+	preserveBool(&plan.LogToMetricRollingWindowEnabled, &config.LogToMetricRollingWindowEnabled)
+	preserveInt(&plan.LogToMetricRollingWindowMinutes, &config.LogToMetricRollingWindowMinutes)
 	preserve(&plan.LinkedLogProjects, &config.LinkedLogProjects)
 	preserve(&plan.ComponentMetricSettingOverallModelList, &config.ComponentMetricSettingOverallModelList)
 	// Preserve email_setting from config to avoid drift from API-enriched values
