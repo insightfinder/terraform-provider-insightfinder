@@ -313,6 +313,8 @@ resource "insightfinder_metric_project" "alerted_metrics" {
 - `model_span` (Number, Computed) Data span in milliseconds used by the detection model.
 - `pattern_id_generation_rule` (Number, Computed) Rule used to generate internal pattern IDs.
 - `component_name_auto_overwrite` (Boolean, Computed) Automatically overwrite component names with values from the data source.
+- `log_to_metric_rolling_window_enabled` (Boolean, Computed) Group log-to-metric sampling buckets into rolling windows for detection, baseline generation and training. Maps to `logToMetricRollingWindowEnabled`. The backend rejects enabling it when a log-to-metric mapping averages or takes a median.
+- `log_to_metric_rolling_window_minutes` (Number, Computed) Rolling window length in minutes, 1 to 600. Must be a whole multiple of the sampling interval and longer than it, or equal to it for the default. Omit it to use the sampling interval; the window in force is read back either way. Maps to `logToMetricRollingWindowMinutes`.
 - `enable_stream_detection` (Boolean, Computed) Enable the streaming detection pipeline.
 - `enable_anomaly_score_escalation` (Boolean, Computed) Enable anomaly score escalation.
 - `escalation_anomaly_score_threshold` (String, Computed) Threshold for anomaly score escalation.

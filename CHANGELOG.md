@@ -5,6 +5,11 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.12.5] - 2026-11-05
+
+### Added
+- **insightfinder_metric_project**: New `log_to_metric_rolling_window_enabled` (Bool, Optional, Computed) and `log_to_metric_rolling_window_minutes` (Int64, Optional, Computed) attributes. Map to the `logToMetricRollingWindowEnabled` and `logToMetricRollingWindowMinutes` metric project settings added in II-25288 (UI: II-25359). Only sent when set in config. The minutes value is validated to 1–600 at plan time; the backend additionally requires a whole multiple of the sampling interval longer than it (equal to it stores the default) and rejects enabling the window when a log-to-metric mapping averages or takes a median. When the minutes are omitted the backend reads back the window in force, the sampling interval in minutes.
+
 ## [1.12.4] - 2026-11-04
 
 ### Added

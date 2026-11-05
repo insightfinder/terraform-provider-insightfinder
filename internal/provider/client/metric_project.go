@@ -45,6 +45,8 @@ type MetricProjectSettings struct {
 	AnomalyDampening                    int     `json:"anomalyDampening,omitempty"`
 	InstanceDownRatioThreshold          float64 `json:"instanceDownRatioThreshold,omitempty"`
 	ComponentNameAutoOverwrite          bool    `json:"componentNameAutoOverwrite,omitempty"`
+	LogToMetricRollingWindowEnabled     bool    `json:"logToMetricRollingWindowEnabled,omitempty"`
+	LogToMetricRollingWindowMinutes     int     `json:"logToMetricRollingWindowMinutes,omitempty"`
 
 	// Prediction
 	PredictionTrainingDataLength     int     `json:"predictionTrainingDataLength,omitempty"`
