@@ -81,6 +81,10 @@ type servicenowResourceModel struct {
 	ProjectConfigs             types.Map    `tfsdk:"project_configs"`
 	TableMapping               types.Map    `tfsdk:"table_mapping"`
 	ResolutionCodeRules        types.List   `tfsdk:"resolution_code_rules"`
+
+	EnableResolutionNotesLearning    types.Bool   `tfsdk:"enable_resolution_notes_learning"`
+	ResolutionNotesSkipRegex         types.String `tfsdk:"resolution_notes_skip_regex"`
+	ResolutionNotesPatternStripRegex types.String `tfsdk:"resolution_notes_pattern_strip_regex"`
 }
 
 // Metadata returns the resource type name.
@@ -259,6 +263,20 @@ func (r *servicenowResource) Schema(_ context.Context, _ resource.SchemaRequest,
 					},
 				},
 			},
+			"enable_resolution_notes_learning": schema.BoolAttribute{
+				Description: "Learn the close notes of resolved ServiceNow tickets for the LLM resolution recommendation of the integrated systems. Maps to `enableResolutionNotesLearning`.",
+				Optional:    true,
+				Computed:    true,
+				Default:     booldefault.StaticBool(false),
+			},
+			"resolution_notes_skip_regex": schema.StringAttribute{
+				Description: "Java regular expression; close notes matching it are not learned. Omit it to use the backend default, which skips test tickets, placeholder notes and InsightFinder's own resolve note. Maps to `resolutionNotesSkipRegex`.",
+				Optional:    true,
+			},
+			"resolution_notes_pattern_strip_regex": schema.StringAttribute{
+				Description: "Java regular expression removed from a pattern name before it is matched against past alerts. Omit it to use the backend default, which strips standalone numbers. Maps to `resolutionNotesPatternStripRegex`.",
+				Optional:    true,
+			},
 		},
 	}
 }
@@ -394,6 +412,10 @@ func (r *servicenowResource) Create(ctx context.Context, req resource.CreateRequ
 		DepartmentID:               plan.DepartmentID.ValueString(),
 		ProjectConfigs:             projectConfigs,
 		ResolutionCodeRules:        resolutionCodeRules,
+
+		EnableResolutionNotesLearning:    plan.EnableResolutionNotesLearning.ValueBool(),
+		ResolutionNotesSkipRegex:         plan.ResolutionNotesSkipRegex.ValueString(),
+		ResolutionNotesPatternStripRegex: plan.ResolutionNotesPatternStripRegex.ValueString(),
 	}
 
 	err = r.client.CreateOrUpdateServiceNowConfig(config, r.client.Username, true)
@@ -587,6 +609,10 @@ func (r *servicenowResource) Read(ctx context.Context, req resource.ReadRequest,
 		state.ResolutionCodeRules = types.ListNull(resolutionCodeRuleObjectType())
 	}
 
+	state.EnableResolutionNotesLearning = types.BoolValue(config.EnableResolutionNotesLearning)
+	state.ResolutionNotesSkipRegex = optionalStringFromAPI(config.ResolutionNotesSkipRegex, state.ResolutionNotesSkipRegex)
+	state.ResolutionNotesPatternStripRegex = optionalStringFromAPI(config.ResolutionNotesPatternStripRegex, state.ResolutionNotesPatternStripRegex)
+
 	if len(config.TableMapping) > 0 {
 		tableMappingValues := make(map[string]attr.Value, len(config.TableMapping))
 		for _, row := range config.TableMapping {
@@ -739,6 +765,10 @@ func (r *servicenowResource) Update(ctx context.Context, req resource.UpdateRequ
 		DepartmentID:               plan.DepartmentID.ValueString(),
 		ProjectConfigs:             projectConfigs,
 		ResolutionCodeRules:        resolutionCodeRules,
+
+		EnableResolutionNotesLearning:    plan.EnableResolutionNotesLearning.ValueBool(),
+		ResolutionNotesSkipRegex:         plan.ResolutionNotesSkipRegex.ValueString(),
+		ResolutionNotesPatternStripRegex: plan.ResolutionNotesPatternStripRegex.ValueString(),
 	}
 
 	err = r.client.CreateOrUpdateServiceNowConfig(config, r.client.Username, true)
@@ -989,4 +1019,14 @@ func tableMappingFromTF(ctx context.Context, m types.Map) ([][]string, error) {
 		result = append(result, []string{project, table})
 	}
 	return result, nil
+}
+
+func optionalStringFromAPI(apiValue string, prior types.String) types.String {
+	if apiValue != "" {
+		return types.StringValue(apiValue)
+	}
+	if !prior.IsNull() && !prior.IsUnknown() && prior.ValueString() == "" {
+		return prior
+	}
+	return types.StringNull()
 }
