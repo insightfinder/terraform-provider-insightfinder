@@ -1652,6 +1652,9 @@ Manages an InsightFinder ServiceNow integration.
 | `department_id` | String | ServiceNow department ID to associate with created tickets. |
 | `table_mapping` | Map of String | Mapping of InsightFinder project names to ServiceNow table names (e.g. `{ "my-project" = "incident" }`). |
 | `project_configs` | Map of Block | Per-project ServiceNow ticket settings (see below). |
+| `enable_resolution_notes_learning` | Boolean | Learn the close notes of resolved ServiceNow tickets for the LLM resolution recommendation of the integrated systems. *Provider default:* `false`. |
+| `resolution_notes_skip_regex` | String | Java regular expression; close notes matching it are not learned. Omit it to use the backend default. |
+| `resolution_notes_pattern_strip_regex` | String | Java regular expression removed from a pattern name before it is matched against past alerts. Omit it to use the backend default. |
 
 #### project_configs Block
 

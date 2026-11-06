@@ -119,6 +119,9 @@ resource "insightfinder_servicenow" "full" {
       outcome = "like"
     },
   ]
+
+  enable_resolution_notes_learning = true
+  resolution_notes_skip_regex      = "(?i)^(n/?a|none|test)$"
 }
 ```
 
@@ -159,6 +162,9 @@ resource "insightfinder_servicenow" "full" {
 - `resolution_code_rules` (List of Object) Ordered list of pattern-based rules used to classify ServiceNow resolution/close codes as positive or negative feedback. Each object has:
   - `pattern` (String, Required) Regular expression matched against the ServiceNow resolution/close code (e.g., `^Solved`).
   - `outcome` (String, Required) Feedback outcome when the pattern matches. Must be `like` or `disLike`.
+- `enable_resolution_notes_learning` (Boolean, Computed) Learn the close notes of resolved ServiceNow tickets for the LLM resolution recommendation of the integrated systems. Defaults to `false`.
+- `resolution_notes_skip_regex` (String) Java regular expression; close notes matching it are not learned. Omit it to use the backend default, which skips test tickets, placeholder notes and InsightFinder's own resolve note.
+- `resolution_notes_pattern_strip_regex` (String) Java regular expression removed from a pattern name before it is matched against past alerts. Omit it to use the backend default, which strips standalone numbers.
 
 ### Read-Only
 

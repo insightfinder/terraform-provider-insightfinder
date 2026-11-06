@@ -52,6 +52,10 @@ type ServiceNowConfig struct {
 	ProjectConfigs             map[string]ServiceNowProjectConfig `json:"project_configs,omitempty"`
 	TableMapping               [][]string                         `json:"table_mapping,omitempty"`
 	ResolutionCodeRules        []ServiceNowResolutionCodeRule     `json:"resolution_code_rules,omitempty"`
+
+	EnableResolutionNotesLearning    bool   `json:"enable_resolution_notes_learning,omitempty"`
+	ResolutionNotesSkipRegex         string `json:"resolution_notes_skip_regex,omitempty"`
+	ResolutionNotesPatternStripRegex string `json:"resolution_notes_pattern_strip_regex,omitempty"`
 }
 
 // ServiceNowResponse represents the API response for ServiceNow operations
@@ -203,6 +207,9 @@ func (c *Client) GetServiceNowConfig(account, serviceHost, username string) (*Se
 	if configItem, ok := entry["configurationItem"].(string); ok {
 		config.ConfigurationItem = configItem
 	}
+	if v, ok := entry["enableResolutionNotesLearning"].(bool); ok {
+		config.EnableResolutionNotesLearning = v
+	}
 
 	// Determine auth type from appId/appKey presence
 	if config.AppID != "" && config.AppKey != "" {
@@ -272,6 +279,12 @@ func (c *Client) GetServiceNowConfig(account, serviceHost, username string) (*Se
 			}
 			if v, ok := configs["departmentId"].(string); ok {
 				config.DepartmentID = v
+			}
+			if v, ok := configs["resolutionNotesSkipRegex"].(string); ok {
+				config.ResolutionNotesSkipRegex = v
+			}
+			if v, ok := configs["resolutionNotesPatternStripRegex"].(string); ok {
+				config.ResolutionNotesPatternStripRegex = v
 			}
 			// Fall back to projectConfigs from configs JSON if not found at root level
 			if config.ProjectConfigs == nil {
@@ -396,6 +409,13 @@ func (c *Client) CreateOrUpdateServiceNowConfig(config *ServiceNowConfig, userna
 				return fmt.Errorf("failed to marshal resolution code rules: %w", err)
 			}
 			formData.Set("resolutionCodeRules", string(resolutionCodeRulesJSON))
+		}
+		formData.Set("enableResolutionNotesLearning", fmt.Sprintf("%t", config.EnableResolutionNotesLearning))
+		if config.ResolutionNotesSkipRegex != "" {
+			formData.Set("resolutionNotesSkipRegex", config.ResolutionNotesSkipRegex)
+		}
+		if config.ResolutionNotesPatternStripRegex != "" {
+			formData.Set("resolutionNotesPatternStripRegex", config.ResolutionNotesPatternStripRegex)
 		}
 	}
 

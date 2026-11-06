@@ -5,6 +5,11 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.12.6] - 2026-11-06
+
+### Added
+- **insightfinder_servicenow**: New `enable_resolution_notes_learning` (Bool, Optional, Computed, default `false`), `resolution_notes_skip_regex` (String, Optional) and `resolution_notes_pattern_strip_regex` (String, Optional) attributes. Map to the `enableResolutionNotesLearning`, `resolutionNotesSkipRegex` and `resolutionNotesPatternStripRegex` ServiceNow integration settings added in II-25445. The learning flag is sent on every apply, since the backend rebuilds the integration from each request. The regexes are sent only when set and read back from the stored config, so an omitted regex keeps the backend default without a diff. An invalid Java regex is rejected by the backend at apply time.
+
 ## [1.12.5] - 2026-11-05
 
 ### Added
