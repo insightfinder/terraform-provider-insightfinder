@@ -5,6 +5,15 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.12.7] - 2026-11-10
+
+### Added
+- **insightfinder_system_settings**: New `feedback_learning_setting` block (Attributes, Optional) with `enabled` (Bool, Optional, Computed), `instance_level` (Bool, Optional, Computed), `min_vote_count` (Int64, Optional, Computed), `confidence_threshold` (Int64, Optional, Computed) and `block_expiry_days` (Int64, Optional, Computed). Maps to the `GET`/`POST /api/external/v1/feedback-learning-setting` system API. The API overwrites every field on each write, so fields left unset in config are read from the server first and sent back unchanged.
+
+### Fixed
+- **insightfinder_system_settings**: Fixed "Provider produced inconsistent result after apply" on `notifications_settings.notification_delay_config` and `dependency_consolidation_setting` (planned `"{}"`, read back `{"e":false,"d":0,"p":{}}` / `{"sn":false,"lw":0}`) on the first update after create or import of a system that had never set them. When left out of config, these fields were planned from state and sent back as `"{}"`, which the backend fills with its defaults. Update now sends `local_kb_sensitivities`, `notification_delay_config` and `dependency_consolidation_setting` only when they are set in config, and `SetHealthViewSetting` keeps the server's current value for any of them that is not sent.
+- **insightfinder_project**: `l2m_settings` entries no longer show as removed and re-added in a plan when nothing in them changed. Because `l2m_settings` is a set, nested attributes left unset in config became unknown whenever any other attribute of the project changed, so the planned entry no longer matched the one in state. A plan modifier now matches entries by `metric_project_name` and keeps the prior state value for unset nested attributes, and Update sends and stores that planned value so preserved values are not cleared on the server. When `l2m_settings` is not in config, the existing value is kept instead of being reset to null.
+
 ## [1.12.6] - 2026-11-06
 
 ### Added

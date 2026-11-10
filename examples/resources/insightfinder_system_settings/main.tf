@@ -371,6 +371,14 @@ resource "insightfinder_system_settings" "full" {
     rootcause_reverse_entry_filter_threshold = 99
     enable_composite_timeline                = true
   }
+
+  feedback_learning_setting = {
+    enabled              = true
+    instance_level       = true
+    min_vote_count       = 3
+    confidence_threshold = 80
+    block_expiry_days    = 30
+  }
 }
 
 variable "username" {

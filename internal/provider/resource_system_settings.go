@@ -43,11 +43,21 @@ type systemSettingsResource struct {
 
 // systemSettingsResourceModel maps the resource schema data.
 type systemSettingsResourceModel struct {
-	ID                    types.String                `tfsdk:"id"`
-	SystemName            types.String                `tfsdk:"system_name"`
-	KnowledgebaseSettings *knowledgebaseSettingsModel `tfsdk:"knowledgebase_settings"`
-	NotificationsSettings *notificationsSettingsModel `tfsdk:"notifications_settings"`
-	MiscellaneousSettings *miscellaneousSettingsModel `tfsdk:"miscellaneous_settings"`
+	ID                      types.String                  `tfsdk:"id"`
+	SystemName              types.String                  `tfsdk:"system_name"`
+	KnowledgebaseSettings   *knowledgebaseSettingsModel   `tfsdk:"knowledgebase_settings"`
+	NotificationsSettings   *notificationsSettingsModel   `tfsdk:"notifications_settings"`
+	MiscellaneousSettings   *miscellaneousSettingsModel   `tfsdk:"miscellaneous_settings"`
+	FeedbackLearningSetting *feedbackLearningSettingModel `tfsdk:"feedback_learning_setting"`
+}
+
+// feedbackLearningSettingModel holds the feedback learning settings for a system
+type feedbackLearningSettingModel struct {
+	Enabled             types.Bool  `tfsdk:"enabled"`
+	InstanceLevel       types.Bool  `tfsdk:"instance_level"`
+	MinVoteCount        types.Int64 `tfsdk:"min_vote_count"`
+	ConfidenceThreshold types.Int64 `tfsdk:"confidence_threshold"`
+	BlockExpiryDays     types.Int64 `tfsdk:"block_expiry_days"`
 }
 
 // miscellaneousSettingsModel holds miscellaneous system framework settings
@@ -977,6 +987,52 @@ func (r *systemSettingsResource) Schema(_ context.Context, _ resource.SchemaRequ
 					},
 				},
 			},
+			"feedback_learning_setting": schema.SingleNestedAttribute{
+				Description: "Feedback learning settings for the system.",
+				Optional:    true,
+				Attributes: map[string]schema.Attribute{
+					"enabled": schema.BoolAttribute{
+						Description: "Enable feedback learning for the system.",
+						Optional:    true,
+						Computed:    true,
+						PlanModifiers: []planmodifier.Bool{
+							boolplanmodifier.UseStateForUnknown(),
+						},
+					},
+					"instance_level": schema.BoolAttribute{
+						Description: "Apply feedback learning at the instance level.",
+						Optional:    true,
+						Computed:    true,
+						PlanModifiers: []planmodifier.Bool{
+							boolplanmodifier.UseStateForUnknown(),
+						},
+					},
+					"min_vote_count": schema.Int64Attribute{
+						Description: "Minimum number of feedback votes required before learning applies.",
+						Optional:    true,
+						Computed:    true,
+						PlanModifiers: []planmodifier.Int64{
+							int64planmodifier.UseStateForUnknown(),
+						},
+					},
+					"confidence_threshold": schema.Int64Attribute{
+						Description: "Confidence threshold for feedback learning.",
+						Optional:    true,
+						Computed:    true,
+						PlanModifiers: []planmodifier.Int64{
+							int64planmodifier.UseStateForUnknown(),
+						},
+					},
+					"block_expiry_days": schema.Int64Attribute{
+						Description: "Number of days after which a feedback-learned block expires.",
+						Optional:    true,
+						Computed:    true,
+						PlanModifiers: []planmodifier.Int64{
+							int64planmodifier.UseStateForUnknown(),
+						},
+					},
+				},
+			},
 		},
 	}
 }
@@ -1050,6 +1106,13 @@ func (r *systemSettingsResource) Create(ctx context.Context, req resource.Create
 		}
 	}
 
+	if plan.FeedbackLearningSetting != nil {
+		if err := r.applyFeedbackLearningSetting(ctx, systemID, plan.FeedbackLearningSetting); err != nil {
+			resp.Diagnostics.AddError("Error Setting Feedback Learning Setting", err.Error())
+			return
+		}
+	}
+
 	plan.ID = types.StringValue(systemName)
 
 	// Read back state to populate computed fields
@@ -1115,7 +1178,30 @@ func (r *systemSettingsResource) Update(ctx context.Context, req resource.Update
 	}
 
 	if plan.NotificationsSettings != nil {
-		if err := r.applyNotificationsSettings(ctx, systemID, plan.NotificationsSettings); err != nil {
+		var config systemSettingsResourceModel
+		diags = req.Config.Get(ctx, &config)
+		resp.Diagnostics.Append(diags...)
+		if resp.Diagnostics.HasError() {
+			return
+		}
+
+		// Raw JSON fields left out of config are planned from prior state. Sending them back
+		// would turn an empty "{}" into backend defaults and break the planned value, so only
+		// send the ones set in config.
+		toApply := *plan.NotificationsSettings
+		if config.NotificationsSettings != nil {
+			if config.NotificationsSettings.LocalKbSensitivities.IsNull() {
+				toApply.LocalKbSensitivities = types.StringNull()
+			}
+			if config.NotificationsSettings.NotificationDelayConfig.IsNull() {
+				toApply.NotificationDelayConfig = types.StringNull()
+			}
+			if config.NotificationsSettings.DependencyConsolidationSetting.IsNull() {
+				toApply.DependencyConsolidationSetting = types.StringNull()
+			}
+		}
+
+		if err := r.applyNotificationsSettings(ctx, systemID, &toApply); err != nil {
 			resp.Diagnostics.AddError("Error Updating Notifications Settings", err.Error())
 			return
 		}
@@ -1124,6 +1210,13 @@ func (r *systemSettingsResource) Update(ctx context.Context, req resource.Update
 	if plan.MiscellaneousSettings != nil {
 		if err := r.applyMiscellaneousSettings(ctx, systemID, plan.MiscellaneousSettings); err != nil {
 			resp.Diagnostics.AddError("Error Updating Miscellaneous Settings", err.Error())
+			return
+		}
+	}
+
+	if plan.FeedbackLearningSetting != nil {
+		if err := r.applyFeedbackLearningSetting(ctx, systemID, plan.FeedbackLearningSetting); err != nil {
+			resp.Diagnostics.AddError("Error Updating Feedback Learning Setting", err.Error())
 			return
 		}
 	}
@@ -1426,6 +1519,40 @@ func (r *systemSettingsResource) applyMiscellaneousSettings(_ context.Context, s
 	}
 	if err := r.client.SetSystemFrameworkSetting(systemID, fwSettings); err != nil {
 		return fmt.Errorf("failed to set system framework setting: %w", err)
+	}
+
+	return nil
+}
+
+// applyFeedbackLearningSetting writes the feedback learning setting to the API. Fields left
+// unset in config keep their current server value, since the API overwrites all of them.
+func (r *systemSettingsResource) applyFeedbackLearningSetting(_ context.Context, systemID string, m *feedbackLearningSettingModel) error {
+	setting, err := r.client.GetFeedbackLearningSetting(systemID)
+	if err != nil {
+		return fmt.Errorf("failed to read current feedback learning setting: %w", err)
+	}
+	if setting == nil {
+		setting = &client.FeedbackLearningSetting{}
+	}
+
+	if !m.Enabled.IsNull() && !m.Enabled.IsUnknown() {
+		setting.Enabled = m.Enabled.ValueBool()
+	}
+	if !m.InstanceLevel.IsNull() && !m.InstanceLevel.IsUnknown() {
+		setting.InstanceLevel = m.InstanceLevel.ValueBool()
+	}
+	if !m.MinVoteCount.IsNull() && !m.MinVoteCount.IsUnknown() {
+		setting.MinVoteCount = m.MinVoteCount.ValueInt64()
+	}
+	if !m.ConfidenceThreshold.IsNull() && !m.ConfidenceThreshold.IsUnknown() {
+		setting.ConfidenceThreshold = m.ConfidenceThreshold.ValueInt64()
+	}
+	if !m.BlockExpiryDays.IsNull() && !m.BlockExpiryDays.IsUnknown() {
+		setting.BlockExpiryDays = m.BlockExpiryDays.ValueInt64()
+	}
+
+	if err := r.client.SetFeedbackLearningSetting(systemID, setting); err != nil {
+		return fmt.Errorf("failed to set feedback learning setting: %w", err)
 	}
 
 	return nil
@@ -1747,6 +1874,20 @@ func (r *systemSettingsResource) readIntoModel(_ context.Context, systemID strin
 			m.MiscellaneousSettings.ShouldAutoShare = types.BoolValue(miscSetting.ShouldAutoShare)
 			m.MiscellaneousSettings.RootcauseReverseEntryFilterThreshold = types.Int64Value(miscSetting.RootCauseReverseEntryFilterThreshold)
 			m.MiscellaneousSettings.EnableCompositeTimeline = types.BoolValue(miscSetting.EnableCompositeTimeline)
+		}
+	}
+
+	if m.FeedbackLearningSetting != nil {
+		flSetting, err := r.client.GetFeedbackLearningSetting(systemID)
+		if err != nil {
+			return fmt.Errorf("failed to read feedback learning setting: %w", err)
+		}
+		if flSetting != nil {
+			m.FeedbackLearningSetting.Enabled = types.BoolValue(flSetting.Enabled)
+			m.FeedbackLearningSetting.InstanceLevel = types.BoolValue(flSetting.InstanceLevel)
+			m.FeedbackLearningSetting.MinVoteCount = types.Int64Value(flSetting.MinVoteCount)
+			m.FeedbackLearningSetting.ConfidenceThreshold = types.Int64Value(flSetting.ConfidenceThreshold)
+			m.FeedbackLearningSetting.BlockExpiryDays = types.Int64Value(flSetting.BlockExpiryDays)
 		}
 	}
 
