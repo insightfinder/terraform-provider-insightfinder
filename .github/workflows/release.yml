@@ -4,6 +4,14 @@ on:
   push:
     tags:
       - 'v*'
+  # Called by auto-release.yml after it creates the tag. A tag pushed with
+  # GITHUB_TOKEN does not trigger the push event above.
+  workflow_call:
+    inputs:
+      tag:
+        description: 'Tag to release (e.g. v1.12.7)'
+        required: true
+        type: string
 
 permissions:
   contents: write
@@ -15,6 +23,7 @@ jobs:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
+          ref: ${{ inputs.tag || github.ref }}
       
       - uses: actions/setup-go@v5
         with:
