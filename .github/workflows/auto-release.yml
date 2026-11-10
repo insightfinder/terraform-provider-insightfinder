@@ -1,0 +1,70 @@
+name: Auto Release
+
+# Tags and releases a new version when a change to VERSION lands on main.
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'VERSION'
+
+permissions:
+  contents: write
+
+concurrency:
+  group: auto-release
+  cancel-in-progress: false
+
+jobs:
+  tag:
+    name: Tag version
+    runs-on: ubuntu-latest
+    outputs:
+      tag: ${{ steps.version.outputs.tag }}
+      created: ${{ steps.create.outputs.created }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Read VERSION
+        id: version
+        run: |
+          version="$(tr -d '[:space:]' < VERSION)"
+          if ! [[ "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "::error file=VERSION::VERSION must be MAJOR.MINOR.PATCH, got '$version'"
+            exit 1
+          fi
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          echo "tag=v$version" >> "$GITHUB_OUTPUT"
+
+      - name: Check CHANGELOG entry
+        run: |
+          if ! grep -q "^## \[${{ steps.version.outputs.version }}\]" CHANGELOG.md; then
+            echo "::error file=CHANGELOG.md::No '## [${{ steps.version.outputs.version }}]' entry in CHANGELOG.md"
+            exit 1
+          fi
+
+      - name: Create tag
+        id: create
+        run: |
+          tag="${{ steps.version.outputs.tag }}"
+          if git ls-remote --exit-code --tags origin "refs/tags/$tag" >/dev/null; then
+            echo "Tag $tag already exists, nothing to release."
+            echo "created=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git tag -a "$tag" -m "Release $tag" "$GITHUB_SHA"
+          git push origin "$tag"
+          echo "created=true" >> "$GITHUB_OUTPUT"
+
+  release:
+    name: Release
+    needs: tag
+    if: needs.tag.outputs.created == 'true'
+    uses: ./.github/workflows/release.yml
+    with:
+      tag: ${{ needs.tag.outputs.tag }}
+    secrets: inherit

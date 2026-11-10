@@ -109,6 +109,14 @@ resource "insightfinder_system_settings" "example" {
     rootcause_reverse_entry_filter_threshold  = 99
     enable_composite_timeline                 = true
   }
+
+  feedback_learning_setting = {
+    enabled              = true
+    instance_level       = true
+    min_vote_count       = 3
+    confidence_threshold = 80
+    block_expiry_days    = 30
+  }
 }
 ```
 
@@ -357,6 +365,22 @@ resource "insightfinder_system_settings" "misc_only" {
 }
 ```
 
+### Feedback Learning Only
+
+```terraform
+resource "insightfinder_system_settings" "feedback_learning_only" {
+  system_name = "my-production-system"
+
+  feedback_learning_setting = {
+    enabled              = true
+    instance_level       = true
+    min_vote_count       = 3
+    confidence_threshold = 80
+    block_expiry_days    = 30
+  }
+}
+```
+
 ### Knowledge Base Only
 
 ```terraform
@@ -438,6 +462,7 @@ resource "insightfinder_system_settings" "with_satellite" {
 - `knowledgebase_settings` (Attributes) Knowledge base and incident prediction settings for the system. See [knowledgebase_settings](#nested-schema-for-knowledgebase_settings) below.
 - `notifications_settings` (Attributes) Notification and alert email settings for the system. See [notifications_settings](#nested-schema-for-notifications_settings) below.
 - `miscellaneous_settings` (Attributes) Miscellaneous system framework settings. See [miscellaneous_settings](#nested-schema-for-miscellaneous_settings) below.
+- `feedback_learning_setting` (Attributes) Feedback learning settings for the system. See [feedback_learning_setting](#nested-schema-for-feedback_learning_setting) below.
 
 ### Read-Only
 
@@ -687,6 +712,20 @@ Configures miscellaneous system framework settings via `/api/external/v1/systemf
 
 ---
 
+### Nested Schema for `feedback_learning_setting`
+
+Configures feedback learning via `/api/external/v1/feedback-learning-setting`. All attributes are Optional and Computed. The API overwrites every field on each write, so any field left unset keeps its current server value (it is read first and sent back unchanged).
+
+| Attribute | Type | Description |
+|-----------|------|-------------|
+| `enabled` | Boolean | Enable feedback learning for the system. |
+| `instance_level` | Boolean | Apply feedback learning at the instance level. |
+| `min_vote_count` | Number | Minimum number of feedback votes required before learning applies. |
+| `confidence_threshold` | Number | Confidence threshold for feedback learning. |
+| `block_expiry_days` | Number | Number of days after which a feedback-learned block expires. |
+
+---
+
 ## Import
 
 `insightfinder_system_settings` resources can be imported using the system name:
@@ -699,7 +738,7 @@ After import, run `terraform plan` to review which computed fields will be popul
 
 ## Notes
 
-- **Partial configuration**: All three blocks (`knowledgebase_settings`, `notifications_settings`, `miscellaneous_settings`) are independently optional. Omitting a block means those settings are not managed by Terraform.
+- **Partial configuration**: All four blocks (`knowledgebase_settings`, `notifications_settings`, `miscellaneous_settings`, `feedback_learning_setting`) are independently optional. Omitting a block means those settings are not managed by Terraform.
 - **Delete behavior**: Removing this resource from Terraform state does not change the settings on the InsightFinder server. The settings persist and must be manually reset if needed.
 - **`satellite_system_set`**: Must be provided as a JSON-encoded string using `jsonencode(...)`. The value is semantically compared during plan/apply to avoid spurious diffs caused by JSON key ordering.
 - **`incident_count_threshold` and `assignment_map`**: Must be provided as JSON-encoded strings using `jsonencode(...)`. These fields are stored as serialized JSON in Terraform state and compared semantically to avoid key-ordering diffs.
@@ -709,4 +748,4 @@ After import, run `terraform plan` to review which computed fields will be popul
 - **`max_notification_delay_tolerance`**: Optional and Computed number (milliseconds). When omitted, the prior state value is re-sent on update.
 - **`custom_consolidation_rules`**: Optional and Computed list of rule objects. Always read back from the API on refresh; when set, the declared list replaces the rules on the server. Include `"consolidationCustom"` in `enabled_consolidation_algorithms` to activate these rules. For `"content"` type `project_field_keys` entries, `field_key` can be omitted or set to `null`.
 - **`metric_log_consolidation_configs`**: Optional and Computed list of metric-log mapping objects. Always read back from the API on refresh; when set, the declared list replaces the mappings on the server.
-- **API endpoints**: `knowledgebase_settings` maps to two separate API calls — `SetGlobalKBSetting` and `SetIncidentPredictionSetting`. `notifications_settings` maps to `SetHealthViewSetting`, plus the dedicated system-down, insights-report (daily/weekly), and per-project instance-down APIs for `system_down_notification`, `daily_report_notification`/`weekly_report_notification`, and `instance_down_notification`. `miscellaneous_settings` maps to two calls on `/api/external/v1/systemframework` — `operation=hideOrOrderOrLongTerm` for `healthview_longterm`, and `operation=systemFrameworkSetting` for the remaining three fields. All four fields are read via a single `GET /api/external/v1/systemframework` call.
+- **API endpoints**: `knowledgebase_settings` maps to two separate API calls — `SetGlobalKBSetting` and `SetIncidentPredictionSetting`. `notifications_settings` maps to `SetHealthViewSetting`, plus the dedicated system-down, insights-report (daily/weekly), and per-project instance-down APIs for `system_down_notification`, `daily_report_notification`/`weekly_report_notification`, and `instance_down_notification`. `miscellaneous_settings` maps to two calls on `/api/external/v1/systemframework` — `operation=hideOrOrderOrLongTerm` for `healthview_longterm`, and `operation=systemFrameworkSetting` for the remaining three fields. All four fields are read via a single `GET /api/external/v1/systemframework` call. `feedback_learning_setting` maps to `GET`/`POST /api/external/v1/feedback-learning-setting`, with every field passed as a query parameter.

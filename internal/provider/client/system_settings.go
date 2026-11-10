@@ -990,10 +990,17 @@ func (c *Client) SetHealthViewSetting(systemID string, updates *HealthViewSettin
 	current.CustomConsolidationRules = updates.CustomConsolidationRules
 	current.MetricLogConsolidationConfigs = updates.MetricLogConsolidationConfigs
 	current.MetricCoOccurrenceBufferMs = updates.MetricCoOccurrenceBufferMs
-	current.LocalKbSensitivities = updates.LocalKbSensitivities
+	// Raw JSON fields are left unset by the caller when not managed, so keep the fetched value
+	if len(updates.LocalKbSensitivities) > 0 {
+		current.LocalKbSensitivities = updates.LocalKbSensitivities
+	}
 	current.AnomalyScoreNotificationMinDelta = updates.AnomalyScoreNotificationMinDelta
-	current.NotificationDelayConfig = updates.NotificationDelayConfig
-	current.DependencyConsolidationSetting = updates.DependencyConsolidationSetting
+	if len(updates.NotificationDelayConfig) > 0 {
+		current.NotificationDelayConfig = updates.NotificationDelayConfig
+	}
+	if len(updates.DependencyConsolidationSetting) > 0 {
+		current.DependencyConsolidationSetting = updates.DependencyConsolidationSetting
+	}
 	current.SystemID = systemID
 	current.ID = systemID
 
@@ -1036,6 +1043,79 @@ func (c *Client) SetHealthViewSetting(systemID string, updates *HealthViewSettin
 			return fmt.Errorf("failed to set health view settings: %s", msg)
 		}
 		return fmt.Errorf("failed to set health view settings")
+	}
+
+	return nil
+}
+
+// FeedbackLearningSetting represents the feedback learning settings for a system
+type FeedbackLearningSetting struct {
+	Enabled             bool  `json:"enabled"`
+	InstanceLevel       bool  `json:"instanceLevel"`
+	MinVoteCount        int64 `json:"minVoteCount"`
+	ConfidenceThreshold int64 `json:"confidenceThreshold"`
+	BlockExpiryDays     int64 `json:"blockExpiryDays"`
+}
+
+// GetFeedbackLearningSetting retrieves the feedback learning setting for a system
+func (c *Client) GetFeedbackLearningSetting(systemID string) (*FeedbackLearningSetting, error) {
+	params := url.Values{}
+	params.Add("customerName", c.Username)
+	params.Add("systemId", systemID)
+
+	path := fmt.Sprintf("/api/external/v1/feedback-learning-setting?%s", params.Encode())
+	body, statusCode, err := c.DoRequest("GET", path, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	if statusCode == 404 || statusCode == 204 {
+		return nil, nil
+	}
+
+	if statusCode != 200 {
+		return nil, fmt.Errorf("failed to get feedback learning setting: HTTP %d - %s", statusCode, string(body))
+	}
+
+	var setting FeedbackLearningSetting
+	if err := json.Unmarshal(body, &setting); err != nil {
+		return nil, fmt.Errorf("failed to parse feedback learning setting: %w", err)
+	}
+
+	return &setting, nil
+}
+
+// SetFeedbackLearningSetting updates the feedback learning setting for a system
+func (c *Client) SetFeedbackLearningSetting(systemID string, setting *FeedbackLearningSetting) error {
+	params := url.Values{}
+	params.Add("customerName", c.Username)
+	params.Add("systemId", systemID)
+	params.Add("enabled", fmt.Sprintf("%t", setting.Enabled))
+	params.Add("instanceLevel", fmt.Sprintf("%t", setting.InstanceLevel))
+	params.Add("minVoteCount", fmt.Sprintf("%d", setting.MinVoteCount))
+	params.Add("confidenceThreshold", fmt.Sprintf("%d", setting.ConfidenceThreshold))
+	params.Add("blockExpiryDays", fmt.Sprintf("%d", setting.BlockExpiryDays))
+
+	path := fmt.Sprintf("/api/external/v1/feedback-learning-setting?%s", params.Encode())
+	body, statusCode, err := c.DoRequest("POST", path, nil)
+	if err != nil {
+		return err
+	}
+
+	if statusCode != 200 {
+		return fmt.Errorf("failed to set feedback learning setting: HTTP %d - %s", statusCode, string(body))
+	}
+
+	var response map[string]any
+	if err := json.Unmarshal(body, &response); err != nil {
+		return nil
+	}
+
+	if success, ok := response["success"].(bool); ok && !success {
+		if msg, ok := response["message"].(string); ok {
+			return fmt.Errorf("failed to set feedback learning setting: %s", msg)
+		}
+		return fmt.Errorf("failed to set feedback learning setting")
 	}
 
 	return nil

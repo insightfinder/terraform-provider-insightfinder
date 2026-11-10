@@ -18,6 +18,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 	"github.com/hashicorp/terraform-plugin-framework/types/basetypes"
+	"github.com/hashicorp/terraform-plugin-go/tftypes"
 	"github.com/hashicorp/terraform-plugin-log/tflog"
 
 	"github.com/insightfinder/terraform-provider-insightfinder/internal/provider/client"
@@ -1086,6 +1087,9 @@ func (r *projectResource) Schema(_ context.Context, _ resource.SchemaRequest, re
 				Description: "Log-to-metric settings. Each entry maps this log project to a target metric project.",
 				Optional:    true,
 				Computed:    true,
+				PlanModifiers: []planmodifier.Set{
+					l2mSettingsPlanModifier{},
+				},
 				NestedObject: schema.NestedAttributeObject{
 					Attributes: map[string]schema.Attribute{
 						"metric_project_name": schema.StringAttribute{
@@ -3917,8 +3921,15 @@ func (r *projectResource) Update(ctx context.Context, req resource.UpdateRequest
 
 	// Process l2m_settings
 	if !config.L2MSettings.IsNull() && !config.L2MSettings.IsUnknown() {
+		// Use the planned value (config plus prior state for unset nested fields)
+		// so preserved values are sent to the API and match the plan after apply
+		resolvedL2M, ok := l2mUnknownsToNull(ctx, plan.L2MSettings).(basetypes.SetValue)
+		if !ok || resolvedL2M.IsNull() || resolvedL2M.IsUnknown() {
+			resolvedL2M = config.L2MSettings
+		}
+
 		var configL2M []l2mSettingModel
-		diags = config.L2MSettings.ElementsAs(ctx, &configL2M, false)
+		diags = resolvedL2M.ElementsAs(ctx, &configL2M, false)
 		resp.Diagnostics.Append(diags...)
 		if resp.Diagnostics.HasError() {
 			return
@@ -3971,8 +3982,8 @@ func (r *projectResource) Update(ctx context.Context, req resource.UpdateRequest
 			}
 		}
 
-		plan.L2MSettings = config.L2MSettings
-	} else {
+		plan.L2MSettings = resolvedL2M
+	} else if plan.L2MSettings.IsUnknown() {
 		plan.L2MSettings = types.SetNull(types.ObjectType{AttrTypes: l2mSettingAttrTypes})
 	}
 
@@ -4454,4 +4465,177 @@ func jsonKeySettingAttrTypes() map[string]attr.Type {
 		"service_now_notification_setting":  types.BoolType,
 		"service_now_notification_setting_display_name": types.StringType,
 	}
+}
+
+// l2mSettingsPlanModifier keeps l2m_settings stable across plans. Because
+// l2m_settings is a set, any nested attribute left unset in config becomes
+// unknown whenever the resource has some other change, which makes Terraform
+// show the whole element as removed and re-added. This modifier matches plan
+// elements to prior state elements by metric_project_name and fills unknown
+// nested values from state, so unchanged entries produce no diff.
+type l2mSettingsPlanModifier struct{}
+
+func (m l2mSettingsPlanModifier) Description(_ context.Context) string {
+	return "Uses prior state values for unset nested l2m_settings attributes."
+}
+
+func (m l2mSettingsPlanModifier) MarkdownDescription(ctx context.Context) string {
+	return m.Description(ctx)
+}
+
+func (m l2mSettingsPlanModifier) PlanModifySet(ctx context.Context, req planmodifier.SetRequest, resp *planmodifier.SetResponse) {
+	// Nothing to carry over on create, and nothing to do on destroy
+	if req.StateValue.IsNull() || req.StateValue.IsUnknown() || req.PlanValue.IsNull() {
+		return
+	}
+
+	// Not managed in config: keep whatever is in state
+	if req.ConfigValue.IsNull() {
+		if req.PlanValue.IsUnknown() {
+			resp.PlanValue = req.StateValue
+		}
+		return
+	}
+
+	if req.PlanValue.IsUnknown() {
+		return
+	}
+
+	priorByName := make(map[string]attr.Value)
+	for _, elem := range req.StateValue.Elements() {
+		if name, ok := l2mElementName(elem); ok {
+			priorByName[name] = elem
+		}
+	}
+
+	planElems := req.PlanValue.Elements()
+	merged := make([]attr.Value, 0, len(planElems))
+	for _, elem := range planElems {
+		if name, ok := l2mElementName(elem); ok {
+			if prior, found := priorByName[name]; found {
+				elem = l2mFillUnknownFromPrior(ctx, elem, prior)
+			}
+		}
+		merged = append(merged, elem)
+	}
+
+	setValue, diags := types.SetValue(req.PlanValue.ElementType(ctx), merged)
+	resp.Diagnostics.Append(diags...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+	resp.PlanValue = setValue
+}
+
+// l2mElementName returns the metric_project_name of an l2m_settings element, if known.
+func l2mElementName(elem attr.Value) (string, bool) {
+	obj, ok := elem.(basetypes.ObjectValue)
+	if !ok || obj.IsNull() || obj.IsUnknown() {
+		return "", false
+	}
+	name, ok := obj.Attributes()["metric_project_name"].(basetypes.StringValue)
+	if !ok || name.IsNull() || name.IsUnknown() {
+		return "", false
+	}
+	return name.ValueString(), true
+}
+
+// l2mFillUnknownFromPrior replaces unknown values in plan with the matching
+// values from prior, recursing into objects and equal-length lists.
+func l2mFillUnknownFromPrior(ctx context.Context, plan, prior attr.Value) attr.Value {
+	if plan == nil || prior == nil || prior.IsUnknown() {
+		return plan
+	}
+	if plan.IsUnknown() {
+		return prior
+	}
+	if plan.IsNull() || prior.IsNull() {
+		return plan
+	}
+
+	switch p := plan.(type) {
+	case basetypes.ObjectValue:
+		po, ok := prior.(basetypes.ObjectValue)
+		if !ok {
+			return plan
+		}
+		priorAttrs := po.Attributes()
+		attrs := make(map[string]attr.Value, len(p.Attributes()))
+		for k, v := range p.Attributes() {
+			attrs[k] = l2mFillUnknownFromPrior(ctx, v, priorAttrs[k])
+		}
+		obj, diags := types.ObjectValue(p.AttributeTypes(ctx), attrs)
+		if diags.HasError() {
+			return plan
+		}
+		return obj
+	case basetypes.ListValue:
+		pl, ok := prior.(basetypes.ListValue)
+		if !ok || len(pl.Elements()) != len(p.Elements()) {
+			return plan
+		}
+		priorElems := pl.Elements()
+		elems := make([]attr.Value, len(p.Elements()))
+		for i, v := range p.Elements() {
+			elems[i] = l2mFillUnknownFromPrior(ctx, v, priorElems[i])
+		}
+		list, diags := types.ListValue(p.ElementType(ctx), elems)
+		if diags.HasError() {
+			return plan
+		}
+		return list
+	}
+	return plan
+}
+
+// l2mUnknownsToNull replaces any remaining unknown values with nulls so the
+// planned l2m_settings can be sent to the API and stored as state.
+func l2mUnknownsToNull(ctx context.Context, v attr.Value) attr.Value {
+	if v == nil {
+		return v
+	}
+	if v.IsUnknown() {
+		nullVal, err := v.Type(ctx).ValueFromTerraform(ctx, tftypes.NewValue(v.Type(ctx).TerraformType(ctx), nil))
+		if err != nil {
+			return v
+		}
+		return nullVal
+	}
+	if v.IsNull() {
+		return v
+	}
+
+	switch val := v.(type) {
+	case basetypes.ObjectValue:
+		attrs := make(map[string]attr.Value, len(val.Attributes()))
+		for k, a := range val.Attributes() {
+			attrs[k] = l2mUnknownsToNull(ctx, a)
+		}
+		obj, diags := types.ObjectValue(val.AttributeTypes(ctx), attrs)
+		if diags.HasError() {
+			return v
+		}
+		return obj
+	case basetypes.ListValue:
+		elems := make([]attr.Value, len(val.Elements()))
+		for i, e := range val.Elements() {
+			elems[i] = l2mUnknownsToNull(ctx, e)
+		}
+		list, diags := types.ListValue(val.ElementType(ctx), elems)
+		if diags.HasError() {
+			return v
+		}
+		return list
+	case basetypes.SetValue:
+		elems := make([]attr.Value, len(val.Elements()))
+		for i, e := range val.Elements() {
+			elems[i] = l2mUnknownsToNull(ctx, e)
+		}
+		set, diags := types.SetValue(val.ElementType(ctx), elems)
+		if diags.HasError() {
+			return v
+		}
+		return set
+	}
+	return v
 }
