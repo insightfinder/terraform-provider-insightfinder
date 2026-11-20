@@ -99,21 +99,23 @@ type projectResourceModel struct {
 	ShowInstanceDown           types.Bool `tfsdk:"show_instance_down"`
 
 	// Log Settings
-	KeywordFeatureNumber     types.Int64   `tfsdk:"keyword_feature_number"`
-	KeywordSetting           types.Int64   `tfsdk:"keyword_setting"`
-	LargeProject             types.Bool    `tfsdk:"large_project"`
-	LogAnomalyEventBaseScore types.String  `tfsdk:"log_anomaly_event_base_score"`
-	LogDetectionMinCount     types.Int64   `tfsdk:"log_detection_min_count"`
-	LogDetectionSize         types.Int64   `tfsdk:"log_detection_size"`
-	LogPatternLimitLevel     types.Int64   `tfsdk:"log_pattern_limit_level"`
-	MaxLogModelSize          types.Int64   `tfsdk:"max_log_model_size"`
-	ModelKeywordSetting      types.Int64   `tfsdk:"model_keyword_setting"`
-	ModelMatchThreshold      types.Float64 `tfsdk:"model_match_threshold"`
-	ModelKeywordSegmentK     types.Int64   `tfsdk:"model_keyword_segment_k"`
-	MultiLineFlag            types.Bool    `tfsdk:"multi_line_flag"`
-	NlpFlag                  types.Bool    `tfsdk:"nlp_flag"`
-	DisableLogProcessingFlag types.Bool    `tfsdk:"disable_log_processing_flag"`
-	PrettyJsonConvertorFlag  types.Bool    `tfsdk:"pretty_json_convertor_flag"`
+	KeywordFeatureNumber             types.Int64   `tfsdk:"keyword_feature_number"`
+	KeywordSetting                   types.Int64   `tfsdk:"keyword_setting"`
+	LargeProject                     types.Bool    `tfsdk:"large_project"`
+	LogAnomalyEventBaseScore         types.String  `tfsdk:"log_anomaly_event_base_score"`
+	LogDetectionMinCount             types.Int64   `tfsdk:"log_detection_min_count"`
+	LogDetectionSize                 types.Int64   `tfsdk:"log_detection_size"`
+	LogPatternLimitLevel             types.Int64   `tfsdk:"log_pattern_limit_level"`
+	MaxLogModelSize                  types.Int64   `tfsdk:"max_log_model_size"`
+	ModelKeywordSetting              types.Int64   `tfsdk:"model_keyword_setting"`
+	ModelMatchThreshold              types.Float64 `tfsdk:"model_match_threshold"`
+	ModelKeywordSegmentK             types.Int64   `tfsdk:"model_keyword_segment_k"`
+	MultiLineFlag                    types.Bool    `tfsdk:"multi_line_flag"`
+	NlpFlag                          types.Bool    `tfsdk:"nlp_flag"`
+	DisableLogProcessingFlag         types.Bool    `tfsdk:"disable_log_processing_flag"`
+	LogToMetricInstanceAggregation   types.Bool    `tfsdk:"log_to_metric_instance_aggregation"`
+	AutomaticHistoricalLogProcessing types.Bool    `tfsdk:"automatic_historical_log_processing"`
+	PrettyJsonConvertorFlag          types.Bool    `tfsdk:"pretty_json_convertor_flag"`
 
 	// Prediction and Root Cause Settings
 	MaximumDetectionWaitTime             types.Int64   `tfsdk:"maximum_detection_wait_time"`
@@ -658,6 +660,16 @@ func (r *projectResource) Schema(_ context.Context, _ resource.SchemaRequest, re
 			},
 			"disable_log_processing_flag": schema.BoolAttribute{
 				Description: "Disable log processing",
+				Optional:    true,
+				Computed:    true,
+			},
+			"log_to_metric_instance_aggregation": schema.BoolAttribute{
+				Description: "Aggregate log-to-metric (L2M) metrics across instances.",
+				Optional:    true,
+				Computed:    true,
+			},
+			"automatic_historical_log_processing": schema.BoolAttribute{
+				Description: "Enable automatic historical log processing (automatic log-to-metric and data quality reruns for historical data). Requires a backend version that includes this setting (II-25564).",
 				Optional:    true,
 				Computed:    true,
 			},
@@ -1434,6 +1446,12 @@ func populateSettings(plan *projectResourceModel) map[string]interface{} {
 	if !plan.DisableLogProcessingFlag.IsNull() {
 		s["disableLogProcessingFlag"] = plan.DisableLogProcessingFlag.ValueBool()
 	}
+	if !plan.LogToMetricInstanceAggregation.IsNull() && !plan.LogToMetricInstanceAggregation.IsUnknown() {
+		s["logToMetricInstanceAggregation"] = plan.LogToMetricInstanceAggregation.ValueBool()
+	}
+	if !plan.AutomaticHistoricalLogProcessing.IsNull() && !plan.AutomaticHistoricalLogProcessing.IsUnknown() {
+		s["automaticHistoricalLogProcessing"] = plan.AutomaticHistoricalLogProcessing.ValueBool()
+	}
 	if !plan.ProjectModelFlag.IsNull() {
 		s["projectModelFlag"] = plan.ProjectModelFlag.ValueBool()
 	}
@@ -1913,6 +1931,8 @@ func (r *projectResource) Create(ctx context.Context, req resource.CreateRequest
 		plan.MultiLineFlag = getBool("multiLineFlag")
 		plan.NlpFlag = getBool("nlpFlag")
 		plan.DisableLogProcessingFlag = getBool("disableLogProcessingFlag")
+		plan.LogToMetricInstanceAggregation = getBool("logToMetricInstanceAggregation")
+		plan.AutomaticHistoricalLogProcessing = getBool("automaticHistoricalLogProcessing")
 		plan.PrettyJsonConvertorFlag = getBool("prettyJsonConvertorFlag")
 
 		// Model Settings
@@ -2154,6 +2174,12 @@ func (r *projectResource) Create(ctx context.Context, req resource.CreateRequest
 	}
 	if !config.DisableLogProcessingFlag.IsNull() {
 		plan.DisableLogProcessingFlag = config.DisableLogProcessingFlag
+	}
+	if !config.LogToMetricInstanceAggregation.IsNull() {
+		plan.LogToMetricInstanceAggregation = config.LogToMetricInstanceAggregation
+	}
+	if !config.AutomaticHistoricalLogProcessing.IsNull() {
+		plan.AutomaticHistoricalLogProcessing = config.AutomaticHistoricalLogProcessing
 	}
 	if !config.PrettyJsonConvertorFlag.IsNull() {
 		plan.PrettyJsonConvertorFlag = config.PrettyJsonConvertorFlag
@@ -2828,6 +2854,8 @@ func (r *projectResource) Read(ctx context.Context, req resource.ReadRequest, re
 	state.MultiLineFlag = getBool("multiLineFlag")
 	state.NlpFlag = getBool("nlpFlag")
 	state.DisableLogProcessingFlag = getBool("disableLogProcessingFlag")
+	state.LogToMetricInstanceAggregation = getBool("logToMetricInstanceAggregation")
+	state.AutomaticHistoricalLogProcessing = getBool("automaticHistoricalLogProcessing")
 	state.PrettyJsonConvertorFlag = getBool("prettyJsonConvertorFlag")
 
 	// Model Settings
@@ -3380,6 +3408,8 @@ func (r *projectResource) Update(ctx context.Context, req resource.UpdateRequest
 		plan.MultiLineFlag = getBool("multiLineFlag")
 		plan.NlpFlag = getBool("nlpFlag")
 		plan.DisableLogProcessingFlag = getBool("disableLogProcessingFlag")
+		plan.LogToMetricInstanceAggregation = getBool("logToMetricInstanceAggregation")
+		plan.AutomaticHistoricalLogProcessing = getBool("automaticHistoricalLogProcessing")
 		plan.PrettyJsonConvertorFlag = getBool("prettyJsonConvertorFlag")
 
 		// Model Settings

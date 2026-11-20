@@ -5,6 +5,11 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+- **insightfinder_project**: New `log_to_metric_instance_aggregation` (Bool, Optional, Computed) and `automatic_historical_log_processing` (Bool, Optional, Computed) attributes. Map to the `logToMetricInstanceAggregation` and `automaticHistoricalLogProcessing` log project settings. Both are only sent when set in config, so leaving them out never changes the backend value. `automatic_historical_log_processing` requires a backend build that includes II-25564 (currently `staging`).
+
 ## [1.12.7] - 2026-11-10
 
 ### Added
