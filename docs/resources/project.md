@@ -434,6 +434,8 @@ resource "insightfinder_project" "loki_logs" {
 - `disable_model_keyword_stats_collection` (Boolean) Disable collection of keyword frequencies for model training. Default: `false`
 - `disable_log_compress_event` (Boolean) Disable saving (compressing) the log event data. Default: `false`
 - `disable_log_processing_flag` (Boolean) Disable log processing.
+- `log_to_metric_instance_aggregation` (Boolean) Aggregate log-to-metric (L2M) metrics across instances. Only sent when set in config. Default: `false`
+- `automatic_historical_log_processing` (Boolean) Enable automatic historical log processing: the merged log-to-metric and data quality rerun, and the automation that drives a historical stream's days through the metric pipeline. Only sent when set in config. Default: `false`. **Note:** requires a backend build that includes II-25564 (currently `staging`); on older backends the setting is ignored and setting it causes an "inconsistent result after apply" error.
 - `log_anomaly_event_base_score` (String) Base score weights for the different log anomaly event types, as a JSON array string in the order rare, hot, cold, detection alert, new pattern, critical. Default: `"[5,0.01,0.0075,0.01,1,100]"`
 - `multi_line_flag` (Boolean) Enable multi-line (regex multiline) processing. Default: `false`
 - `nlp_flag` (Boolean) Enable NLP. Deprecated. Default: `false`
