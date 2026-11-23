@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **Airgap bundle**: `scripts/airgap/prepare-bundle.sh` builds a self-contained `.tgz` (provider binary in a local `terraform.d/` plugin folder, configuration, and `run-if-terraform.sh`) that runs on a machine without internet access. Ships with `examples/airgap-data-quality`, the data quality log project and L2M metric project configuration; other configurations can be bundled with `CONFIG_DIR`.
 - **insightfinder_project**: New `log_to_metric_instance_aggregation` (Bool, Optional, Computed) and `automatic_historical_log_processing` (Bool, Optional, Computed) attributes. Map to the `logToMetricInstanceAggregation` and `automaticHistoricalLogProcessing` log project settings. Both are only sent when set in config, so leaving them out never changes the backend value. `automatic_historical_log_processing` requires a backend build that includes II-25564 (currently `staging`).
 
 ## [1.12.7] - 2026-11-10

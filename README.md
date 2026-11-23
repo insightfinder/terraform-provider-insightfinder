@@ -56,6 +56,44 @@ make install
 
 This will compile the provider and install it to `~/.terraform.d/plugins/`.
 
+### Airgapped Environments
+
+`scripts/airgap/prepare-bundle.sh`, run from the repository root, builds
+`dist/airgap/if-<config folder>-bundle.tgz`. It contains the provider, the configuration from a
+config folder (default `examples/airgap-data-quality`) and `run-if-terraform.sh` for the first run. The
+provider sits in the bundle's own `terraform.d/` folder, which Terraform searches automatically, so
+the airgapped machine needs only the `terraform` binary: no internet, no `~/.terraformrc` and no
+admin rights.
+
+The scripts are not specific to one customer. For another setup, add an
+`examples/airgap-<name>/` folder with its `.tf` (and any `.json`) files and pass it as `CONFIG_DIR`.
+
+```bash
+scripts/airgap/prepare-bundle.sh                                   # bundles examples/airgap-data-quality
+ARCH=arm64 scripts/airgap/prepare-bundle.sh                        # if uname -m says aarch64
+CONFIG_DIR=examples/airgap-<name> scripts/airgap/prepare-bundle.sh # another configuration
+
+# on the airgapped machine
+tar xzf if-airgap-data-quality-bundle.tgz && cd if-airgap-data-quality-bundle
+# edit main.tf (project and system names), then set IF_BASE_URL / IF_USERNAME / IF_LICENSE_KEY
+# in the environment or at the top of run-if-terraform.sh
+./run-if-terraform.sh
+```
+
+On the airgapped machine:
+
+- Terraform 1.x for Linux must be installed. The bundle does not include it.
+- The bundle's `ARCH` must match the machine (`uname -m`: `x86_64` is `amd64`, `aarch64` is `arm64`).
+- If InsightFinder uses a private certificate authority, set `SSL_CERT_FILE=/path/to/ca.pem`.
+- `automatic_historical_log_processing` needs a backend build that includes II-25564. Remove it
+  from `main.tf` on an older backend.
+- After the first run, change settings by editing `main.tf` and running `terraform plan` /
+  `terraform apply` in the same folder. Keep `terraform.tfstate` there, since it holds the state.
+- To upgrade the provider, build a new bundle, copy its `terraform.d/` over the old one and run
+  `terraform init -upgrade`.
+- `terraform init` warns about incomplete lock file checksums. This is expected for a provider
+  installed from a local folder and can be ignored.
+
 ## Usage
 
 ### Provider Configuration
