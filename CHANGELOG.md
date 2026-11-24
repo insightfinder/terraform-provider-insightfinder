@@ -7,7 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.12.8] - 2026-11-23
+
 ### Added
+- **insightfinder_project**: New `default_instance_name` (String, Optional, Computed) and `data_quality_anomaly_metric` (Bool, Optional, Computed) attributes on `l2m_settings.json_parsers`. Map to the `defaultInstanceName` and `dataQualityAnomalyMetric` log-to-metric JSON parser fields that the AI WatchTower data quality monitor sets (`"All"` for entries without the instance name key, and `true` on its anomalous data value series). Previously these fields could not be sent, so applying `l2m_settings` to a data quality log project dropped them and broke the anomalous data value check. Left out of config, both keep the value already on the server, so existing configurations plan no changes.
 - **insightfinder_project**: New `log_to_metric_instance_aggregation` (Bool, Optional, Computed) and `automatic_historical_log_processing` (Bool, Optional, Computed) attributes. Map to the `logToMetricInstanceAggregation` and `automaticHistoricalLogProcessing` log project settings. Both are only sent when set in config, so leaving them out never changes the backend value. `automatic_historical_log_processing` requires a backend build that includes II-25564 (currently `staging`).
 
 ## [1.12.7] - 2026-11-10

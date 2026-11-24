@@ -251,21 +251,23 @@ type l2mRegexParserModel struct {
 }
 
 type l2mJsonParserModel struct {
-	MetricValueKey       types.String `tfsdk:"metric_value_key"`
-	BaseValueKey         types.String `tfsdk:"base_value_key"`
-	InstanceNameKey      types.String `tfsdk:"instance_name_key"`
-	ContainerNameKey     types.String `tfsdk:"container_name_key"`
-	TimestampKey         types.String `tfsdk:"timestamp_key"`
-	TimestampFormat      types.String `tfsdk:"timestamp_format"`
-	DataFilter           types.String `tfsdk:"data_filter"`
-	Operation            types.Int64  `tfsdk:"operation"`
-	MetricName           types.String `tfsdk:"metric_name"`
-	AdditionalMetricName types.String `tfsdk:"additional_metric_name"`
-	AggregationMode      types.Int64  `tfsdk:"aggregation_mode"`
-	GroupingByComponent  types.Bool   `tfsdk:"grouping_by_component"`
-	AggregationPeriod    types.Int64  `tfsdk:"aggregation_period"`
-	ContainerType        types.Int64  `tfsdk:"container_type"`
-	DerivedValueModel    types.Object `tfsdk:"derived_value_model"`
+	MetricValueKey           types.String `tfsdk:"metric_value_key"`
+	BaseValueKey             types.String `tfsdk:"base_value_key"`
+	InstanceNameKey          types.String `tfsdk:"instance_name_key"`
+	ContainerNameKey         types.String `tfsdk:"container_name_key"`
+	TimestampKey             types.String `tfsdk:"timestamp_key"`
+	TimestampFormat          types.String `tfsdk:"timestamp_format"`
+	DataFilter               types.String `tfsdk:"data_filter"`
+	Operation                types.Int64  `tfsdk:"operation"`
+	MetricName               types.String `tfsdk:"metric_name"`
+	AdditionalMetricName     types.String `tfsdk:"additional_metric_name"`
+	AggregationMode          types.Int64  `tfsdk:"aggregation_mode"`
+	GroupingByComponent      types.Bool   `tfsdk:"grouping_by_component"`
+	AggregationPeriod        types.Int64  `tfsdk:"aggregation_period"`
+	ContainerType            types.Int64  `tfsdk:"container_type"`
+	DerivedValueModel        types.Object `tfsdk:"derived_value_model"`
+	DefaultInstanceName      types.String `tfsdk:"default_instance_name"`
+	DataQualityAnomalyMetric types.Bool   `tfsdk:"data_quality_anomaly_metric"`
 }
 
 type l2mSettingModel struct {
@@ -301,21 +303,23 @@ var l2mRegexParserAttrTypes = map[string]attr.Type{
 }
 
 var l2mJsonParserAttrTypes = map[string]attr.Type{
-	"metric_value_key":       types.StringType,
-	"base_value_key":         types.StringType,
-	"instance_name_key":      types.StringType,
-	"container_name_key":     types.StringType,
-	"timestamp_key":          types.StringType,
-	"timestamp_format":       types.StringType,
-	"data_filter":            types.StringType,
-	"operation":              types.Int64Type,
-	"metric_name":            types.StringType,
-	"additional_metric_name": types.StringType,
-	"aggregation_mode":       types.Int64Type,
-	"grouping_by_component":  types.BoolType,
-	"aggregation_period":     types.Int64Type,
-	"container_type":         types.Int64Type,
-	"derived_value_model":    types.ObjectType{AttrTypes: l2mDerivedValueAttrTypes},
+	"metric_value_key":            types.StringType,
+	"base_value_key":              types.StringType,
+	"instance_name_key":           types.StringType,
+	"container_name_key":          types.StringType,
+	"timestamp_key":               types.StringType,
+	"timestamp_format":            types.StringType,
+	"data_filter":                 types.StringType,
+	"operation":                   types.Int64Type,
+	"metric_name":                 types.StringType,
+	"additional_metric_name":      types.StringType,
+	"aggregation_mode":            types.Int64Type,
+	"grouping_by_component":       types.BoolType,
+	"aggregation_period":          types.Int64Type,
+	"container_type":              types.Int64Type,
+	"derived_value_model":         types.ObjectType{AttrTypes: l2mDerivedValueAttrTypes},
+	"default_instance_name":       types.StringType,
+	"data_quality_anomaly_metric": types.BoolType,
 }
 
 var l2mSettingAttrTypes = map[string]attr.Type{
@@ -1270,6 +1274,16 @@ func (r *projectResource) Schema(_ context.Context, _ resource.SchemaRequest, re
 									},
 									"container_type": schema.Int64Attribute{
 										Description: "Container type.",
+										Optional:    true,
+										Computed:    true,
+									},
+									"default_instance_name": schema.StringAttribute{
+										Description: "Instance name for log entries that lack the instance_name_key field (AI WatchTower data quality uses \"All\").",
+										Optional:    true,
+										Computed:    true,
+									},
+									"data_quality_anomaly_metric": schema.BoolAttribute{
+										Description: "Whether the metric is an AI WatchTower data quality anomalous data value series: the field's other data quality rules do not drop its values.",
 										Optional:    true,
 										Computed:    true,
 									},
@@ -4317,20 +4331,22 @@ func l2mSettingModelToClient(ctx context.Context, m l2mSettingModel) (*client.L2
 		}
 		for _, jm := range jsonModels {
 			p := client.L2MJsonParser{
-				MetricValueKey:       jm.MetricValueKey.ValueStringPointer(),
-				BaseValueKey:         jm.BaseValueKey.ValueStringPointer(),
-				InstanceNameKey:      jm.InstanceNameKey.ValueStringPointer(),
-				ContainerNameKey:     jm.ContainerNameKey.ValueStringPointer(),
-				TimestampKey:         jm.TimestampKey.ValueStringPointer(),
-				TimestampFormat:      jm.TimestampFormat.ValueStringPointer(),
-				DataFilter:           jm.DataFilter.ValueStringPointer(),
-				Operation:            l2mInt64ToIntPtr(jm.Operation),
-				MetricName:           jm.MetricName.ValueStringPointer(),
-				AdditionalMetricName: jm.AdditionalMetricName.ValueStringPointer(),
-				AggregationMode:      l2mInt64ToIntPtr(jm.AggregationMode),
-				GroupingByComponent:  jm.GroupingByComponent.ValueBoolPointer(),
-				AggregationPeriod:    l2mInt64ToIntPtr(jm.AggregationPeriod),
-				ContainerType:        l2mInt64ToIntPtr(jm.ContainerType),
+				MetricValueKey:           jm.MetricValueKey.ValueStringPointer(),
+				BaseValueKey:             jm.BaseValueKey.ValueStringPointer(),
+				InstanceNameKey:          jm.InstanceNameKey.ValueStringPointer(),
+				ContainerNameKey:         jm.ContainerNameKey.ValueStringPointer(),
+				TimestampKey:             jm.TimestampKey.ValueStringPointer(),
+				TimestampFormat:          jm.TimestampFormat.ValueStringPointer(),
+				DataFilter:               jm.DataFilter.ValueStringPointer(),
+				Operation:                l2mInt64ToIntPtr(jm.Operation),
+				MetricName:               jm.MetricName.ValueStringPointer(),
+				AdditionalMetricName:     jm.AdditionalMetricName.ValueStringPointer(),
+				AggregationMode:          l2mInt64ToIntPtr(jm.AggregationMode),
+				GroupingByComponent:      jm.GroupingByComponent.ValueBoolPointer(),
+				AggregationPeriod:        l2mInt64ToIntPtr(jm.AggregationPeriod),
+				ContainerType:            l2mInt64ToIntPtr(jm.ContainerType),
+				DefaultInstanceName:      jm.DefaultInstanceName.ValueStringPointer(),
+				DataQualityAnomalyMetric: jm.DataQualityAnomalyMetric.ValueBoolPointer(),
 			}
 			if !jm.DerivedValueModel.IsNull() && !jm.DerivedValueModel.IsUnknown() {
 				var dvm l2mDerivedValueModel
@@ -4399,21 +4415,23 @@ func l2mSettingModelFromClient(ctx context.Context, s client.L2MSetting) (l2mSet
 		var jsonModels []l2mJsonParserModel
 		for _, jp := range s.JsonParsers {
 			jm := l2mJsonParserModel{
-				MetricValueKey:       l2mStrPtrToTF(jp.MetricValueKey),
-				BaseValueKey:         l2mStrPtrToTF(jp.BaseValueKey),
-				InstanceNameKey:      l2mStrPtrToTF(jp.InstanceNameKey),
-				ContainerNameKey:     l2mStrPtrToTF(jp.ContainerNameKey),
-				TimestampKey:         l2mStrPtrToTF(jp.TimestampKey),
-				TimestampFormat:      l2mStrPtrToTF(jp.TimestampFormat),
-				DataFilter:           l2mStrPtrToTF(jp.DataFilter),
-				Operation:            l2mIntPtrToTF(jp.Operation),
-				MetricName:           l2mStrPtrToTF(jp.MetricName),
-				AdditionalMetricName: l2mStrPtrToTF(jp.AdditionalMetricName),
-				AggregationMode:      l2mIntPtrToTF(jp.AggregationMode),
-				GroupingByComponent:  l2mBoolPtrToTF(jp.GroupingByComponent),
-				AggregationPeriod:    l2mIntPtrToTF(jp.AggregationPeriod),
-				ContainerType:        l2mIntPtrToTF(jp.ContainerType),
-				DerivedValueModel:    types.ObjectNull(l2mDerivedValueAttrTypes),
+				MetricValueKey:           l2mStrPtrToTF(jp.MetricValueKey),
+				BaseValueKey:             l2mStrPtrToTF(jp.BaseValueKey),
+				InstanceNameKey:          l2mStrPtrToTF(jp.InstanceNameKey),
+				ContainerNameKey:         l2mStrPtrToTF(jp.ContainerNameKey),
+				TimestampKey:             l2mStrPtrToTF(jp.TimestampKey),
+				TimestampFormat:          l2mStrPtrToTF(jp.TimestampFormat),
+				DataFilter:               l2mStrPtrToTF(jp.DataFilter),
+				Operation:                l2mIntPtrToTF(jp.Operation),
+				MetricName:               l2mStrPtrToTF(jp.MetricName),
+				AdditionalMetricName:     l2mStrPtrToTF(jp.AdditionalMetricName),
+				AggregationMode:          l2mIntPtrToTF(jp.AggregationMode),
+				GroupingByComponent:      l2mBoolPtrToTF(jp.GroupingByComponent),
+				AggregationPeriod:        l2mIntPtrToTF(jp.AggregationPeriod),
+				ContainerType:            l2mIntPtrToTF(jp.ContainerType),
+				DerivedValueModel:        types.ObjectNull(l2mDerivedValueAttrTypes),
+				DefaultInstanceName:      l2mStrPtrToTF(jp.DefaultInstanceName),
+				DataQualityAnomalyMetric: l2mBoolPtrToTF(jp.DataQualityAnomalyMetric),
 			}
 			if jp.DerivedValueModel != nil {
 				mappingIDs := jp.DerivedValueModel.MappingIDList

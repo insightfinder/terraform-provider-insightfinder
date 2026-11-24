@@ -669,6 +669,8 @@ Optional:
 - `aggregation_period` (Number) Aggregation period.
 - `container_type` (Number) Container type identifier.
 - `grouping_by_component` (Boolean) Whether to group metrics by component.
+- `default_instance_name` (String) Instance name for log entries that lack the `instance_name_key` field. AI WatchTower's data quality monitor uses `"All"`.
+- `data_quality_anomaly_metric` (Boolean) Whether the metric is an AI WatchTower data quality anomalous data value series: the field's other data quality rules do not drop its values.
 - `derived_value_model` (Attributes) Derived value transformation model. See [below for nested schema](#nestedatt--l2m_settings--json_parsers--derived_value_model).
 
 <a id="nestedatt--l2m_settings--json_parsers--derived_value_model"></a>
