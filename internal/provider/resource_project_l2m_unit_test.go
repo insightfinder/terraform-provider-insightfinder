@@ -5,11 +5,15 @@ package provider
 
 import (
 	"context"
+	"encoding/json"
+	"strings"
 	"testing"
 
 	"github.com/hashicorp/terraform-plugin-framework/attr"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/types"
+
+	"github.com/insightfinder/terraform-provider-insightfinder/internal/provider/client"
 )
 
 var l2mSettingObjType = types.ObjectType{AttrTypes: l2mSettingAttrTypes}
@@ -128,5 +132,45 @@ func TestL2MUnknownsToNull(t *testing.T) {
 	got := l2mUnknownsToNull(ctx, l2mTestSetting(l2mUnknownOf))
 	if !got.Equal(l2mTestSetting(l2mNullOf)) {
 		t.Fatalf("expected unknowns to become nulls, got %s", got)
+	}
+}
+
+func TestL2MJsonParser_DataQualityFieldsRoundTrip(t *testing.T) {
+	ctx := context.Background()
+	metric, all, anomaly := "amount", "All", true
+	in := client.L2MSetting{
+		MetricProjectName: "dq-L2M",
+		JsonParsers: []client.L2MJsonParser{{
+			MetricName:               &metric,
+			DefaultInstanceName:      &all,
+			DataQualityAnomalyMetric: &anomaly,
+		}},
+	}
+
+	model, diags := l2mSettingModelFromClient(ctx, in)
+	if diags.HasError() {
+		t.Fatalf("from client: %v", diags)
+	}
+	out, diags := l2mSettingModelToClient(ctx, model)
+	if diags.HasError() {
+		t.Fatalf("to client: %v", diags)
+	}
+
+	p := out.JsonParsers[0]
+	if p.DefaultInstanceName == nil || *p.DefaultInstanceName != "All" {
+		t.Errorf("defaultInstanceName = %v, want All", p.DefaultInstanceName)
+	}
+	if p.DataQualityAnomalyMetric == nil || !*p.DataQualityAnomalyMetric {
+		t.Errorf("dataQualityAnomalyMetric = %v, want true", p.DataQualityAnomalyMetric)
+	}
+
+	body, err := json.Marshal(p)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, key := range []string{`"defaultInstanceName":"All"`, `"dataQualityAnomalyMetric":true`} {
+		if !strings.Contains(string(body), key) {
+			t.Errorf("request body %s lacks %s", body, key)
+		}
 	}
 }

@@ -37,21 +37,23 @@ type L2MRegexParser struct {
 
 // L2MJsonParser represents a single JSON parser in L2M settings
 type L2MJsonParser struct {
-	MetricValueKey       *string               `json:"metricValueKey,omitempty"`
-	BaseValueKey         *string               `json:"baseValueKey,omitempty"`
-	InstanceNameKey      *string               `json:"instanceNameKey,omitempty"`
-	ContainerNameKey     *string               `json:"containerNameKey,omitempty"`
-	TimestampKey         *string               `json:"timestampKey,omitempty"`
-	TimestampFormat      *string               `json:"timestampFormat,omitempty"`
-	DataFilter           *string               `json:"dataFilter,omitempty"`
-	Operation            *int                  `json:"operation,omitempty"`
-	MetricName           *string               `json:"metricName,omitempty"`
-	AdditionalMetricName *string               `json:"additionalMetricName,omitempty"`
-	AggregationMode      *int                  `json:"aggregationMode,omitempty"`
-	GroupingByComponent  *bool                 `json:"groupingByComponent,omitempty"`
-	AggregationPeriod    *int                  `json:"aggregationPeriod,omitempty"`
-	ContainerType        *int                  `json:"containerType,omitempty"`
-	DerivedValueModel    *L2MDerivedValueModel `json:"derivedValueModel,omitempty"`
+	MetricValueKey           *string               `json:"metricValueKey,omitempty"`
+	BaseValueKey             *string               `json:"baseValueKey,omitempty"`
+	InstanceNameKey          *string               `json:"instanceNameKey,omitempty"`
+	ContainerNameKey         *string               `json:"containerNameKey,omitempty"`
+	TimestampKey             *string               `json:"timestampKey,omitempty"`
+	TimestampFormat          *string               `json:"timestampFormat,omitempty"`
+	DataFilter               *string               `json:"dataFilter,omitempty"`
+	Operation                *int                  `json:"operation,omitempty"`
+	MetricName               *string               `json:"metricName,omitempty"`
+	AdditionalMetricName     *string               `json:"additionalMetricName,omitempty"`
+	AggregationMode          *int                  `json:"aggregationMode,omitempty"`
+	GroupingByComponent      *bool                 `json:"groupingByComponent,omitempty"`
+	AggregationPeriod        *int                  `json:"aggregationPeriod,omitempty"`
+	ContainerType            *int                  `json:"containerType,omitempty"`
+	DerivedValueModel        *L2MDerivedValueModel `json:"derivedValueModel,omitempty"`
+	DefaultInstanceName      *string               `json:"defaultInstanceName,omitempty"`
+	DataQualityAnomalyMetric *bool                 `json:"dataQualityAnomalyMetric,omitempty"`
 }
 
 // L2MSetting represents a single L2M configuration entry (one per target metric project)
